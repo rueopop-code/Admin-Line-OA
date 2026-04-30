@@ -299,9 +299,75 @@
     th, td { padding: 8px 10px; font-size:12px; }
     .items-list { max-width:160px; }
   }
+
+  /* ═══════════════════════════════════════════════
+   *  PRINT STYLES — ใบสั่งซื้อ
+   * ═══════════════════════════════════════════════ */
+  #printArea { display: none; }
+
+  @media print {
+    @page { margin: 8mm; size: A5; }
+    body > *:not(#printArea) { display: none !important; }
+    #printArea {
+      display: block !important;
+      font-family: 'Sarabun', 'TH Sarabun New', sans-serif;
+      color: #000;
+      background: #fff;
+      padding: 0;
+      margin: 0;
+    }
+    .print-receipt {
+      page-break-after: always;
+      padding: 6mm 8mm;
+      box-sizing: border-box;
+      font-size: 11pt;
+      line-height: 1.4;
+    }
+    .print-receipt:last-child { page-break-after: auto; }
+    .pr-header {
+      display: flex; justify-content: space-between;
+      border-bottom: 2px solid #000; padding-bottom: 4mm; margin-bottom: 4mm;
+    }
+    .pr-shop { font-size: 14pt; font-weight: 700; margin: 0; }
+    .pr-tagline { font-size: 9pt; color: #555; margin: 0; }
+    .pr-orderid { font-size: 13pt; font-weight: 800; text-align: right; }
+    .pr-date { font-size: 9pt; color: #555; text-align: right; }
+    .pr-section { margin: 3mm 0; }
+    .pr-label { font-weight: 700; font-size: 9pt; color: #444; }
+    .pr-value { font-size: 11pt; }
+    .pr-row { padding: 2px 0; }
+    .print-receipt table { width: 100%; border-collapse: collapse; margin: 3mm 0; }
+    .print-receipt th, .print-receipt td {
+      padding: 4px 6px; border-bottom: 1px solid #ccc; text-align: left; font-size: 10pt;
+    }
+    .print-receipt th {
+      background: #000; color: #fff; font-weight: 700; font-size: 9pt;
+    }
+    .print-receipt td.num { text-align: right; white-space: nowrap; }
+    .pr-total {
+      margin-top: 4mm; padding: 3mm 4mm;
+      border: 2.5px solid #000; border-radius: 3mm;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .pr-total-label { font-size: 12pt; font-weight: 700; }
+    .pr-total-amount { font-size: 18pt; font-weight: 800; }
+    .pr-footer { margin-top: 5mm; text-align: center; font-size: 8pt; color: #888; border-top: 1px dashed #ccc; padding-top: 3mm; }
+    .pr-status {
+      display: inline-block; padding: 1px 10px;
+      border: 1.5px solid #000; border-radius: 10px;
+      font-size: 9pt; font-weight: 700;
+    }
+    .pr-note {
+      background: #fff8e1; border: 1px solid #ffa726;
+      padding: 3px 8px; margin-top: 2mm; font-size: 10pt; border-radius: 2mm;
+    }
+  }
 </style>
 </head>
 <body>
+
+<!-- Print area (hidden in screen, only shown when printing) -->
+<div id="printArea"></div>
 
 <header>
   <div class="admin-logo">
@@ -369,7 +435,12 @@
   <div class="orders-card">
     <div class="orders-head">
       <h2>รายการออเดอร์</h2>
-      <span id="last-updated" style="font-size:12px;color:var(--sub);">—</span>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <button onclick="printAllVisible()" title="🖨️ ปริ้นออเดอร์ที่เห็นทั้งหมด (ตามฟิลเตอร์)" style="padding:6px 12px;background:#f3e5f5;border:1.5px solid #6a1b9a;color:#6a1b9a;border-radius:8px;font-size:12px;font-family:'Sarabun',sans-serif;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
+          🖨️ ปริ้นทั้งหมด
+        </button>
+        <span id="last-updated" style="font-size:12px;color:var(--sub);">—</span>
+      </div>
     </div>
     <div id="table-wrap" style="overflow-x:auto;">
       <table>
@@ -830,6 +901,7 @@ function renderOrders(orders) {
           <div class="row-actions">
             <button class="icon-btn" title="แชท / ส่งข้อความ" onclick="openChatModal('${escapeAttr(o.order_id)}')">💬</button>
             ${isGhost ? '' : `<button class="icon-btn" title="📤 ส่งออเดอร์ให้ลูกค้าใน LINE" onclick="resendOrder('${escapeAttr(o.order_id)}')" style="background:#e8f5e9;color:#2e7d32;">📤</button>`}
+            ${isGhost ? '' : `<button class="icon-btn" title="🖨️ ปริ้นใบสั่งซื้อ" onclick="printOrder('${escapeAttr(o.order_id)}')" style="background:#f3e5f5;color:#6a1b9a;">🖨️</button>`}
             ${editBtn}
             <button class="icon-btn danger" title="ลบ" onclick="deleteOrder('${escapeAttr(o.order_id)}')">🗑️</button>
           </div>
@@ -924,6 +996,170 @@ function validateUserIdInput() {
 }
 
 // ─── RESEND ORDER (ส่ง Flex สรุปออเดอร์ให้ลูกค้าใน LINE) ───
+// ═══════════════════════════════════════════════════════
+//  PRINT — ปริ้นใบสั่งซื้อ
+// ═══════════════════════════════════════════════════════
+
+const STATUS_PR_LABELS = {
+  pending  : 'รอดำเนินการ',
+  sent     : 'ร้านได้รับแล้ว',
+  confirmed: 'ยืนยันแล้ว',
+  shipped  : 'กำลังจัดส่ง',
+  done     : 'เสร็จสิ้น',
+  cancelled: 'ยกเลิก',
+  failed   : 'ผิดพลาด'
+};
+
+// สร้าง HTML ของใบสั่งซื้อ 1 ใบ
+function buildPrintReceipt(o) {
+  const items = Array.isArray(o.items) ? o.items : [];
+  const itemsHtml = items.length ? items.map((i, idx) => {
+    const lineTotal = (i.qty || 1) * (i.price || 0);
+    const wholesale = (i.retailPrice && i.price && i.price < i.retailPrice)
+      ? ` <span style="font-size:8pt;color:#666;">(ราคาส่ง)</span>` : '';
+    return `<tr>
+      <td>${idx+1}</td>
+      <td>${escapeHtml((i.emoji||'') + ' ' + (i.name||''))}${wholesale}</td>
+      <td class="num">${i.qty||1}</td>
+      <td class="num">฿${(i.price||0).toLocaleString()}</td>
+      <td class="num">฿${lineTotal.toLocaleString()}</td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="5" style="text-align:center;color:#999;">— ไม่มีรายการ —</td></tr>';
+
+  const date = new Date(o.created_at).toLocaleString('th-TH', {
+    dateStyle: 'medium', timeStyle: 'short'
+  });
+  const status = o.status || 'pending';
+  const statusLabel = STATUS_PR_LABELS[status] || status;
+
+  // ที่อยู่จัดส่ง / pickup
+  const orderType = o.order_type || 'delivery';
+  const addrSection = orderType === 'delivery' && o.address
+    ? `<div class="pr-section">
+         <div class="pr-label">📍 ที่อยู่จัดส่ง</div>
+         <div class="pr-value">${escapeHtml(o.address)}</div>
+       </div>`
+    : `<div class="pr-section">
+         <div class="pr-label">📦 ประเภท</div>
+         <div class="pr-value">รับเอง / Pickup</div>
+       </div>`;
+
+  const noteSection = o.note
+    ? `<div class="pr-note">📝 หมายเหตุ: ${escapeHtml(o.note)}</div>`
+    : '';
+
+  return `<div class="print-receipt">
+    <div class="pr-header">
+      <div>
+        <h2 class="pr-shop">มนชิน ซัพพลาย</h2>
+        <div class="pr-tagline">สั่งง่าย ส่งไว ใจดี</div>
+      </div>
+      <div>
+        <div class="pr-orderid">#${escapeHtml(o.order_id)}</div>
+        <div class="pr-date">${date}</div>
+      </div>
+    </div>
+
+    <div class="pr-section">
+      <div class="pr-row" style="display:flex;justify-content:space-between;">
+        <div>
+          <span class="pr-label">ลูกค้า:</span>
+          <span class="pr-value"> <b>${escapeHtml(o.customer_name||'-')}</b></span>
+        </div>
+        <div>
+          <span class="pr-status">${statusLabel}</span>
+        </div>
+      </div>
+      ${o.phone ? `<div class="pr-row"><span class="pr-label">โทร:</span> <span class="pr-value">${escapeHtml(o.phone)}</span></div>` : ''}
+    </div>
+
+    ${addrSection}
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:8%;">#</th>
+          <th>รายการ</th>
+          <th class="num" style="width:12%;">จำนวน</th>
+          <th class="num" style="width:18%;">ราคา</th>
+          <th class="num" style="width:18%;">รวม</th>
+        </tr>
+      </thead>
+      <tbody>${itemsHtml}</tbody>
+    </table>
+
+    <div class="pr-total">
+      <span class="pr-total-label">ยอดรวมทั้งสิ้น</span>
+      <span class="pr-total-amount">฿${(o.total||0).toLocaleString()}</span>
+    </div>
+
+    ${noteSection}
+
+    <div class="pr-footer">
+      ขอบคุณที่อุดหนุนค่ะ ❤️ • พิมพ์เมื่อ ${new Date().toLocaleString('th-TH', {dateStyle:'short',timeStyle:'short'})}
+    </div>
+  </div>`;
+}
+
+// ปริ้น 1 ออเดอร์
+function printOrder(orderId) {
+  const o = allOrders.find(x => x.order_id === orderId);
+  if (!o) { toast('ไม่พบออเดอร์'); return; }
+  if (String(o.order_id).startsWith('LINE-')) {
+    toast('ปริ้น chat ไม่ได้', 'error'); return;
+  }
+
+  const html = buildPrintReceipt(o);
+  document.getElementById('printArea').innerHTML = html;
+  setTimeout(() => window.print(), 100);
+}
+
+// ปริ้นออเดอร์ที่เห็นทั้งหมด (ตาม filter ปัจจุบัน)
+function printAllVisible() {
+  // ใช้ logic เดียวกับ renderOrders ในการกรอง
+  const normPhone = (p) => String(p || '').replace(/\D/g, '');
+  const normName = (n) => String(n || '').trim().toLowerCase();
+
+  const realOrders = allOrders.filter(o => !String(o.order_id || '').startsWith('LINE-'));
+  const realLineUids = new Set(realOrders.map(o => o.line_user_id).filter(Boolean));
+  const realPhones   = new Set(realOrders.map(o => normPhone(o.phone)).filter(Boolean));
+  const realNames    = new Set(realOrders.map(o => normName(o.customer_name)).filter(Boolean));
+
+  let merged = allOrders.filter(o => {
+    const isGhost = String(o.order_id || '').startsWith('LINE-');
+    if (!isGhost) return true;
+    if (o.line_user_id && realLineUids.has(o.line_user_id)) return false;
+    if (o.phone && realPhones.has(normPhone(o.phone))) return false;
+    if (o.customer_name && realNames.has(normName(o.customer_name))) return false;
+    return true;
+  });
+
+  // apply filter
+  let list = merged;
+  if (currentFilter === 'line_chat') {
+    list = merged.filter(o => String(o.order_id || '').startsWith('LINE-'));
+  } else if (currentFilter !== 'all') {
+    list = merged.filter(o => (o.status || 'pending') === currentFilter
+                          && !String(o.order_id || '').startsWith('LINE-'));
+  }
+
+  // กรองออก ghost (ปริ้นไม่ได้)
+  list = list.filter(o => !String(o.order_id || '').startsWith('LINE-'));
+
+  if (!list.length) {
+    toast('ไม่มีออเดอร์ให้ปริ้น');
+    return;
+  }
+
+  if (list.length > 30) {
+    if (!confirm(`จะปริ้น ${list.length} ใบ ใช่ไหม?\n(แต่ละใบ = 1 หน้า A5)`)) return;
+  }
+
+  const html = list.map(o => buildPrintReceipt(o)).join('');
+  document.getElementById('printArea').innerHTML = html;
+  setTimeout(() => window.print(), 100);
+}
+
 async function resendOrder(orderId) {
   if (!confirm(`📤 ส่งสรุปออเดอร์ #${orderId} ไปให้ลูกค้าใน LINE?`)) return;
 
