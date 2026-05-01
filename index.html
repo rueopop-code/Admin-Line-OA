@@ -791,15 +791,23 @@ function renderOrders(orders) {
 
   // ── MERGE: ซ่อน ghost order ที่มีออเดอร์จริงผูกอยู่ ──
   // ghost = order_id ขึ้นต้นด้วย "LINE-" (จากลูกค้าทัก LINE มาก่อนสั่งของ)
-  // วิธี match: line_user_id เดียวกัน, phone เดียวกัน, หรือ ชื่อเดียวกัน
+  // วิธี match: line_user_id เดียวกัน, phone เดียวกัน, ชื่อ LINE เดียวกัน หรือ ชื่อจริงเดียวกัน
   const normPhone = (p) => String(p || '').replace(/\D/g, '');
   const normName = (n) => String(n || '').trim().toLowerCase();
+
+  // helper: รวบรวมชื่อทุกแบบของออเดอร์ (line_name + customer_name)
+  const orderNames = (o) => {
+    const arr = [];
+    if (o.line_name) arr.push(normName(o.line_name));
+    if (o.customer_name) arr.push(normName(o.customer_name));
+    return arr.filter(Boolean);
+  };
 
   // เก็บข้อมูลจากออเดอร์จริง (มี order ID ปกติ) ไว้สำหรับ matching
   const realOrders = orders.filter(o => !String(o.order_id || '').startsWith('LINE-'));
   const realLineUids = new Set(realOrders.map(o => o.line_user_id).filter(Boolean));
   const realPhones   = new Set(realOrders.map(o => normPhone(o.phone)).filter(Boolean));
-  const realNames    = new Set(realOrders.map(o => normName(o.customer_name)).filter(Boolean));
+  const realNames    = new Set(realOrders.flatMap(o => orderNames(o)));
 
   const merged = orders.filter(o => {
     const isGhost = String(o.order_id || '').startsWith('LINE-');
@@ -807,7 +815,9 @@ function renderOrders(orders) {
     // ghost — ซ่อนถ้ามีออเดอร์จริงของลูกค้าคนเดียวกันแล้ว
     if (o.line_user_id && realLineUids.has(o.line_user_id)) return false;
     if (o.phone && realPhones.has(normPhone(o.phone))) return false;
-    if (o.customer_name && realNames.has(normName(o.customer_name))) return false;
+    // เช็คชื่อทั้ง line_name และ customer_name
+    const ghostNames = orderNames(o);
+    if (ghostNames.some(n => realNames.has(n))) return false;
     return true;
   });
 
@@ -832,28 +842,25 @@ function renderOrders(orders) {
   tbody.innerHTML = list.map(o => {
     const isGhost = String(o.order_id || '').startsWith('LINE-');
     // หาว่ามี ghost ที่ผูกกับลูกค้าคนนี้ไหม → แสดง 💬 LINE chip
-    // match จาก line_user_id, phone, หรือ ชื่อ
     const myPhone = normPhone(o.phone);
-    const myName  = normName(o.customer_name);
-    const hasLineChat = !isGhost && orders.some(g =>
-      String(g.order_id || '').startsWith('LINE-') &&
-      g.line_user_id && (
-        (o.line_user_id && g.line_user_id === o.line_user_id) ||
-        (myPhone && normPhone(g.phone) === myPhone) ||
-        (myName && normName(g.customer_name) === myName)
-      )
-    );
+    const myNames = orderNames(o);
+    const hasLineChat = !isGhost && orders.some(g => {
+      if (!String(g.order_id || '').startsWith('LINE-') || !g.line_user_id) return false;
+      if (o.line_user_id && g.line_user_id === o.line_user_id) return true;
+      if (myPhone && normPhone(g.phone) === myPhone) return true;
+      const gNames = orderNames(g);
+      return myNames.some(n => gNames.includes(n));
+    });
 
     // หา line_user_id ของลูกค้า (จาก ghost ถ้าออเดอร์จริงยังไม่มี) — ใช้สำหรับ openChatModal
     let effectiveLineUid = o.line_user_id;
     if (!effectiveLineUid && hasLineChat) {
-      const ghost = orders.find(g =>
-        String(g.order_id || '').startsWith('LINE-') &&
-        g.line_user_id && (
-          (myPhone && normPhone(g.phone) === myPhone) ||
-          (myName && normName(g.customer_name) === myName)
-        )
-      );
+      const ghost = orders.find(g => {
+        if (!String(g.order_id || '').startsWith('LINE-') || !g.line_user_id) return false;
+        if (myPhone && normPhone(g.phone) === myPhone) return true;
+        const gNames = orderNames(g);
+        return myNames.some(n => gNames.includes(n));
+      });
       if (ghost) effectiveLineUid = ghost.line_user_id;
     }
 
@@ -889,10 +896,14 @@ function renderOrders(orders) {
     const editBtn = isGhost
       ? `<button class="icon-btn" title="🔗 ผูกบัญชี (ใส่เบอร์/ชื่อ)" onclick="openLinkModal('${escapeAttr(o.order_id)}')" style="background:#e3f2fd;color:#1565c0;">🔗</button>`
       : `<button class="icon-btn" title="แก้ไข" onclick="openEditModal('${escapeAttr(o.order_id)}')">✏️</button>`;
+    // แสดงชื่อจริงเป็นหลัก, ชื่อ LINE เป็นรอง (ถ้าต่างกัน)
+    const lineNameDisplay = (o.line_name && o.line_name !== o.customer_name)
+      ? `<small style="color:#06C755;font-size:10px;font-weight:600;">📱 ${escapeHtml(o.line_name)}</small><br>`
+      : '';
     return `
       <tr class="${isNew ? 'row-new' : ''}">
         <td>${orderIdDisplay}</td>
-        <td><strong>${escapeHtml(o.customer_name || '-')}</strong><br>${cidDisplay}</td>
+        <td><strong>${escapeHtml(o.customer_name || '-')}</strong><br>${lineNameDisplay}${cidDisplay}</td>
         <td><div class="items-list">${itemsText || '<em>—</em>'}</div></td>
         <td>${totalDisplay}</td>
         <td>${statusCell}</td>
