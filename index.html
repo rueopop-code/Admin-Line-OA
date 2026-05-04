@@ -724,7 +724,9 @@ async function loadOrders() {
   }
 
   try {
-    const { data, error } = await sb.from('orders').select('*').order('created_at', { ascending: false });
+    const { data, error } = await sb.from('orders').select('*')
+      .not('order_id', 'like', 'LINK-%')  // ✨ ซ่อน LINK- mapping rows
+      .order('created_at', { ascending: false });
     if (error) throw error;
     allOrders = data || [];
     renderOrders(allOrders);
@@ -766,7 +768,8 @@ function handleRealtimeChange(payload) {
   const { eventType, new: newRow, old: oldRow } = payload;
 
   if (eventType === 'INSERT') {
-    // ออเดอร์ใหม่เข้ามา
+    // ออเดอร์ใหม่เข้ามา (ข้าม LINK- mapping rows)
+    if (String(newRow.order_id || '').startsWith('LINK-')) return;
     if (!allOrders.find(o => o.order_id === newRow.order_id)) {
       allOrders.unshift(newRow);
       recentlyAddedIds.add(newRow.order_id);
@@ -818,6 +821,8 @@ function renderOrders(orders) {
   };
 
   // เก็บข้อมูลจากออเดอร์จริง (มี order ID ปกติ) ไว้สำหรับ matching
+  // ✨ กรอง LINK- rows ออกทั้งหมด — เป็นแค่ mapping record ไม่ใช่ออเดอร์จริง
+  orders = orders.filter(o => !String(o.order_id || '').startsWith('LINK-'));
   const realOrders = orders.filter(o => !String(o.order_id || '').startsWith('LINE-'));
   const realLineUids = new Set(realOrders.map(o => o.line_user_id).filter(Boolean));
   const realPhones   = new Set(realOrders.map(o => normPhone(o.phone)).filter(Boolean));
