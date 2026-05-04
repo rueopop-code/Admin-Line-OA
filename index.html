@@ -1005,21 +1005,41 @@ function renderStats(orders) {
 // ─── UPDATE STATUS ───
 async function updateStatus(orderId, status) {
   if (!sb) return;
+  const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
   try {
     const o = allOrders.find(x => x.order_id === orderId);
     const oldStatus = o ? o.status : null;
 
-    const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
-    if (error) throw error;
-    if (o) o.status = status;
-    renderStats(allOrders);
-    toast('อัปเดตสถานะแล้ว ✓', 'success');
+    // ✨ ถ้ามี backend URL → เรียก PATCH endpoint (จะส่ง LINE notification อัตโนมัติ)
+    if (backendUrl) {
+      const r = await fetch(`${backendUrl}/orders/${encodeURIComponent(orderId)}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || `HTTP ${r.status}`);
+      }
+      const result = await r.json();
+      if (o) o.status = status;
+      // อัปเดต array allOrders ด้วย row ที่ backend ส่งกลับ (ถ้ามี)
+      if (result.order) {
+        const idx = allOrders.findIndex(x => x.order_id === orderId);
+        if (idx >= 0) allOrders[idx] = result.order;
+      }
+    } else {
+      // fallback: ไม่มี backend URL → update Supabase ตรง (ไม่ส่ง LINE)
+      const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
+      if (error) throw error;
+      if (o) o.status = status;
+    }
 
-    // 🔔 Auto-notify: ส่งข้อความตามเทมเพลตให้ลูกค้า (ถ้าสถานะเปลี่ยนจริง และเปิด toggle)
-    //  หมายเหตุ: ไม่เรียก backend PATCH /orders/:id/status เพราะ:
-    //  (1) Supabase ถูกอัปเดตตรงๆ แล้ว
-    //  (2) /notify จัดการส่ง LINE ตามเทมเพลตของแอดมินอยู่แล้ว
-    //  ถ้าเรียก PATCH ด้วย ลูกค้าจะได้ข้อความซ้ำ 2 ครั้ง (เทมเพลต + hardcode)
+    renderOrders(allOrders);
+    renderStats(allOrders);
+
+    // ✨ ถ้าผ่าน backend แล้ว LINE notification ถูกส่งจาก server ไปแล้ว
+    // ยังคง auto-notify เทมเพลตเพิ่มเติม (message ใน web chat) ถ้า toggle เปิด
     const autoNotify = document.getElementById('autoNotifyToggle').checked;
     if (autoNotify && o && oldStatus !== status) {
       const tpls = getTemplates();
@@ -1027,9 +1047,12 @@ async function updateStatus(orderId, status) {
       if (tpl && tpl.trim()) {
         const text = fillTemplate(tpl, o);
         await sendMessage(o, text, { kind: 'system', silent: true });
-        toast(`🔔 ส่งแจ้งเตือนให้ลูกค้าแล้ว`, 'success');
+        toast(`🔔 เปลี่ยนสถานะ → ส่งแจ้งเตือน LINE แล้ว ✓`, 'success');
+        return;
       }
     }
+
+    toast('อัปเดตสถานะแล้ว ✓', 'success');
   } catch (e) {
     toast('อัปเดตไม่สำเร็จ: ' + e.message, 'error');
   }
