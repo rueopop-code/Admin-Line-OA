@@ -866,13 +866,16 @@ function renderOrders(orders) {
 
   const merged = orders.filter(o => {
     const isGhost = String(o.order_id || '').startsWith('LINE-');
-    if (!isGhost) return true;
-    // ghost — ซ่อนถ้ามีออเดอร์จริงของลูกค้าคนเดียวกันแล้ว
+    if (!isGhost) return true; // real order แสดงเสมอ — ไม่ filter ออกเด็ดขาด
+
+    // ghost — ซ่อนเฉพาะเมื่อมีออเดอร์จริงของลูกค้าคนเดียวกันแน่ๆ
+    // ✨ FIX: ใช้ line_user_id เป็น matching key หลัก (แม่นยำ 100%)
+    // ไม่ใช้ชื่อ เพราะชื่อซ้ำได้ (เช่น "PHONE") ทำให้ real order หาย
     if (o.line_user_id && realLineUids.has(o.line_user_id)) return false;
-    if (o.phone && realPhones.has(normPhone(o.phone))) return false;
-    // เช็คชื่อทั้ง line_name และ customer_name
-    const ghostNames = orderNames(o);
-    if (ghostNames.some(n => realNames.has(n))) return false;
+    // ใช้เบอร์โทรได้ถ้า phone มีความยาวพอ (>= 9 หลัก กันเบอร์สั้นผิดพลาด)
+    const gPhone = normPhone(o.phone);
+    if (gPhone.length >= 9 && realPhones.has(gPhone)) return false;
+    // ✨ ไม่ใช้ชื่อในการ match แล้ว — ชื่อซ้ำกันได้และทำให้ real order หายได้
     return true;
   });
 
@@ -945,12 +948,13 @@ function renderOrders(orders) {
     // หาว่ามี ghost ที่ผูกกับลูกค้าคนนี้ไหม → แสดง 💬 LINE chip
     const myPhone = normPhone(o.phone);
     const myNames = orderNames(o);
+    // ✨ FIX: hasLineChat ใช้ line_user_id + phone เท่านั้น ไม่ใช้ชื่อ
     const hasLineChat = !isGhost && orders.some(g => {
       if (!String(g.order_id || '').startsWith('LINE-') || !g.line_user_id) return false;
       if (o.line_user_id && g.line_user_id === o.line_user_id) return true;
-      if (myPhone && normPhone(g.phone) === myPhone) return true;
-      const gNames = orderNames(g);
-      return myNames.some(n => gNames.includes(n));
+      const gPhone = normPhone(g.phone);
+      if (myPhone.length >= 9 && gPhone === myPhone) return true;
+      return false;
     });
 
     // หา line_user_id ของลูกค้า (จาก ghost ถ้าออเดอร์จริงยังไม่มี) — ใช้สำหรับ openChatModal
@@ -958,9 +962,10 @@ function renderOrders(orders) {
     if (!effectiveLineUid && hasLineChat) {
       const ghost = orders.find(g => {
         if (!String(g.order_id || '').startsWith('LINE-') || !g.line_user_id) return false;
-        if (myPhone && normPhone(g.phone) === myPhone) return true;
-        const gNames = orderNames(g);
-        return myNames.some(n => gNames.includes(n));
+        if (o.line_user_id && g.line_user_id === o.line_user_id) return true;
+        const gPhone = normPhone(g.phone);
+        if (myPhone.length >= 9 && gPhone === myPhone) return true;
+        return false;
       });
       if (ghost) effectiveLineUid = ghost.line_user_id;
     }
