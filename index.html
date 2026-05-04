@@ -557,6 +557,39 @@
   </div>
 </div>
 
+<!-- ── MANUAL LINK MODAL (กรอก LINE User ID โดยตรง) ── -->
+<div class="modal-bg" id="manualLinkModal">
+  <div class="modal" style="max-width:460px;">
+    <div class="modal-hdr" style="background:linear-gradient(135deg,#06C755,#04a045);color:#fff;">
+      <h3>📱 ผูก LINE User ID ให้ออเดอร์</h3>
+      <button class="x" onclick="closeManualLinkModal()" style="color:#fff;">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#e8f5e9;color:#2e7d32;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:13px;line-height:1.6;">
+        💡 <b>วิธีได้ LINE User ID:</b> ให้ลูกค้าพิมพ์ <code style="background:#c8e6c9;padding:1px 5px;border-radius:4px;">id</code> ใน LINE OA — บอทจะส่ง ID กลับมา
+      </div>
+      <div id="mlOrderInfo" style="background:#f5f5f7;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;color:#555;"></div>
+      <div class="info-grid">
+        <label>LINE User ID</label>
+        <div>
+          <input type="text" id="mlUid" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                 style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:monospace;"
+                 oninput="validateMlUid()">
+          <div id="mlUidHint" style="font-size:11px;color:var(--sub);margin-top:4px;">ขึ้นต้นด้วย U ตามด้วย 32 ตัวอักษร</div>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:12px;cursor:pointer;">
+        <input type="checkbox" id="mlResendAfter" checked>
+        <span>ส่งสรุปออเดอร์ไปให้ลูกค้าหลังผูกบัญชีสำเร็จ</span>
+      </label>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeManualLinkModal()">ยกเลิก</button>
+      <button class="btn btn-primary" id="mlSaveBtn" onclick="saveManualLink()" style="background:var(--line);border-color:var(--line);">📱 ผูกบัญชี</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── CHAT MODAL ── -->
 <div class="modal-bg" id="chatModal">
   <div class="modal">
@@ -1273,20 +1306,13 @@ function printAllVisible() {
 }
 
 async function resendOrder(orderId) {
-  if (!confirm(`📤 ส่งสรุปออเดอร์ #${orderId} ไปให้ลูกค้าใน LINE?`)) return;
-
   const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
-  if (!backendUrl) {
-    toast('กรุณาตั้ง Backend URL ก่อน', 'error');
-    return;
-  }
+  if (!backendUrl) { toast('กรุณาตั้ง Backend URL ก่อน', 'error'); return; }
 
   toast('⏳ กำลังส่ง...', 'info');
 
   try {
-    const res = await fetch(`${backendUrl}/resend-order/${encodeURIComponent(orderId)}`, {
-      method: 'POST'
-    });
+    const res = await fetch(`${backendUrl}/resend-order/${encodeURIComponent(orderId)}`, { method: 'POST' });
     const result = await res.json().catch(() => ({}));
 
     if (res.ok && result.success) {
@@ -1296,11 +1322,103 @@ async function resendOrder(orderId) {
                 : 'customer_id ตรง';
       toast(`✅ ส่งออเดอร์แล้ว (${via})`, 'success');
     } else {
-      const hint = result.hint ? `\n\n💡 ${result.hint}` : '';
-      toast(`❌ ${result.error || 'ส่งไม่สำเร็จ'}${hint}`, 'error');
+      // ✨ ถ้า backend บอก no LINE user linked → เปิด modal ให้กรอก LINE User ID โดยตรง
+      if (result.error && result.error.includes('no LINE user')) {
+        openManualLinkModal(orderId);
+      } else {
+        toast(`❌ ${result.error || 'ส่งไม่สำเร็จ'}`, 'error');
+      }
     }
   } catch (e) {
-    toast('❌ เชื่อมต่อไม่ได้: ' + e.message, 'error');
+    // backend offline หรือ CORS → เปิด manual link modal เพื่อให้แอดมินผูกเองได้
+    openManualLinkModal(orderId);
+  }
+}
+
+// ── MANUAL LINK MODAL ──
+let manualLinkOrderId = null;
+
+function openManualLinkModal(orderId) {
+  const o = allOrders.find(x => x.order_id === orderId);
+  manualLinkOrderId = orderId;
+  document.getElementById('mlOrderInfo').innerHTML =
+    `📦 ออเดอร์ <b>#${escapeHtml(orderId)}</b> — ${escapeHtml(o?.customer_name || '-')} ` +
+    `<span style="color:var(--sub);">฿${(o?.total||0).toLocaleString()}</span>`;
+  document.getElementById('mlUid').value = '';
+  document.getElementById('mlUidHint').textContent = 'ขึ้นต้นด้วย U ตามด้วย 32 ตัวอักษร';
+  document.getElementById('mlUidHint').style.color = 'var(--sub)';
+  document.getElementById('manualLinkModal').classList.add('show');
+  setTimeout(() => document.getElementById('mlUid').focus(), 100);
+}
+
+function closeManualLinkModal() {
+  document.getElementById('manualLinkModal').classList.remove('show');
+  manualLinkOrderId = null;
+}
+
+function validateMlUid() {
+  const val = document.getElementById('mlUid').value.trim();
+  const hint = document.getElementById('mlUidHint');
+  if (!val) {
+    hint.textContent = 'ขึ้นต้นด้วย U ตามด้วย 32 ตัวอักษร';
+    hint.style.color = 'var(--sub)';
+  } else if (isValidLineUid(val)) {
+    hint.textContent = '✅ LINE User ID ถูกต้อง';
+    hint.style.color = 'var(--line)';
+  } else {
+    hint.textContent = '⚠️ ต้องเป็น U + 32 ตัวอักษร hex (รวม 33 ตัว)';
+    hint.style.color = '#e65100';
+  }
+}
+
+async function saveManualLink() {
+  if (!manualLinkOrderId || !sb) return;
+  const uid = document.getElementById('mlUid').value.trim();
+  if (!isValidLineUid(uid)) {
+    toast('LINE User ID ไม่ถูกต้อง', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('mlSaveBtn');
+  btn.disabled = true; btn.textContent = 'กำลังผูก...';
+
+  try {
+    // อัปเดต line_user_id ให้ออเดอร์นี้ + ออเดอร์อื่นของ customer เดิมด้วย
+    const o = allOrders.find(x => x.order_id === manualLinkOrderId);
+    const customerId = o?.customer_id;
+
+    if (customerId) {
+      await sb.from('orders').update({ line_user_id: uid }).eq('customer_id', customerId);
+    } else {
+      await sb.from('orders').update({ line_user_id: uid }).eq('order_id', manualLinkOrderId);
+    }
+
+    // อัปเดต allOrders ใน memory
+    allOrders.forEach(x => {
+      if (x.order_id === manualLinkOrderId || (customerId && x.customer_id === customerId)) {
+        x.line_user_id = uid;
+      }
+    });
+    renderOrders(allOrders);
+
+    toast('✅ ผูก LINE User ID แล้ว', 'success');
+
+    // ถ้าติ๊ก "ส่งสรุปออเดอร์หลังผูก" → ลอง resend ผ่าน backend
+    const shouldResend = document.getElementById('mlResendAfter').checked;
+    closeManualLinkModal();
+
+    if (shouldResend) {
+      const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
+      if (backendUrl) {
+        await new Promise(r => setTimeout(r, 600)); // รอ DB propagate
+        const r2 = await fetch(`${backendUrl}/resend-order/${encodeURIComponent(manualLinkOrderId || o?.order_id)}`, { method: 'POST' }).catch(() => null);
+        if (r2?.ok) toast('📤 ส่งสรุปออเดอร์ให้ลูกค้าแล้ว ✓', 'success');
+      }
+    }
+  } catch (e) {
+    toast('ผูกไม่สำเร็จ: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '📱 ผูกบัญชี';
   }
 }
 
@@ -1779,6 +1897,7 @@ document.addEventListener('keydown', e => {
     if (document.getElementById('editModal').classList.contains('show')) closeEditModal();
     else if (document.getElementById('chatModal').classList.contains('show')) closeChatModal();
     else if (document.getElementById('tplModal').classList.contains('show')) closeTemplatesModal();
+    else if (document.getElementById('manualLinkModal').classList.contains('show')) closeManualLinkModal();
   }
 });
 </script>
