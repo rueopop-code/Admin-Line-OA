@@ -450,6 +450,9 @@
     <div class="orders-head">
       <h2>รายการออเดอร์</h2>
       <div style="display:flex;align-items:center;gap:10px;">
+        <button onclick="autoLinkAll()" id="autoLinkAllBtn" title="🔗 ลอง Auto-Link ออเดอร์ที่ยังไม่ผูก LINE กับ line_users ทั้งหมด" style="padding:6px 12px;background:#e8f5e9;border:1.5px solid #06C755;color:#04a045;border-radius:8px;font-size:12px;font-family:'Sarabun',sans-serif;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
+          🔗 Auto-Link ทั้งหมด
+        </button>
         <button onclick="printAllVisible()" title="🖨️ ปริ้นออเดอร์ที่เห็นทั้งหมด (ตามฟิลเตอร์)" style="padding:6px 12px;background:#f3e5f5;border:1.5px solid #6a1b9a;color:#6a1b9a;border-radius:8px;font-size:12px;font-family:'Sarabun',sans-serif;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
           🖨️ ปริ้นทั้งหมด
         </button>
@@ -1393,6 +1396,13 @@ async function saveManualLink() {
       await sb.from('orders').update({ line_user_id: uid }).eq('order_id', manualLinkOrderId);
     }
 
+    // ✨ FIX Bug 3: upsert ลง line_users เพื่อให้ auto-link ครั้งถัดไปเจอทันที
+    try {
+      const luRow = { user_id: uid, last_seen: new Date().toISOString() };
+      if (customerId) luRow.customer_id = customerId;
+      await sb.from('line_users').upsert([luRow], { onConflict: 'user_id' });
+    } catch(e) { console.warn('upsert line_users failed:', e.message); }
+
     // อัปเดต allOrders ใน memory
     allOrders.forEach(x => {
       if (x.order_id === manualLinkOrderId || (customerId && x.customer_id === customerId)) {
@@ -1419,6 +1429,63 @@ async function saveManualLink() {
     toast('ผูกไม่สำเร็จ: ' + e.message, 'error');
   } finally {
     btn.disabled = false; btn.textContent = '📱 ผูกบัญชี';
+  }
+}
+
+// ── AUTO-LINK ALL (ปุ่มในหัวตาราง) ──────────────────────────
+// ลอง match orders ที่ยังไม่มี line_user_id กับ line_users table ด้วย customer_id
+async function autoLinkAll() {
+  if (!sb) { toast('ยังไม่ได้เชื่อมต่อ Supabase', 'error'); return; }
+
+  const btn = document.getElementById('autoLinkAllBtn');
+  btn.disabled = true; btn.textContent = '⏳ กำลัง Link...';
+
+  try {
+    // ✨ วิธีที่ 1: ดึง line_users ทุกแถวที่มี customer_id แล้ว batch update orders
+    const { data: luRows, error: luErr } = await sb.from('line_users')
+      .select('user_id, customer_id')
+      .not('customer_id', 'is', null);
+    if (luErr) throw luErr;
+
+    let linked = 0;
+    for (const lu of (luRows || [])) {
+      const { data: updated } = await sb.from('orders')
+        .update({ line_user_id: lu.user_id })
+        .eq('customer_id', lu.customer_id)
+        .is('line_user_id', null)
+        .select('order_id');
+      if (updated?.length) {
+        linked += updated.length;
+        updated.forEach(o => {
+          const ord = allOrders.find(x => x.order_id === o.order_id);
+          if (ord) ord.line_user_id = lu.user_id;
+        });
+      }
+    }
+
+    // ✨ วิธีที่ 2: เรียก backend /backfill-line-links สำรอง (จับคู่ด้วย phone/name)
+    const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
+    let backfillCount = 0;
+    if (backendUrl) {
+      try {
+        const r = await fetch(`${backendUrl}/backfill-line-links`, { method: 'POST' });
+        const result = await r.json().catch(() => ({}));
+        backfillCount = result.updated || 0;
+      } catch(e) { console.warn('backfill call failed:', e.message); }
+    }
+
+    const total = linked + backfillCount;
+    renderOrders(allOrders);
+    if (total > 0) {
+      toast(`✅ Auto-Link สำเร็จ ${total} ออเดอร์`, 'success');
+      await loadOrders();
+    } else {
+      toast('ℹ️ ไม่พบออเดอร์ที่ต้อง Link เพิ่ม', '');
+    }
+  } catch (e) {
+    toast('Auto-Link ไม่สำเร็จ: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔗 Auto-Link ทั้งหมด';
   }
 }
 
