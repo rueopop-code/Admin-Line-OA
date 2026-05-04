@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — Monshin supply</title>
+<title>Admin - Monshinsupply</title>
 <link rel="icon" type="image/png" href="file:///C:/Users/dealInTrend/Desktop/logo%20%E0%B8%A3%E0%B9%89%E0%B8%B2%E0%B8%99%20%E0%B8%97%E0%B8%A3%E0%B8%87%E0%B8%81%E0%B8%A5%E0%B8%A1.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
@@ -75,16 +75,12 @@
 
   /* Filter bar */
   .filter-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
-  #searchInput:focus { border-color:#1d1d1f; box-shadow:0 0 0 3px rgba(29,29,31,0.08); }
-  #searchInput::placeholder { color:#aaa; }
-  #searchClearBtn:hover { background:#e0e0e0; color:#333; }
   .fchip {
     padding:5px 12px; border-radius:16px; border:1px solid var(--border);
     background:#fff; font-size:12px; cursor:pointer; transition:.15s;
     color:var(--sub); font-family:inherit;
   }
   .fchip.active { background:#1d1d1f; color:#fff; border-color:#1d1d1f; }
-  mark.search-hl { background:#fff59d; color:#d84315; padding:0 2px; border-radius:2px; font-weight:700; }
 
   /* Orders table */
   .orders-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
@@ -376,7 +372,7 @@
 
 <header>
   <div class="admin-logo">
-    Admin — Monshin<span>supply</span>
+    Admin — Monshin<span>Supply</span>
     <span id="liveDot" class="live-dot" title="สถานะเรียลไทม์"></span>
   </div>
   <div class="hdr-right">
@@ -415,15 +411,6 @@
     <div class="stat-card orange"><div class="stat-num">—</div><div class="stat-label">รอดำเนินการ</div></div>
     <div class="stat-card blue"><div class="stat-num">—</div><div class="stat-label">ยืนยันแล้ว</div></div>
     <div class="stat-card green"><div class="stat-num">—</div><div class="stat-label">รายได้รวม (฿)</div></div>
-  </div>
-
-  <!-- 🔍 Search Bar -->
-  <div style="margin-bottom:10px;position:relative;">
-    <input type="text" id="searchInput" placeholder="🔍 ค้นหา: ชื่อลูกค้า, ชื่อ LINE, เบอร์โทร, เลขออเดอร์..." 
-           oninput="renderOrders(allOrders)"
-           style="width:100%;padding:10px 38px 10px 14px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;font-family:'Sarabun',sans-serif;background:#fff;outline:none;transition:.15s;">
-    <button id="searchClearBtn" onclick="clearSearch()" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:#f0f0f0;border:none;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:13px;font-weight:700;color:#666;">×</button>
-    <div id="searchResultCount" style="display:none;margin-top:6px;font-size:12px;color:var(--sub);padding-left:4px;"></div>
   </div>
 
   <div class="filter-bar" id="filterBar" style="justify-content:space-between;">
@@ -845,56 +832,10 @@ function renderOrders(orders) {
   }
   // 'all' = แสดงทุกอย่าง รวม ghost ที่ยังไม่มีออเดอร์จริง
 
-  // 🔍 Search filter (ทำหลัง status filter)
-  const searchInput = document.getElementById('searchInput');
-  const searchTerm = searchInput ? searchInput.value.trim().toLowerCase() : '';
-  const searchClearBtn = document.getElementById('searchClearBtn');
-  const searchResultCount = document.getElementById('searchResultCount');
-
-  if (searchTerm) {
-    const searchPhone = searchTerm.replace(/\D/g, ''); // เบอร์โทร — ตัด dash/space
-    list = list.filter(o => {
-      // เลขออเดอร์
-      if (String(o.order_id || '').toLowerCase().includes(searchTerm)) return true;
-      // ชื่อลูกค้า
-      if (String(o.customer_name || '').toLowerCase().includes(searchTerm)) return true;
-      // ชื่อ LINE
-      if (String(o.line_name || '').toLowerCase().includes(searchTerm)) return true;
-      // เบอร์โทร (เปรียบเทียบเฉพาะตัวเลข)
-      if (searchPhone && searchPhone.length >= 3) {
-        const orderPhone = String(o.phone || '').replace(/\D/g, '');
-        if (orderPhone.includes(searchPhone)) return true;
-      }
-      // customer_id
-      if (String(o.customer_id || '').toLowerCase().includes(searchTerm)) return true;
-      // ที่อยู่
-      if (String(o.address || '').toLowerCase().includes(searchTerm)) return true;
-      // ในรายการสินค้า
-      if (Array.isArray(o.items)) {
-        for (const item of o.items) {
-          if (String(item.name || '').toLowerCase().includes(searchTerm)) return true;
-        }
-      }
-      return false;
-    });
-
-    // แสดงผลลัพธ์การค้นหา
-    if (searchClearBtn) searchClearBtn.style.display = 'block';
-    if (searchResultCount) {
-      searchResultCount.style.display = 'block';
-      searchResultCount.innerHTML = `🔍 พบ <b>${list.length}</b> รายการ จากคำค้น "<b>${escapeHtml(searchTerm)}</b>"`;
-    }
-  } else {
-    if (searchClearBtn) searchClearBtn.style.display = 'none';
-    if (searchResultCount) searchResultCount.style.display = 'none';
-  }
-
   if (!list.length) {
-    const emptyMsg = searchTerm
-      ? `ไม่พบรายการที่ตรงกับ "${escapeHtml(searchTerm)}"`
-      : (currentFilter === 'line_chat'
-        ? 'ยังไม่มีลูกค้าทักเข้ามาทาง LINE OA (ที่ยังไม่ได้สั่งสินค้า)'
-        : 'ยังไม่มีออเดอร์');
+    const emptyMsg = currentFilter === 'line_chat'
+      ? 'ยังไม่มีลูกค้าทักเข้ามาทาง LINE OA (ที่ยังไม่ได้สั่งสินค้า)'
+      : 'ยังไม่มีออเดอร์';
     tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${emptyMsg}</td></tr>`;
     return;
   }
@@ -1709,15 +1650,8 @@ function isValidLineUid(uid) {
   return typeof uid === 'string' && /^U[0-9a-f]{32}$/i.test(uid);
 }
 function escapeHtml(s) {
-  return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-
-// 🔍 ล้างคำค้นหา
-function clearSearch() {
-  const inp = document.getElementById('searchInput');
-  if (inp) inp.value = '';
-  renderOrders(allOrders);
-  if (inp) inp.focus();
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 }
 function escapeAttr(s) {
   return String(s ?? '').replace(/['"\\]/g, '\\$&');
