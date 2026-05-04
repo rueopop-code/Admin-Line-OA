@@ -1006,56 +1006,69 @@ function renderStats(orders) {
 async function updateStatus(orderId, status) {
   if (!sb) return;
   const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
-  try {
-    const o = allOrders.find(x => x.order_id === orderId);
-    const oldStatus = o ? o.status : null;
+  const o = allOrders.find(x => x.order_id === orderId);
+  const oldStatus = o ? o.status : null;
+  let viaBackend = false;
 
-    // ✨ ถ้ามี backend URL → เรียก PATCH endpoint (จะส่ง LINE notification อัตโนมัติ)
-    if (backendUrl) {
+  // ลอง backend ก่อน (ส่ง LINE อัตโนมัติ)
+  if (backendUrl) {
+    try {
       const r = await fetch(`${backendUrl}/orders/${encodeURIComponent(orderId)}/status`, {
-        method: 'PATCH',
+        method : 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
+        body   : JSON.stringify({ status })
       });
-      if (!r.ok) {
+      if (r.ok) {
+        const result = await r.json().catch(() => ({}));
+        if (o) o.status = status;
+        if (result.order) {
+          const idx = allOrders.findIndex(x => x.order_id === orderId);
+          if (idx >= 0) allOrders[idx] = result.order;
+        }
+        viaBackend = true;
+      } else {
         const err = await r.json().catch(() => ({}));
-        throw new Error(err.error || `HTTP ${r.status}`);
+        console.warn('backend PATCH failed:', err.error || r.status, '— fallback to Supabase direct');
       }
-      const result = await r.json();
-      if (o) o.status = status;
-      // อัปเดต array allOrders ด้วย row ที่ backend ส่งกลับ (ถ้ามี)
-      if (result.order) {
-        const idx = allOrders.findIndex(x => x.order_id === orderId);
-        if (idx >= 0) allOrders[idx] = result.order;
-      }
-    } else {
-      // fallback: ไม่มี backend URL → update Supabase ตรง (ไม่ส่ง LINE)
+    } catch (fetchErr) {
+      // CORS / network error — fallback โดยไม่ throw
+      console.warn('backend unreachable:', fetchErr.message, '— fallback to Supabase direct');
+    }
+  }
+
+  // Fallback: อัปเดต Supabase ตรงถ้า backend ไม่พร้อม
+  if (!viaBackend) {
+    try {
       const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
       if (error) throw error;
       if (o) o.status = status;
+    } catch (e) {
+      toast('อัปเดตไม่สำเร็จ: ' + e.message, 'error');
+      return;
     }
-
-    renderOrders(allOrders);
-    renderStats(allOrders);
-
-    // ✨ ถ้าผ่าน backend แล้ว LINE notification ถูกส่งจาก server ไปแล้ว
-    // ยังคง auto-notify เทมเพลตเพิ่มเติม (message ใน web chat) ถ้า toggle เปิด
-    const autoNotify = document.getElementById('autoNotifyToggle').checked;
-    if (autoNotify && o && oldStatus !== status) {
-      const tpls = getTemplates();
-      const tpl  = tpls[status];
-      if (tpl && tpl.trim()) {
-        const text = fillTemplate(tpl, o);
-        await sendMessage(o, text, { kind: 'system', silent: true });
-        toast(`🔔 เปลี่ยนสถานะ → ส่งแจ้งเตือน LINE แล้ว ✓`, 'success');
-        return;
-      }
-    }
-
-    toast('อัปเดตสถานะแล้ว ✓', 'success');
-  } catch (e) {
-    toast('อัปเดตไม่สำเร็จ: ' + e.message, 'error');
   }
+
+  renderOrders(allOrders);
+  renderStats(allOrders);
+
+  // Auto-notify เทมเพลต
+  const autoNotify = document.getElementById('autoNotifyToggle').checked;
+  if (autoNotify && o && oldStatus !== status) {
+    const tpls = getTemplates();
+    const tpl  = tpls[status];
+    if (tpl && tpl.trim()) {
+      const text = fillTemplate(tpl, o);
+      await sendMessage(o, text, { kind: 'system', silent: true });
+      toast(viaBackend
+        ? '🔔 เปลี่ยนสถานะ + ส่ง LINE แล้ว ✓'
+        : '✅ อัปเดตสถานะแล้ว (LINE ไม่พร้อม — backend offline)', 'success');
+      return;
+    }
+  }
+
+  toast(viaBackend
+    ? '✅ อัปเดตสถานะ + ส่ง LINE แล้ว ✓'
+    : '✅ อัปเดตสถานะแล้ว (LINE ไม่พร้อม — backend offline)', 'success');
 }
 
 // ─── DELETE ORDER ───
