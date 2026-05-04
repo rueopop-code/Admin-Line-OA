@@ -999,9 +999,12 @@ function renderOrders(orders) {
               `<option value="${val}" ${val===st?'selected':''}>${label}</option>`
             ).join('')}
           </select>`;
+    // ✨ FIX: real order ที่ยังไม่มี line_user_id → ปุ่ม 🔗 auto-link อัตโนมัติ
     const editBtn = isGhost
       ? `<button class="icon-btn" title="🔗 ผูกบัญชี (ใส่เบอร์/ชื่อ)" onclick="openLinkModal('${escapeAttr(o.order_id)}')" style="background:#e3f2fd;color:#1565c0;">🔗</button>`
-      : `<button class="icon-btn" title="แก้ไข" onclick="openEditModal('${escapeAttr(o.order_id)}')">✏️</button>`;
+      : (!o.line_user_id
+          ? `<button class="icon-btn" title="🔗 ผูก LINE อัตโนมัติ" onclick="autoLinkOrder('${escapeAttr(o.order_id)}')" style="background:#fff8e1;color:#f57f17;border-color:#ffca28;">🔗</button>`
+          : `<button class="icon-btn" title="แก้ไข" onclick="openEditModal('${escapeAttr(o.order_id)}')">✏️</button>`);
     // แสดงชื่อจริงเป็นหลัก, ชื่อ LINE เป็นรอง (ถ้าต่างกัน)
     const lineNameDisplay = (o.line_name && o.line_name !== o.customer_name)
       ? `<small style="color:#06C755;font-size:10px;font-weight:600;">📱 ${escapeHtml(o.line_name)}</small><br>`
@@ -1338,8 +1341,86 @@ async function resendOrder(orderId) {
       }
     }
   } catch (e) {
-    // backend offline หรือ CORS → เปิด manual link modal เพื่อให้แอดมินผูกเองได้
-    openManualLinkModal(orderId);
+    // backend offline หรือ CORS → ลอง auto-link ผ่าน Supabase ก่อน
+    const linked = await autoLinkOrder(orderId, { silent: true });
+    if (!linked) openManualLinkModal(orderId);
+  }
+}
+
+// ── AUTO-LINK ORDER (ค้น LINK- row ใน Supabase แล้ว update orders โดยตรง) ──
+// เรียกได้ทั้งจากปุ่ม 🔗 และจาก resendOrder ตอน backend offline
+async function autoLinkOrder(orderId, opts = {}) {
+  const silent = opts.silent || false;
+  if (!sb) { if (!silent) toast('ยังไม่ได้เชื่อมต่อ Supabase', 'error'); return false; }
+
+  const o = allOrders.find(x => x.order_id === orderId);
+  if (!o) return false;
+
+  // ถ้ามี line_user_id อยู่แล้ว → ไม่ต้องทำอะไร
+  if (o.line_user_id) {
+    if (!silent) toast('✅ ผูกบัญชีอยู่แล้ว', 'success');
+    return true;
+  }
+
+  if (!silent) toast('⏳ กำลังค้นหา LINE User...', '');
+
+  try {
+    const customerId = o.customer_id;
+    let lineUid = null;
+
+    // วิธีที่ 1: ค้น LINK-{customerId} row โดยตรง (แม่นที่สุด)
+    if (!lineUid && customerId) {
+      const linkRowId = 'LINK-' + customerId.slice(0, 20);
+      const { data: lr } = await sb.from('orders')
+        .select('line_user_id').eq('order_id', linkRowId)
+        .not('line_user_id', 'is', null).maybeSingle();
+      if (lr?.line_user_id) { lineUid = lr.line_user_id; console.log('🔗 found via LINK- row'); }
+    }
+
+    // วิธีที่ 2: ค้น line_users.customer_id
+    if (!lineUid && customerId) {
+      const { data: lu } = await sb.from('line_users')
+        .select('user_id').eq('customer_id', customerId)
+        .order('last_seen', { ascending: false }).limit(1).maybeSingle();
+      if (lu?.user_id) { lineUid = lu.user_id; console.log('🔗 found via line_users.customer_id'); }
+    }
+
+    // วิธีที่ 3: ค้น LINE- ghost ด้วย phone (>= 9 หลัก เท่านั้น)
+    if (!lineUid && o.phone) {
+      const normP = o.phone.replace(/\D/g, '');
+      if (normP.length >= 9) {
+        const { data: ghosts } = await sb.from('orders')
+          .select('line_user_id').like('order_id', 'LINE-%')
+          .eq('phone', normP).not('line_user_id', 'is', null).limit(1);
+        if (ghosts?.[0]?.line_user_id) { lineUid = ghosts[0].line_user_id; console.log('🔗 found via ghost phone'); }
+      }
+    }
+
+    if (!lineUid) {
+      if (!silent) toast('❌ ยังไม่พบ LINE User — ลูกค้ายังไม่ได้เปิดร้านผ่าน LINE', 'error');
+      return false;
+    }
+
+    // อัปเดต line_user_id ให้ทุกออเดอร์ของ customer นี้
+    if (customerId) {
+      await sb.from('orders').update({ line_user_id: lineUid }).eq('customer_id', customerId);
+    } else {
+      await sb.from('orders').update({ line_user_id: lineUid }).eq('order_id', orderId);
+    }
+
+    // อัปเดต allOrders ใน memory
+    allOrders.forEach(x => {
+      if (x.order_id === orderId || (customerId && x.customer_id === customerId)) {
+        x.line_user_id = lineUid;
+      }
+    });
+    renderOrders(allOrders);
+    if (!silent) toast('✅ ผูก LINE อัตโนมัติสำเร็จ!', 'success');
+    return true;
+
+  } catch (e) {
+    if (!silent) toast('ผูกไม่สำเร็จ: ' + e.message, 'error');
+    return false;
   }
 }
 
