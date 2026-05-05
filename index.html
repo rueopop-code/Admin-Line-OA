@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Admin — Monshin supply</title>
-<link rel="icon" type="image/png" href="file:///C:/Users/dealInTrend/Desktop/logo%20%E0%B8%A3%E0%B9%89%E0%B8%B2%E0%B8%99%20%E0%B8%97%E0%B8%A3%E0%B8%87%E0%B8%81%E0%B8%A5%E0%B8%A1.png">
+<title>Admin — Maejai Shop</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -376,7 +375,7 @@
 
 <header>
   <div class="admin-logo">
-    Admin — Monshin<span>supply</span>
+    Admin — Maejai<span>Shop</span>
     <span id="liveDot" class="live-dot" title="สถานะเรียลไทม์"></span>
   </div>
   <div class="hdr-right">
@@ -405,7 +404,7 @@
     </div>
     <div class="config-field">
       <label>BACKEND URL (option, สำหรับ LINE)</label>
-      <input type="text" id="backend-url" placeholder="https://YOUR-APP.up.railway.app" value="https://lineoa-production-a8e8.up.railway.app">
+      <input type="text" id="backend-url" placeholder="https://YOUR-APP.up.railway.app" value="">
     </div>
     <button class="load-btn" onclick="connectAndLoad()">เชื่อมต่อ</button>
   </div>
@@ -450,9 +449,6 @@
     <div class="orders-head">
       <h2>รายการออเดอร์</h2>
       <div style="display:flex;align-items:center;gap:10px;">
-        <button onclick="autoLinkAll()" id="autoLinkAllBtn" title="🔗 ลอง Auto-Link ออเดอร์ที่ยังไม่ผูก LINE กับ line_users ทั้งหมด" style="padding:6px 12px;background:#e8f5e9;border:1.5px solid #06C755;color:#04a045;border-radius:8px;font-size:12px;font-family:'Sarabun',sans-serif;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
-          🔗 Auto-Link ทั้งหมด
-        </button>
         <button onclick="printAllVisible()" title="🖨️ ปริ้นออเดอร์ที่เห็นทั้งหมด (ตามฟิลเตอร์)" style="padding:6px 12px;background:#f3e5f5;border:1.5px solid #6a1b9a;color:#6a1b9a;border-radius:8px;font-size:12px;font-family:'Sarabun',sans-serif;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:4px;">
           🖨️ ปริ้นทั้งหมด
         </button>
@@ -479,6 +475,31 @@
     </div>
   </div>
 
+</div>
+
+<!-- ── MAP MODAL ── -->
+<div class="modal-bg" id="mapModal">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-hdr">
+      <h3>📍 แผนที่จัดส่ง <code id="mapOrderId" style="font-size:13px;color:var(--sub);margin-left:6px;"></code></h3>
+      <button class="x" onclick="closeMapModal()">×</button>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <div id="mapInfo" style="padding:14px 18px;background:#fff3e0;border-bottom:1px solid #ffb74d;font-size:13px;line-height:1.5;"></div>
+      <div style="padding:14px 18px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button onclick="openInGoogleMaps()" style="flex:1;padding:10px 14px;background:#4285F4;border:none;color:#fff;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          🗺️ เปิดใน Google Maps
+        </button>
+        <button onclick="openInGoogleMapsDirections()" style="flex:1;padding:10px 14px;background:#34A853;border:none;color:#fff;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          🚗 ดูเส้นทาง (Directions)
+        </button>
+        <button onclick="copyMapCoords()" style="padding:10px 14px;background:#fff;border:1.5px solid #888;color:#666;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;font-weight:600;cursor:pointer;">
+          📋 คัดลอกพิกัด
+        </button>
+      </div>
+      <iframe id="mapIframe" style="width:100%;height:400px;border:0;display:block;" allowfullscreen loading="lazy"></iframe>
+    </div>
+  </div>
 </div>
 
 <!-- ── EDIT ORDER MODAL ── -->
@@ -556,39 +577,6 @@
     <div class="modal-ftr">
       <button class="btn" onclick="closeLinkModal()">ยกเลิก</button>
       <button class="btn btn-primary" onclick="saveLinkGhost()" style="background:linear-gradient(135deg,#1976d2,#0d47a1);">🔗 ผูกและรวมข้อมูล</button>
-    </div>
-  </div>
-</div>
-
-<!-- ── MANUAL LINK MODAL (กรอก LINE User ID โดยตรง) ── -->
-<div class="modal-bg" id="manualLinkModal">
-  <div class="modal" style="max-width:460px;">
-    <div class="modal-hdr" style="background:linear-gradient(135deg,#06C755,#04a045);color:#fff;">
-      <h3>📱 ผูก LINE User ID ให้ออเดอร์</h3>
-      <button class="x" onclick="closeManualLinkModal()" style="color:#fff;">×</button>
-    </div>
-    <div class="modal-body">
-      <div style="background:#e8f5e9;color:#2e7d32;padding:12px 16px;border-radius:10px;margin-bottom:16px;font-size:13px;line-height:1.6;">
-        💡 <b>วิธีได้ LINE User ID:</b> ให้ลูกค้าพิมพ์ <code style="background:#c8e6c9;padding:1px 5px;border-radius:4px;">id</code> ใน LINE OA — บอทจะส่ง ID กลับมา
-      </div>
-      <div id="mlOrderInfo" style="background:#f5f5f7;padding:10px 14px;border-radius:8px;margin-bottom:14px;font-size:13px;color:#555;"></div>
-      <div class="info-grid">
-        <label>LINE User ID</label>
-        <div>
-          <input type="text" id="mlUid" placeholder="Uxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                 style="width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:8px;font-size:13px;font-family:monospace;"
-                 oninput="validateMlUid()">
-          <div id="mlUidHint" style="font-size:11px;color:var(--sub);margin-top:4px;">ขึ้นต้นด้วย U ตามด้วย 32 ตัวอักษร</div>
-        </div>
-      </div>
-      <label style="display:flex;align-items:center;gap:8px;font-size:13px;margin-top:12px;cursor:pointer;">
-        <input type="checkbox" id="mlResendAfter" checked>
-        <span>ส่งสรุปออเดอร์ไปให้ลูกค้าหลังผูกบัญชีสำเร็จ</span>
-      </label>
-    </div>
-    <div class="modal-ftr">
-      <button class="btn" onclick="closeManualLinkModal()">ยกเลิก</button>
-      <button class="btn btn-primary" id="mlSaveBtn" onclick="saveManualLink()" style="background:var(--line);border-color:var(--line);">📱 ผูกบัญชี</button>
     </div>
   </div>
 </div>
@@ -760,9 +748,7 @@ async function loadOrders() {
   }
 
   try {
-    const { data, error } = await sb.from('orders').select('*')
-      .not('order_id', 'like', 'LINK-%')  // ✨ ซ่อน LINK- mapping rows
-      .order('created_at', { ascending: false });
+    const { data, error } = await sb.from('orders').select('*').order('created_at', { ascending: false });
     if (error) throw error;
     allOrders = data || [];
     renderOrders(allOrders);
@@ -804,8 +790,7 @@ function handleRealtimeChange(payload) {
   const { eventType, new: newRow, old: oldRow } = payload;
 
   if (eventType === 'INSERT') {
-    // ออเดอร์ใหม่เข้ามา (ข้าม LINK- mapping rows)
-    if (String(newRow.order_id || '').startsWith('LINK-')) return;
+    // ออเดอร์ใหม่เข้ามา
     if (!allOrders.find(o => o.order_id === newRow.order_id)) {
       allOrders.unshift(newRow);
       recentlyAddedIds.add(newRow.order_id);
@@ -857,8 +842,6 @@ function renderOrders(orders) {
   };
 
   // เก็บข้อมูลจากออเดอร์จริง (มี order ID ปกติ) ไว้สำหรับ matching
-  // ✨ กรอง LINK- rows ออกทั้งหมด — เป็นแค่ mapping record ไม่ใช่ออเดอร์จริง
-  orders = orders.filter(o => !String(o.order_id || '').startsWith('LINK-'));
   const realOrders = orders.filter(o => !String(o.order_id || '').startsWith('LINE-'));
   const realLineUids = new Set(realOrders.map(o => o.line_user_id).filter(Boolean));
   const realPhones   = new Set(realOrders.map(o => normPhone(o.phone)).filter(Boolean));
@@ -866,16 +849,13 @@ function renderOrders(orders) {
 
   const merged = orders.filter(o => {
     const isGhost = String(o.order_id || '').startsWith('LINE-');
-    if (!isGhost) return true; // real order แสดงเสมอ — ไม่ filter ออกเด็ดขาด
-
-    // ghost — ซ่อนเฉพาะเมื่อมีออเดอร์จริงของลูกค้าคนเดียวกันแน่ๆ
-    // ✨ FIX: ใช้ line_user_id เป็น matching key หลัก (แม่นยำ 100%)
-    // ไม่ใช้ชื่อ เพราะชื่อซ้ำได้ (เช่น "PHONE") ทำให้ real order หาย
+    if (!isGhost) return true;
+    // ghost — ซ่อนถ้ามีออเดอร์จริงของลูกค้าคนเดียวกันแล้ว
     if (o.line_user_id && realLineUids.has(o.line_user_id)) return false;
-    // ใช้เบอร์โทรได้ถ้า phone มีความยาวพอ (>= 9 หลัก กันเบอร์สั้นผิดพลาด)
-    const gPhone = normPhone(o.phone);
-    if (gPhone.length >= 9 && realPhones.has(gPhone)) return false;
-    // ✨ ไม่ใช้ชื่อในการ match แล้ว — ชื่อซ้ำกันได้และทำให้ real order หายได้
+    if (o.phone && realPhones.has(normPhone(o.phone))) return false;
+    // เช็คชื่อทั้ง line_name และ customer_name
+    const ghostNames = orderNames(o);
+    if (ghostNames.some(n => realNames.has(n))) return false;
     return true;
   });
 
@@ -948,13 +928,12 @@ function renderOrders(orders) {
     // หาว่ามี ghost ที่ผูกกับลูกค้าคนนี้ไหม → แสดง 💬 LINE chip
     const myPhone = normPhone(o.phone);
     const myNames = orderNames(o);
-    // ✨ FIX: hasLineChat ใช้ line_user_id + phone เท่านั้น ไม่ใช้ชื่อ
     const hasLineChat = !isGhost && orders.some(g => {
       if (!String(g.order_id || '').startsWith('LINE-') || !g.line_user_id) return false;
       if (o.line_user_id && g.line_user_id === o.line_user_id) return true;
-      const gPhone = normPhone(g.phone);
-      if (myPhone.length >= 9 && gPhone === myPhone) return true;
-      return false;
+      if (myPhone && normPhone(g.phone) === myPhone) return true;
+      const gNames = orderNames(g);
+      return myNames.some(n => gNames.includes(n));
     });
 
     // หา line_user_id ของลูกค้า (จาก ghost ถ้าออเดอร์จริงยังไม่มี) — ใช้สำหรับ openChatModal
@@ -962,10 +941,9 @@ function renderOrders(orders) {
     if (!effectiveLineUid && hasLineChat) {
       const ghost = orders.find(g => {
         if (!String(g.order_id || '').startsWith('LINE-') || !g.line_user_id) return false;
-        if (o.line_user_id && g.line_user_id === o.line_user_id) return true;
-        const gPhone = normPhone(g.phone);
-        if (myPhone.length >= 9 && gPhone === myPhone) return true;
-        return false;
+        if (myPhone && normPhone(g.phone) === myPhone) return true;
+        const gNames = orderNames(g);
+        return myNames.some(n => gNames.includes(n));
       });
       if (ghost) effectiveLineUid = ghost.line_user_id;
     }
@@ -999,12 +977,9 @@ function renderOrders(orders) {
               `<option value="${val}" ${val===st?'selected':''}>${label}</option>`
             ).join('')}
           </select>`;
-    // ✨ FIX: real order ที่ยังไม่มี line_user_id → ปุ่ม 🔗 auto-link อัตโนมัติ
     const editBtn = isGhost
       ? `<button class="icon-btn" title="🔗 ผูกบัญชี (ใส่เบอร์/ชื่อ)" onclick="openLinkModal('${escapeAttr(o.order_id)}')" style="background:#e3f2fd;color:#1565c0;">🔗</button>`
-      : (!o.line_user_id
-          ? `<button class="icon-btn" title="🔗 ผูก LINE อัตโนมัติ" onclick="autoLinkOrder('${escapeAttr(o.order_id)}')" style="background:#fff8e1;color:#f57f17;border-color:#ffca28;">🔗</button>`
-          : `<button class="icon-btn" title="แก้ไข" onclick="openEditModal('${escapeAttr(o.order_id)}')">✏️</button>`);
+      : `<button class="icon-btn" title="แก้ไข" onclick="openEditModal('${escapeAttr(o.order_id)}')">✏️</button>`;
     // แสดงชื่อจริงเป็นหลัก, ชื่อ LINE เป็นรอง (ถ้าต่างกัน)
     const lineNameDisplay = (o.line_name && o.line_name !== o.customer_name)
       ? `<small style="color:#06C755;font-size:10px;font-weight:600;">📱 ${escapeHtml(o.line_name)}</small><br>`
@@ -1020,6 +995,7 @@ function renderOrders(orders) {
         <td>
           <div class="row-actions">
             <button class="icon-btn" title="แชท / ส่งข้อความ" onclick="openChatModal('${escapeAttr(o.order_id)}')">💬</button>
+            ${(o.map_lat && o.map_lng) ? `<button class="icon-btn" title="📍 ดูแผนที่จัดส่ง" onclick="openMapModal('${escapeAttr(o.order_id)}')" style="background:#fff3e0;color:#e65100;">📍</button>` : ''}
             ${isGhost ? '' : `<button class="icon-btn" title="📤 ส่งออเดอร์ให้ลูกค้าใน LINE" onclick="resendOrder('${escapeAttr(o.order_id)}')" style="background:#e8f5e9;color:#2e7d32;">📤</button>`}
             ${isGhost ? '' : `<button class="icon-btn" title="🖨️ ปริ้นใบสั่งซื้อ" onclick="printOrder('${escapeAttr(o.order_id)}')" style="background:#f3e5f5;color:#6a1b9a;">🖨️</button>`}
             ${editBtn}
@@ -1049,70 +1025,34 @@ function renderStats(orders) {
 // ─── UPDATE STATUS ───
 async function updateStatus(orderId, status) {
   if (!sb) return;
-  const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
-  const o = allOrders.find(x => x.order_id === orderId);
-  const oldStatus = o ? o.status : null;
-  let viaBackend = false;
+  try {
+    const o = allOrders.find(x => x.order_id === orderId);
+    const oldStatus = o ? o.status : null;
 
-  // ลอง backend ก่อน (ส่ง LINE อัตโนมัติ)
-  if (backendUrl) {
-    try {
-      const r = await fetch(`${backendUrl}/orders/${encodeURIComponent(orderId)}/status`, {
-        method : 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body   : JSON.stringify({ status })
-      });
-      if (r.ok) {
-        const result = await r.json().catch(() => ({}));
-        if (o) o.status = status;
-        if (result.order) {
-          const idx = allOrders.findIndex(x => x.order_id === orderId);
-          if (idx >= 0) allOrders[idx] = result.order;
-        }
-        viaBackend = true;
-      } else {
-        const err = await r.json().catch(() => ({}));
-        console.warn('backend PATCH failed:', err.error || r.status, '— fallback to Supabase direct');
+    const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
+    if (error) throw error;
+    if (o) o.status = status;
+    renderStats(allOrders);
+    toast('อัปเดตสถานะแล้ว ✓', 'success');
+
+    // 🔔 Auto-notify: ส่งข้อความตามเทมเพลตให้ลูกค้า (ถ้าสถานะเปลี่ยนจริง และเปิด toggle)
+    //  หมายเหตุ: ไม่เรียก backend PATCH /orders/:id/status เพราะ:
+    //  (1) Supabase ถูกอัปเดตตรงๆ แล้ว
+    //  (2) /notify จัดการส่ง LINE ตามเทมเพลตของแอดมินอยู่แล้ว
+    //  ถ้าเรียก PATCH ด้วย ลูกค้าจะได้ข้อความซ้ำ 2 ครั้ง (เทมเพลต + hardcode)
+    const autoNotify = document.getElementById('autoNotifyToggle').checked;
+    if (autoNotify && o && oldStatus !== status) {
+      const tpls = getTemplates();
+      const tpl  = tpls[status];
+      if (tpl && tpl.trim()) {
+        const text = fillTemplate(tpl, o);
+        await sendMessage(o, text, { kind: 'system', silent: true });
+        toast(`🔔 ส่งแจ้งเตือนให้ลูกค้าแล้ว`, 'success');
       }
-    } catch (fetchErr) {
-      // CORS / network error — fallback โดยไม่ throw
-      console.warn('backend unreachable:', fetchErr.message, '— fallback to Supabase direct');
     }
+  } catch (e) {
+    toast('อัปเดตไม่สำเร็จ: ' + e.message, 'error');
   }
-
-  // Fallback: อัปเดต Supabase ตรงถ้า backend ไม่พร้อม
-  if (!viaBackend) {
-    try {
-      const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
-      if (error) throw error;
-      if (o) o.status = status;
-    } catch (e) {
-      toast('อัปเดตไม่สำเร็จ: ' + e.message, 'error');
-      return;
-    }
-  }
-
-  renderOrders(allOrders);
-  renderStats(allOrders);
-
-  // Auto-notify เทมเพลต
-  const autoNotify = document.getElementById('autoNotifyToggle').checked;
-  if (autoNotify && o && oldStatus !== status) {
-    const tpls = getTemplates();
-    const tpl  = tpls[status];
-    if (tpl && tpl.trim()) {
-      const text = fillTemplate(tpl, o);
-      await sendMessage(o, text, { kind: 'system', silent: true });
-      toast(viaBackend
-        ? '🔔 เปลี่ยนสถานะ + ส่ง LINE แล้ว ✓'
-        : '✅ อัปเดตสถานะแล้ว (LINE ไม่พร้อม — backend offline)', 'success');
-      return;
-    }
-  }
-
-  toast(viaBackend
-    ? '✅ อัปเดตสถานะ + ส่ง LINE แล้ว ✓'
-    : '✅ อัปเดตสถานะแล้ว (LINE ไม่พร้อม — backend offline)', 'success');
 }
 
 // ─── DELETE ORDER ───
@@ -1190,10 +1130,14 @@ function buildPrintReceipt(o) {
 
   // ที่อยู่จัดส่ง / pickup
   const orderType = o.order_type || 'delivery';
+  const coordsLine = (o.map_lat && o.map_lng)
+    ? `<div style="font-size:9pt;color:#666;margin-top:2mm;">📌 GPS: ${o.map_lat.toFixed(5)}, ${o.map_lng.toFixed(5)}</div>`
+    : '';
   const addrSection = orderType === 'delivery' && o.address
     ? `<div class="pr-section">
          <div class="pr-label">📍 ที่อยู่จัดส่ง</div>
          <div class="pr-value">${escapeHtml(o.address)}</div>
+         ${coordsLine}
        </div>`
     : `<div class="pr-section">
          <div class="pr-label">📦 ประเภท</div>
@@ -1258,6 +1202,73 @@ function buildPrintReceipt(o) {
 }
 
 // ปริ้น 1 ออเดอร์
+// ═══════════════════════════════════════════════════════
+//  📍 MAP MODAL — ดูแผนที่จัดส่ง
+// ═══════════════════════════════════════════════════════
+
+let _currentMapOrder = null;
+
+function openMapModal(orderId) {
+  const o = allOrders.find(x => x.order_id === orderId);
+  if (!o) { toast('ไม่พบออเดอร์'); return; }
+  if (!o.map_lat || !o.map_lng) {
+    toast('ออเดอร์นี้ไม่มีพิกัด GPS', 'error');
+    return;
+  }
+
+  _currentMapOrder = o;
+
+  document.getElementById('mapOrderId').textContent = '#' + orderId;
+
+  // info section
+  document.getElementById('mapInfo').innerHTML = `
+    <div style="font-weight:700;color:#e65100;margin-bottom:6px;">
+      👤 ${escapeHtml(o.customer_name || '-')} ${o.phone ? `• 📞 ${escapeHtml(o.phone)}` : ''}
+    </div>
+    ${o.address ? `<div style="color:#5d4037;margin-bottom:6px;">🏠 ${escapeHtml(o.address)}</div>` : ''}
+    <div style="font-size:11px;color:#888;font-family:monospace;">
+      📌 พิกัด: ${o.map_lat.toFixed(6)}, ${o.map_lng.toFixed(6)}
+    </div>
+  `;
+
+  // Google Maps embed (ฟรี ไม่ต้องใช้ API key)
+  const iframe = document.getElementById('mapIframe');
+  iframe.src = `https://maps.google.com/maps?q=${o.map_lat},${o.map_lng}&z=17&output=embed`;
+
+  document.getElementById('mapModal').classList.add('show');
+}
+
+function closeMapModal() {
+  document.getElementById('mapModal').classList.remove('show');
+  document.getElementById('mapIframe').src = ''; // หยุดโหลด
+  _currentMapOrder = null;
+}
+
+function openInGoogleMaps() {
+  if (!_currentMapOrder) return;
+  const { map_lat, map_lng, customer_name, address } = _currentMapOrder;
+  const label = encodeURIComponent(customer_name || address || 'จุดจัดส่ง');
+  window.open(`https://www.google.com/maps/search/?api=1&query=${map_lat},${map_lng}`, '_blank');
+}
+
+function openInGoogleMapsDirections() {
+  if (!_currentMapOrder) return;
+  const { map_lat, map_lng } = _currentMapOrder;
+  // เปิดเส้นทาง — Google Maps จะใช้ตำแหน่งปัจจุบันของแอดมินเป็นจุดเริ่ม
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${map_lat},${map_lng}&travelmode=driving`, '_blank');
+}
+
+function copyMapCoords() {
+  if (!_currentMapOrder) return;
+  const { map_lat, map_lng } = _currentMapOrder;
+  const text = `${map_lat},${map_lng}`;
+  navigator.clipboard.writeText(text).then(() => {
+    toast('📋 คัดลอกพิกัด: ' + text);
+  }).catch(() => {
+    toast('คัดลอกไม่สำเร็จ', 'error');
+  });
+}
+
 function printOrder(orderId) {
   const o = allOrders.find(x => x.order_id === orderId);
   if (!o) { toast('ไม่พบออเดอร์'); return; }
@@ -1317,13 +1328,20 @@ function printAllVisible() {
 }
 
 async function resendOrder(orderId) {
+  if (!confirm(`📤 ส่งสรุปออเดอร์ #${orderId} ไปให้ลูกค้าใน LINE?`)) return;
+
   const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
-  if (!backendUrl) { toast('กรุณาตั้ง Backend URL ก่อน', 'error'); return; }
+  if (!backendUrl) {
+    toast('กรุณาตั้ง Backend URL ก่อน', 'error');
+    return;
+  }
 
   toast('⏳ กำลังส่ง...', 'info');
 
   try {
-    const res = await fetch(`${backendUrl}/resend-order/${encodeURIComponent(orderId)}`, { method: 'POST' });
+    const res = await fetch(`${backendUrl}/resend-order/${encodeURIComponent(orderId)}`, {
+      method: 'POST'
+    });
     const result = await res.json().catch(() => ({}));
 
     if (res.ok && result.success) {
@@ -1333,245 +1351,11 @@ async function resendOrder(orderId) {
                 : 'customer_id ตรง';
       toast(`✅ ส่งออเดอร์แล้ว (${via})`, 'success');
     } else {
-      // ✨ ถ้า backend บอก no LINE user linked → เปิด modal ให้กรอก LINE User ID โดยตรง
-      if (result.error && result.error.includes('no LINE user')) {
-        openManualLinkModal(orderId);
-      } else {
-        toast(`❌ ${result.error || 'ส่งไม่สำเร็จ'}`, 'error');
-      }
+      const hint = result.hint ? `\n\n💡 ${result.hint}` : '';
+      toast(`❌ ${result.error || 'ส่งไม่สำเร็จ'}${hint}`, 'error');
     }
   } catch (e) {
-    // backend offline หรือ CORS → ลอง auto-link ผ่าน Supabase ก่อน
-    const linked = await autoLinkOrder(orderId, { silent: true });
-    if (!linked) openManualLinkModal(orderId);
-  }
-}
-
-// ── AUTO-LINK ORDER (ค้น LINK- row ใน Supabase แล้ว update orders โดยตรง) ──
-// เรียกได้ทั้งจากปุ่ม 🔗 และจาก resendOrder ตอน backend offline
-async function autoLinkOrder(orderId, opts = {}) {
-  const silent = opts.silent || false;
-  if (!sb) { if (!silent) toast('ยังไม่ได้เชื่อมต่อ Supabase', 'error'); return false; }
-
-  const o = allOrders.find(x => x.order_id === orderId);
-  if (!o) return false;
-
-  // ถ้ามี line_user_id อยู่แล้ว → ไม่ต้องทำอะไร
-  if (o.line_user_id) {
-    if (!silent) toast('✅ ผูกบัญชีอยู่แล้ว', 'success');
-    return true;
-  }
-
-  if (!silent) toast('⏳ กำลังค้นหา LINE User...', '');
-
-  try {
-    const customerId = o.customer_id;
-    let lineUid = null;
-
-    // วิธีที่ 1: ค้น LINK-{customerId} row โดยตรง (แม่นที่สุด)
-    if (!lineUid && customerId) {
-      const linkRowId = 'LINK-' + customerId.slice(0, 20);
-      const { data: lr } = await sb.from('orders')
-        .select('line_user_id').eq('order_id', linkRowId)
-        .not('line_user_id', 'is', null).maybeSingle();
-      if (lr?.line_user_id) { lineUid = lr.line_user_id; console.log('🔗 found via LINK- row'); }
-    }
-
-    // วิธีที่ 2: ค้น line_users.customer_id
-    if (!lineUid && customerId) {
-      const { data: lu } = await sb.from('line_users')
-        .select('user_id').eq('customer_id', customerId)
-        .order('last_seen', { ascending: false }).limit(1).maybeSingle();
-      if (lu?.user_id) { lineUid = lu.user_id; console.log('🔗 found via line_users.customer_id'); }
-    }
-
-    // วิธีที่ 3: ค้น LINE- ghost ด้วย phone (>= 9 หลัก เท่านั้น)
-    if (!lineUid && o.phone) {
-      const normP = o.phone.replace(/\D/g, '');
-      if (normP.length >= 9) {
-        const { data: ghosts } = await sb.from('orders')
-          .select('line_user_id').like('order_id', 'LINE-%')
-          .eq('phone', normP).not('line_user_id', 'is', null).limit(1);
-        if (ghosts?.[0]?.line_user_id) { lineUid = ghosts[0].line_user_id; console.log('🔗 found via ghost phone'); }
-      }
-    }
-
-    if (!lineUid) {
-      if (!silent) toast('❌ ยังไม่พบ LINE User — ลูกค้ายังไม่ได้เปิดร้านผ่าน LINE', 'error');
-      return false;
-    }
-
-    // อัปเดต line_user_id ให้ทุกออเดอร์ของ customer นี้
-    if (customerId) {
-      await sb.from('orders').update({ line_user_id: lineUid }).eq('customer_id', customerId);
-    } else {
-      await sb.from('orders').update({ line_user_id: lineUid }).eq('order_id', orderId);
-    }
-
-    // อัปเดต allOrders ใน memory
-    allOrders.forEach(x => {
-      if (x.order_id === orderId || (customerId && x.customer_id === customerId)) {
-        x.line_user_id = lineUid;
-      }
-    });
-    renderOrders(allOrders);
-    if (!silent) toast('✅ ผูก LINE อัตโนมัติสำเร็จ!', 'success');
-    return true;
-
-  } catch (e) {
-    if (!silent) toast('ผูกไม่สำเร็จ: ' + e.message, 'error');
-    return false;
-  }
-}
-
-// ── MANUAL LINK MODAL ──
-let manualLinkOrderId = null;
-
-function openManualLinkModal(orderId) {
-  const o = allOrders.find(x => x.order_id === orderId);
-  manualLinkOrderId = orderId;
-  document.getElementById('mlOrderInfo').innerHTML =
-    `📦 ออเดอร์ <b>#${escapeHtml(orderId)}</b> — ${escapeHtml(o?.customer_name || '-')} ` +
-    `<span style="color:var(--sub);">฿${(o?.total||0).toLocaleString()}</span>`;
-  document.getElementById('mlUid').value = '';
-  document.getElementById('mlUidHint').textContent = 'ขึ้นต้นด้วย U ตามด้วย 32 ตัวอักษร';
-  document.getElementById('mlUidHint').style.color = 'var(--sub)';
-  document.getElementById('manualLinkModal').classList.add('show');
-  setTimeout(() => document.getElementById('mlUid').focus(), 100);
-}
-
-function closeManualLinkModal() {
-  document.getElementById('manualLinkModal').classList.remove('show');
-  manualLinkOrderId = null;
-}
-
-function validateMlUid() {
-  const val = document.getElementById('mlUid').value.trim();
-  const hint = document.getElementById('mlUidHint');
-  if (!val) {
-    hint.textContent = 'ขึ้นต้นด้วย U ตามด้วย 32 ตัวอักษร';
-    hint.style.color = 'var(--sub)';
-  } else if (isValidLineUid(val)) {
-    hint.textContent = '✅ LINE User ID ถูกต้อง';
-    hint.style.color = 'var(--line)';
-  } else {
-    hint.textContent = '⚠️ ต้องเป็น U + 32 ตัวอักษร hex (รวม 33 ตัว)';
-    hint.style.color = '#e65100';
-  }
-}
-
-async function saveManualLink() {
-  if (!manualLinkOrderId || !sb) return;
-  const uid = document.getElementById('mlUid').value.trim();
-  if (!isValidLineUid(uid)) {
-    toast('LINE User ID ไม่ถูกต้อง', 'error');
-    return;
-  }
-
-  const btn = document.getElementById('mlSaveBtn');
-  btn.disabled = true; btn.textContent = 'กำลังผูก...';
-
-  try {
-    // อัปเดต line_user_id ให้ออเดอร์นี้ + ออเดอร์อื่นของ customer เดิมด้วย
-    const o = allOrders.find(x => x.order_id === manualLinkOrderId);
-    const customerId = o?.customer_id;
-
-    if (customerId) {
-      await sb.from('orders').update({ line_user_id: uid }).eq('customer_id', customerId);
-    } else {
-      await sb.from('orders').update({ line_user_id: uid }).eq('order_id', manualLinkOrderId);
-    }
-
-    // ✨ FIX Bug 3: upsert ลง line_users เพื่อให้ auto-link ครั้งถัดไปเจอทันที
-    try {
-      const luRow = { user_id: uid, last_seen: new Date().toISOString() };
-      if (customerId) luRow.customer_id = customerId;
-      await sb.from('line_users').upsert([luRow], { onConflict: 'user_id' });
-    } catch(e) { console.warn('upsert line_users failed:', e.message); }
-
-    // อัปเดต allOrders ใน memory
-    allOrders.forEach(x => {
-      if (x.order_id === manualLinkOrderId || (customerId && x.customer_id === customerId)) {
-        x.line_user_id = uid;
-      }
-    });
-    renderOrders(allOrders);
-
-    toast('✅ ผูก LINE User ID แล้ว', 'success');
-
-    // ถ้าติ๊ก "ส่งสรุปออเดอร์หลังผูก" → ลอง resend ผ่าน backend
-    const shouldResend = document.getElementById('mlResendAfter').checked;
-    closeManualLinkModal();
-
-    if (shouldResend) {
-      const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
-      if (backendUrl) {
-        await new Promise(r => setTimeout(r, 600)); // รอ DB propagate
-        const r2 = await fetch(`${backendUrl}/resend-order/${encodeURIComponent(manualLinkOrderId || o?.order_id)}`, { method: 'POST' }).catch(() => null);
-        if (r2?.ok) toast('📤 ส่งสรุปออเดอร์ให้ลูกค้าแล้ว ✓', 'success');
-      }
-    }
-  } catch (e) {
-    toast('ผูกไม่สำเร็จ: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = '📱 ผูกบัญชี';
-  }
-}
-
-// ── AUTO-LINK ALL (ปุ่มในหัวตาราง) ──────────────────────────
-// ลอง match orders ที่ยังไม่มี line_user_id กับ line_users table ด้วย customer_id
-async function autoLinkAll() {
-  if (!sb) { toast('ยังไม่ได้เชื่อมต่อ Supabase', 'error'); return; }
-
-  const btn = document.getElementById('autoLinkAllBtn');
-  btn.disabled = true; btn.textContent = '⏳ กำลัง Link...';
-
-  try {
-    // ✨ วิธีที่ 1: ดึง line_users ทุกแถวที่มี customer_id แล้ว batch update orders
-    const { data: luRows, error: luErr } = await sb.from('line_users')
-      .select('user_id, customer_id')
-      .not('customer_id', 'is', null);
-    if (luErr) throw luErr;
-
-    let linked = 0;
-    for (const lu of (luRows || [])) {
-      const { data: updated } = await sb.from('orders')
-        .update({ line_user_id: lu.user_id })
-        .eq('customer_id', lu.customer_id)
-        .is('line_user_id', null)
-        .select('order_id');
-      if (updated?.length) {
-        linked += updated.length;
-        updated.forEach(o => {
-          const ord = allOrders.find(x => x.order_id === o.order_id);
-          if (ord) ord.line_user_id = lu.user_id;
-        });
-      }
-    }
-
-    // ✨ วิธีที่ 2: เรียก backend /backfill-line-links สำรอง (จับคู่ด้วย phone/name)
-    const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
-    let backfillCount = 0;
-    if (backendUrl) {
-      try {
-        const r = await fetch(`${backendUrl}/backfill-line-links`, { method: 'POST' });
-        const result = await r.json().catch(() => ({}));
-        backfillCount = result.updated || 0;
-      } catch(e) { console.warn('backfill call failed:', e.message); }
-    }
-
-    const total = linked + backfillCount;
-    renderOrders(allOrders);
-    if (total > 0) {
-      toast(`✅ Auto-Link สำเร็จ ${total} ออเดอร์`, 'success');
-      await loadOrders();
-    } else {
-      toast('ℹ️ ไม่พบออเดอร์ที่ต้อง Link เพิ่ม', '');
-    }
-  } catch (e) {
-    toast('Auto-Link ไม่สำเร็จ: ' + e.message, 'error');
-  } finally {
-    btn.disabled = false; btn.textContent = '🔗 Auto-Link ทั้งหมด';
+    toast('❌ เชื่อมต่อไม่ได้: ' + e.message, 'error');
   }
 }
 
@@ -2047,10 +1831,10 @@ function toast(msg, type = '') {
 // ─── KEYBOARD SHORTCUTS ───
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    if (document.getElementById('editModal').classList.contains('show')) closeEditModal();
+    if (document.getElementById('mapModal').classList.contains('show')) closeMapModal();
+    else if (document.getElementById('editModal').classList.contains('show')) closeEditModal();
     else if (document.getElementById('chatModal').classList.contains('show')) closeChatModal();
     else if (document.getElementById('tplModal').classList.contains('show')) closeTemplatesModal();
-    else if (document.getElementById('manualLinkModal').classList.contains('show')) closeManualLinkModal();
   }
 });
 </script>
