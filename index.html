@@ -105,6 +105,74 @@
     font-size: 12px; font-family: inherit; background: var(--bg); cursor: pointer;
   }
   .items-list { font-size: 12px; color: var(--sub); line-height: 1.6; max-width:280px; }
+  .items-cell-clickable {
+    cursor: pointer; transition: background .15s;
+  }
+  .items-cell-clickable:hover {
+    background: #f0fdf4;
+  }
+  .items-cell-clickable:hover .items-list {
+    color: var(--line);
+  }
+  .items-list-link {
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:11px; color:var(--line); font-weight:600;
+    cursor:pointer; text-decoration:none; margin-top:3px;
+    background:none; border:none; font-family:inherit; padding:0;
+  }
+  .items-list-link:hover { text-decoration:underline; }
+
+  /* ── Items Popup ── */
+  #itemsPopup .modal { max-width:480px; }
+  .items-popup-header {
+    display:flex; align-items:center; gap:10px; margin-bottom:14px;
+  }
+  .items-popup-badge {
+    font-size:11px; font-weight:700; padding:3px 9px;
+    border-radius:20px; background:#f3e5f5; color:#6a1b9a;
+  }
+  .items-popup-table {
+    width:100%; border-collapse:collapse; font-size:13px;
+  }
+  .items-popup-table th {
+    text-align:left; font-size:11px; font-weight:700; color:var(--sub);
+    text-transform:uppercase; letter-spacing:.3px;
+    padding:0 10px 10px; border-bottom:2px solid var(--border);
+  }
+  .items-popup-table th:last-child { text-align:right; }
+  .items-popup-table td {
+    padding:11px 10px; border-bottom:1px solid var(--border);
+    vertical-align:middle;
+  }
+  .items-popup-table tr:last-child td { border-bottom:none; }
+  .items-popup-table .item-thumb {
+    width:40px; height:40px; border-radius:8px; object-fit:cover;
+    background:var(--bg); display:flex; align-items:center;
+    justify-content:center; font-size:22px; flex:0 0 40px;
+  }
+  .items-popup-table .item-thumb img {
+    width:100%; height:100%; border-radius:8px; object-fit:cover;
+  }
+  .items-popup-table .item-name { font-weight:600; line-height:1.3; }
+  .items-popup-table .item-size { font-size:11px; color:var(--sub); margin-top:2px; }
+  .items-popup-table .item-qty {
+    font-weight:700; color:#fff; background:var(--sub);
+    border-radius:6px; padding:2px 8px; font-size:12px;
+  }
+  .items-popup-table .item-price { text-align:right; font-weight:700; white-space:nowrap; }
+  .items-popup-total {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:14px 10px 4px; border-top:2px solid var(--border); margin-top:4px;
+  }
+  .items-popup-total .label { font-size:12px; color:var(--sub); font-weight:600; }
+  .items-popup-total .amount { font-size:22px; font-weight:800; color:#1d1d1f; }
+  .items-popup-meta {
+    background:var(--bg); border-radius:10px; padding:12px 14px;
+    margin-bottom:14px; font-size:13px; line-height:1.8;
+    display:grid; grid-template-columns:auto 1fr; gap:0 10px;
+  }
+  .items-popup-meta .ml { color:var(--sub); font-weight:600; }
+  .items-popup-meta .mv { font-weight:500; }
 
   .row-actions { display:flex; gap:4px; }
   .icon-btn {
@@ -478,6 +546,22 @@
 </div>
 
 <!-- ── MAP MODAL ── -->
+<!-- ── ITEMS POPUP ── -->
+<div class="modal-bg" id="itemsPopup" onclick="if(event.target===this)closeItemsPopup()">
+  <div class="modal" id="itemsPopupInner">
+    <div class="modal-hdr">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <h3>🛒 รายการสินค้า</h3>
+        <code id="ipOrderId" style="font-size:12px;color:var(--sub);"></code>
+      </div>
+      <button class="x" onclick="closeItemsPopup()">×</button>
+    </div>
+    <div class="modal-body" id="ipBody">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="mapModal">
   <div class="modal" style="max-width:680px;">
     <div class="modal-hdr">
@@ -948,9 +1032,14 @@ function renderOrders(orders) {
       if (ghost) effectiveLineUid = ghost.line_user_id;
     }
 
-    const itemsText = isGhost
+    // สรุปสินค้าสั้นๆ — คลิกทั้งช่องเพื่อเปิด popup
+    const itemArr = o.items || [];
+    const shortItems = isGhost
       ? '<em style="color:#1565c0;">💬 แชท LINE OA (ยังไม่มีออเดอร์)</em>'
-      : (o.items || []).map(i => `${i.emoji||''} ${escapeHtml(i.name)} ×${i.qty}`).join(', ');
+      : itemArr.slice(0,2).map(i => `${i.emoji||''} ${escapeHtml(i.name)} ×${i.qty}`).join(', ')
+          + (itemArr.length > 2
+            ? `<span style="color:var(--line);font-weight:600;"> +${itemArr.length-2}</span>`
+            : '');
     const date = new Date(o.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' });
     const st = o.status || 'pending';
     const isNew = recentlyAddedIds.has(o.order_id);
@@ -980,6 +1069,7 @@ function renderOrders(orders) {
     const editBtn = isGhost
       ? `<button class="icon-btn" title="🔗 ผูกบัญชี (ใส่เบอร์/ชื่อ)" onclick="openLinkModal('${escapeAttr(o.order_id)}')" style="background:#e3f2fd;color:#1565c0;">🔗</button>`
       : `<button class="icon-btn" title="แก้ไข" onclick="openEditModal('${escapeAttr(o.order_id)}')">✏️</button>`;
+    const viewItemsBtn = isGhost ? '' : `<button class="icon-btn" title="🛒 ดูรายการสินค้า" onclick="openItemsPopup('${escapeAttr(o.order_id)}')" style="background:#e8f5e9;color:#2e7d32;">🛒</button>`;
     // แสดงชื่อจริงเป็นหลัก, ชื่อ LINE เป็นรอง (ถ้าต่างกัน)
     const lineNameDisplay = (o.line_name && o.line_name !== o.customer_name)
       ? `<small style="color:#06C755;font-size:10px;font-weight:600;">📱 ${escapeHtml(o.line_name)}</small><br>`
@@ -988,7 +1078,7 @@ function renderOrders(orders) {
       <tr class="${isNew ? 'row-new' : ''}">
         <td>${orderIdDisplay}</td>
         <td><strong>${escapeHtml(o.customer_name || '-')}</strong><br>${lineNameDisplay}${cidDisplay}</td>
-        <td><div class="items-list">${itemsText || '<em>—</em>'}</div></td>
+        <td class="${isGhost ? '' : 'items-cell-clickable'}" ${isGhost ? '' : `onclick="openItemsPopup('${escapeAttr(o.order_id)}')"`}><div class="items-list">${shortItems || '<em>—</em>'}</div></td>
         <td>${totalDisplay}</td>
         <td>${statusCell}</td>
         <td style="font-size:12px;color:var(--sub);white-space:nowrap;">${date}</td>
@@ -1242,6 +1332,87 @@ function closeMapModal() {
   document.getElementById('mapModal').classList.remove('show');
   document.getElementById('mapIframe').src = ''; // หยุดโหลด
   _currentMapOrder = null;
+}
+
+// ══════════════════════════════════════════════════════
+//  ITEMS POPUP — ดูรายการสินค้าในออเดอร์
+// ══════════════════════════════════════════════════════
+function openItemsPopup(orderId) {
+  const o = allOrders.find(x => x.order_id === orderId);
+  if (!o) return;
+
+  document.getElementById('ipOrderId').textContent = '#' + orderId;
+
+  const items = o.items || [];
+  const STATUS_TH = {
+    pending:'รอดำเนินการ', sent:'ส่ง LINE แล้ว', confirmed:'ยืนยันแล้ว',
+    shipping:'กำลังจัดส่ง', shipped:'กำลังจัดส่ง', delivered:'สำเร็จ', cancelled:'ยกเลิก'
+  };
+  const statusTh = STATUS_TH[o.status] || o.status || '—';
+
+  // meta info
+  const metaRows = [
+    ['ลูกค้า', escapeHtml(o.customer_name || '—')],
+    o.phone   ? ['โทร', escapeHtml(o.phone)]             : null,
+    o.address ? ['ที่อยู่', escapeHtml(o.address)]        : null,
+    o.note    ? ['หมายเหตุ', escapeHtml(o.note)]          : null,
+    ['สถานะ', statusTh],
+  ].filter(Boolean).map(([l,v]) =>
+    `<span class="ml">${l}</span><span class="mv">${v}</span>`
+  ).join('');
+
+  // items table
+  const rows = items.map(i => {
+    const unitPrice = i.price ?? i.p ?? 0;
+    const qty       = i.qty  ?? i.quantity ?? 1;
+    const lineTotal = unitPrice * qty;
+    const thumbHtml = i.img
+      ? `<div class="item-thumb"><img src="${escapeAttr(i.img)}" alt="" loading="lazy"></div>`
+      : `<div class="item-thumb">${i.emoji || '📦'}</div>`;
+    const sizeTxt = i.size ? `<div class="item-size">${escapeHtml(i.size)}</div>` : '';
+    return `
+      <tr>
+        <td style="width:48px;padding-right:6px;">${thumbHtml}</td>
+        <td>
+          <div class="item-name">${escapeHtml(i.name || '—')}</div>
+          ${sizeTxt}
+        </td>
+        <td style="text-align:center;padding:11px 6px;">
+          <span class="item-qty">×${qty}</span>
+        </td>
+        <td class="item-price">
+          ${unitPrice ? `฿${unitPrice.toLocaleString()}` : '—'}<br>
+          ${lineTotal && qty>1 ? `<small style="color:var(--sub);font-weight:400;">= ฿${lineTotal.toLocaleString()}</small>` : ''}
+        </td>
+      </tr>`;
+  }).join('');
+
+  const totalHtml = `
+    <div class="items-popup-total">
+      <div class="label">ยอดรวม (${items.length} รายการ)</div>
+      <div class="amount">฿${(o.total||0).toLocaleString()}</div>
+    </div>`;
+
+  document.getElementById('ipBody').innerHTML = `
+    ${metaRows ? `<div class="items-popup-meta">${metaRows}</div>` : ''}
+    <table class="items-popup-table">
+      <thead>
+        <tr>
+          <th colspan="2">สินค้า</th>
+          <th style="text-align:center;">จำนวน</th>
+          <th style="text-align:right;">ราคา</th>
+        </tr>
+      </thead>
+      <tbody>${rows || '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--sub);">ไม่มีรายการสินค้า</td></tr>'}</tbody>
+    </table>
+    ${totalHtml}
+  `;
+
+  document.getElementById('itemsPopup').classList.add('show');
+}
+
+function closeItemsPopup() {
+  document.getElementById('itemsPopup').classList.remove('show');
 }
 
 function openInGoogleMaps() {
