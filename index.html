@@ -2135,7 +2135,7 @@ async function toggleCouponActive(id, current) {
 }
 
 async function deleteCoupon(id, name) {
-  if (!confirm('ลบคูปอง "' + name + '" จริงหรือไม่?')) return;
+  if (!confirm('ลบคูปองนี้จริงหรือไม่?')) return;
   const bu = getBackendUrl();
   if (!bu) return;
   await fetch(bu + '/coupons/' + id, { method: 'DELETE' });
@@ -2200,9 +2200,9 @@ async function loadCoupons() {
               '</span>' +
             '</label>' +
             '<button data-coupon="' + safeJson + '" onclick="editCouponFromBtn(this)"' +
-              'style="padding:5px 12px;background:#e3f2fd;color:#1565c0;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sarabun',sans-serif;">แก้ไข</button>' +
-            '<button onclick="deleteCoupon(' + c.id + ','' + c.name.replace(/'/g,"\'") + '')"' +
-              'style="padding:5px 12px;background:#ffebee;color:#c62828;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sarabun',sans-serif;">ลบ</button>' +
+              'style="padding:5px 12px;background:#e3f2fd;color:#1565c0;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:Sarabun,sans-serif;">แก้ไข</button>' +
+            '<button onclick="deleteCoupon(' + c.id + ')"' +
+              'style="padding:5px 12px;background:#ffebee;color:#c62828;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:Sarabun,sans-serif;">ลบ</button>' +
           '</div>' +
         '</div>' +
         (usedPct !== null ? '<div style="margin-top:10px;background:#f5f5f5;border-radius:8px;height:5px;overflow:hidden;"><div style="height:100%;background:' + barColor + ';width:' + Math.min(usedPct,100) + '%;border-radius:8px;"></div></div>' : '') +
