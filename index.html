@@ -448,6 +448,7 @@
   </div>
   <div class="hdr-right">
     <span id="liveLabel" class="live-label">ออฟไลน์</span>
+    <button class="hdr-icon-btn" onclick="openCouponModal()" title="จัดการคูปอง/ส่วนลด">🎟️</button>
     <button class="hdr-icon-btn" onclick="openTemplatesModal()" title="ตั้งค่าเทมเพลตข้อความ">⚙️</button>
     <button class="refresh-btn" onclick="loadOrders()">
       <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
@@ -2006,8 +2007,329 @@ document.addEventListener('keydown', e => {
     else if (document.getElementById('editModal').classList.contains('show')) closeEditModal();
     else if (document.getElementById('chatModal').classList.contains('show')) closeChatModal();
     else if (document.getElementById('tplModal').classList.contains('show')) closeTemplatesModal();
+    else if (document.getElementById('couponModal').classList.contains('show')) closeCouponModal();
   }
 });
+
+
+// ══════════════════════════════════════════════════════════
+//  COUPON MANAGEMENT
+// ══════════════════════════════════════════════════════════
+
+let _editingCouponId = null;
+
+function getBackendUrl() {
+  return (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
+}
+
+function openCouponModal() {
+  const bu = getBackendUrl();
+  if (!bu) { alert('กรุณากรอก BACKEND URL ก่อนใช้งานระบบคูปอง'); return; }
+  document.getElementById('couponModal').classList.add('show');
+  loadCoupons();
+}
+function closeCouponModal() {
+  document.getElementById('couponModal').classList.remove('show');
+  resetCouponForm();
+}
+
+function updateCouponForm() {
+  const dtype = document.getElementById('cf_dtype').value;
+  const atype = document.getElementById('cf_atype').value;
+  document.getElementById('cf_dval_lbl').textContent =
+    dtype === 'percent' ? 'จำนวนส่วนลด (%) *' : 'จำนวนส่วนลด (บาท) *';
+  document.getElementById('cf_maxdiscount_wrap').style.display =
+    dtype === 'percent' ? 'block' : 'none';
+  document.getElementById('cf_condition_wrap').style.display =
+    atype === 'auto' ? 'block' : 'none';
+}
+
+function resetCouponForm() {
+  _editingCouponId = null;
+  document.getElementById('couponFormTitle').textContent = 'สร้างคูปองใหม่';
+  document.getElementById('couponSaveBtn').textContent = 'บันทึกคูปอง';
+  ['cf_name','cf_desc','cf_dval','cf_maxdiscount','cf_minorder','cf_limit','cf_start','cf_end']
+    .forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  document.getElementById('cf_dtype').value  = 'fixed';
+  document.getElementById('cf_atype').value  = 'auto';
+  document.getElementById('cf_cond').value   = 'always';
+  document.getElementById('cf_active').checked = true;
+  updateCouponForm();
+}
+
+function editCouponFromBtn(btn) {
+  const c = JSON.parse(btn.dataset.coupon);
+  _editingCouponId = c.id;
+  document.getElementById('couponFormTitle').textContent = 'แก้ไขคูปอง';
+  document.getElementById('couponSaveBtn').textContent = 'อัปเดตคูปอง';
+  document.getElementById('cf_name').value      = c.name || '';
+  document.getElementById('cf_desc').value      = c.description || '';
+  document.getElementById('cf_dtype').value     = c.discount_type || 'fixed';
+  document.getElementById('cf_dval').value      = c.discount_value || '';
+  document.getElementById('cf_maxdiscount').value = c.max_discount || '';
+  document.getElementById('cf_minorder').value  = c.min_order || '';
+  document.getElementById('cf_atype').value     = c.apply_type || 'auto';
+  document.getElementById('cf_cond').value      = c.condition_type || 'always';
+  document.getElementById('cf_limit').value     = c.usage_limit || '';
+  document.getElementById('cf_active').checked  = c.is_active !== false;
+  if (c.start_date) document.getElementById('cf_start').value = c.start_date.slice(0,16);
+  if (c.end_date)   document.getElementById('cf_end').value   = c.end_date.slice(0,16);
+  updateCouponForm();
+  document.getElementById('couponFormWrap').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function saveCoupon() {
+  const bu = getBackendUrl();
+  if (!bu) { alert('ไม่มี BACKEND URL'); return; }
+  const name = document.getElementById('cf_name').value.trim();
+  const dval = document.getElementById('cf_dval').value;
+  if (!name) { alert('กรุณากรอกชื่อโปรโมชั่น'); return; }
+  if (!dval) { alert('กรุณากรอกจำนวนส่วนลด'); return; }
+
+  const atype = document.getElementById('cf_atype').value;
+  const cfstart = document.getElementById('cf_start').value;
+  const cfend   = document.getElementById('cf_end').value;
+  const body = {
+    name,
+    description:    document.getElementById('cf_desc').value.trim() || null,
+    discount_type:  document.getElementById('cf_dtype').value,
+    discount_value: Number(dval),
+    max_discount:   document.getElementById('cf_maxdiscount').value ? Number(document.getElementById('cf_maxdiscount').value) : null,
+    min_order:      Number(document.getElementById('cf_minorder').value || 0),
+    apply_type:     atype,
+    condition_type: atype === 'auto' ? document.getElementById('cf_cond').value : null,
+    usage_limit:    document.getElementById('cf_limit').value ? Number(document.getElementById('cf_limit').value) : null,
+    start_date:     cfstart ? new Date(cfstart).toISOString() : null,
+    end_date:       cfend   ? new Date(cfend).toISOString()   : null,
+    is_active:      document.getElementById('cf_active').checked
+  };
+
+  const btn = document.getElementById('couponSaveBtn');
+  btn.disabled = true;
+  try {
+    const url    = _editingCouponId ? bu + '/coupons/' + _editingCouponId : bu + '/coupons';
+    const method = _editingCouponId ? 'PATCH' : 'POST';
+    const r = await fetch(url, {
+      method, headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'บันทึกไม่ได้');
+    resetCouponForm();
+    await loadCoupons();
+  } catch(e) {
+    alert('เกิดข้อผิดพลาด: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function toggleCouponActive(id, current) {
+  const bu = getBackendUrl();
+  if (!bu) return;
+  await fetch(bu + '/coupons/' + id, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_active: !current })
+  });
+  loadCoupons();
+}
+
+async function deleteCoupon(id, name) {
+  if (!confirm('ลบคูปอง "' + name + '" จริงหรือไม่?')) return;
+  const bu = getBackendUrl();
+  if (!bu) return;
+  await fetch(bu + '/coupons/' + id, { method: 'DELETE' });
+  loadCoupons();
+}
+
+function fmtDateTH(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' });
+}
+
+async function loadCoupons() {
+  const bu = getBackendUrl();
+  const el = document.getElementById('couponList');
+  if (!bu) { el.innerHTML = '<div style="color:#aaa;text-align:center;padding:20px;">กรุณาตั้งค่า BACKEND URL</div>'; return; }
+  el.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px;">กำลังโหลด...</div>';
+  try {
+    const r = await fetch(bu + '/coupons');
+    const d = await r.json();
+    const coupons = d.coupons || [];
+    if (!coupons.length) {
+      el.innerHTML = '<div style="text-align:center;color:#aaa;padding:20px;">ยังไม่มีคูปอง</div>';
+      return;
+    }
+    el.innerHTML = coupons.map(c => {
+      const isAuto   = c.apply_type === 'auto';
+      const isActive = c.is_active;
+      const usedPct  = c.usage_limit ? Math.round((c.used_count / c.usage_limit) * 100) : null;
+      const condLabel = c.condition_type === 'first_order' ? 'สั่งครั้งแรก' : 'ทุกออเดอร์';
+      const discLabel = c.discount_type === 'percent'
+        ? c.discount_value + '%' + (c.max_discount ? ' (สูงสุด ' + c.max_discount.toLocaleString() + ')' : '')
+        : '฿' + (c.discount_value||0).toLocaleString();
+      const safeJson  = JSON.stringify(c).replace(/"/g, '&quot;');
+      const barColor  = usedPct >= 100 ? '#e53935' : usedPct >= 70 ? '#FFA726' : '#66BB6A';
+
+      return '<div style="background:#fff;border:1.5px solid ' + (isActive ? '#e8f5e9' : '#f5f5f5') + ';border-radius:12px;padding:14px 16px;">' +
+        '<div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">' +
+          '<div style="flex:1;min-width:200px;">' +
+            '<div style="font-size:14px;font-weight:700;color:#2C3E50;margin-bottom:6px;">' + c.name +
+              '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:6px;' +
+                (isAuto ? 'background:#e3f2fd;color:#1565c0;' : 'background:#f3e5f5;color:#6a1b9a;') + '">' +
+                (isAuto ? 'AUTO' : 'MANUAL') + '</span>' +
+              '<span style="display:inline-block;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-left:4px;' +
+                (isActive ? 'background:#e8f5e9;color:#2e7d32;' : 'background:#f5f5f5;color:#aaa;') + '">' +
+                (isActive ? 'เปิดอยู่' : 'ปิดอยู่') + '</span>' +
+            '</div>' +
+            (c.description ? '<div style="font-size:12px;color:#777;margin-bottom:6px;">' + c.description + '</div>' : '') +
+            '<div style="display:flex;flex-wrap:wrap;gap:6px;font-size:12px;">' +
+              '<span style="background:#fff8e1;color:#E65100;padding:2px 8px;border-radius:6px;font-weight:700;">ลด ' + discLabel + '</span>' +
+              (isAuto ? '<span style="background:#f1f8e9;color:#558b2f;padding:2px 8px;border-radius:6px;">' + condLabel + '</span>' : '') +
+              (c.min_order > 0 ? '<span style="background:#f3e5f5;color:#6a1b9a;padding:2px 8px;border-radius:6px;">ขั้นต่ำ ฿' + c.min_order.toLocaleString() + '</span>' : '') +
+              (c.usage_limit ? '<span style="background:#e3f2fd;color:#1565c0;padding:2px 8px;border-radius:6px;">ใช้ ' + c.used_count + '/' + c.usage_limit + ' ครั้ง</span>' : '<span style="color:#aaa;font-size:11px;">ไม่จำกัด (ใช้ ' + c.used_count + ' ครั้ง)</span>') +
+            '</div>' +
+            '<div style="font-size:11px;color:#aaa;margin-top:6px;">' + fmtDateTH(c.start_date) + ' → ' + fmtDateTH(c.end_date) + '</div>' +
+          '</div>' +
+          '<div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">' +
+            '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-weight:600;">' +
+              '<span style="color:' + (isActive ? '#27AE60' : '#aaa') + ';">' + (isActive ? 'เปิด' : 'ปิด') + '</span>' +
+              '<span class="switch" style="transform:scale(0.85);">' +
+                '<input type="checkbox" onchange="toggleCouponActive(' + c.id + ',' + isActive + ')" ' + (isActive ? 'checked' : '') + '>' +
+                '<span class="slider"></span>' +
+              '</span>' +
+            '</label>' +
+            '<button data-coupon="' + safeJson + '" onclick="editCouponFromBtn(this)"' +
+              'style="padding:5px 12px;background:#e3f2fd;color:#1565c0;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sarabun',sans-serif;">แก้ไข</button>' +
+            '<button onclick="deleteCoupon(' + c.id + ','' + c.name.replace(/'/g,"\'") + '')"' +
+              'style="padding:5px 12px;background:#ffebee;color:#c62828;border:none;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Sarabun',sans-serif;">ลบ</button>' +
+          '</div>' +
+        '</div>' +
+        (usedPct !== null ? '<div style="margin-top:10px;background:#f5f5f5;border-radius:8px;height:5px;overflow:hidden;"><div style="height:100%;background:' + barColor + ';width:' + Math.min(usedPct,100) + '%;border-radius:8px;"></div></div>' : '') +
+      '</div>';
+    }).join('');
+  } catch(e) {
+    el.innerHTML = '<div style="color:#e53935;text-align:center;padding:20px;">โหลดไม่ได้: ' + e.message + '</div>';
+  }
+}
+
 </script>
+
+<!-- ══════════════════════════════════════════════════════════
+     COUPON MANAGEMENT MODAL
+══════════════════════════════════════════════════════════ -->
+<div class="modal-bg" id="couponModal">
+  <div class="modal" style="max-width:780px;width:95%;max-height:92vh;display:flex;flex-direction:column;">
+    <div class="modal-hdr">
+      <h3>🎟️ จัดการคูปอง / ส่วนลด</h3>
+      <button class="x" onclick="closeCouponModal()">×</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;flex:1;padding:20px;">
+
+      <!-- Add new coupon form -->
+      <div id="couponFormWrap" style="background:#f8f9fa;border:1.5px solid #e0e0e0;border-radius:14px;padding:18px;margin-bottom:20px;">
+        <div style="font-size:14px;font-weight:700;color:#2C3E50;margin-bottom:14px;display:flex;align-items:center;gap:6px;">
+          <span id="couponFormTitle">➕ สร้างคูปองใหม่</span>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+          <div style="grid-column:1/-1;">
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">ชื่อโปรโมชั่น *</label>
+            <input id="cf_name" type="text" placeholder="เช่น ส่วนลดลูกค้าใหม่, Flash Sale 50%"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          </div>
+          <div style="grid-column:1/-1;">
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">คำอธิบาย (ไม่บังคับ)</label>
+            <input id="cf_desc" type="text" placeholder="รายละเอียดโปรโมชั่น"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          </div>
+
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">ประเภทส่วนลด</label>
+            <select id="cf_dtype" onchange="updateCouponForm()"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;background:#fff;">
+              <option value="fixed">💰 ลดเป็นบาท (fixed)</option>
+              <option value="percent">📊 ลดเป็นเปอร์เซ็นต์ (%)</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;" id="cf_dval_lbl">จำนวนส่วนลด (บาท) *</label>
+            <input id="cf_dval" type="number" min="0" placeholder="20"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          </div>
+
+          <div id="cf_maxdiscount_wrap" style="display:none;">
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">ส่วนลดสูงสุด (บาท)</label>
+            <input id="cf_maxdiscount" type="number" min="0" placeholder="สูงสุดกี่บาท (ถ้าไม่ระบุ = ไม่จำกัด)"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">ยอดขั้นต่ำ (บาท)</label>
+            <input id="cf_minorder" type="number" min="0" placeholder="0 = ไม่มีขั้นต่ำ"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          </div>
+
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">โหมดการใช้งาน</label>
+            <select id="cf_atype" onchange="updateCouponForm()"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;background:#fff;">
+              <option value="auto">⚡ อัตโนมัติ (ลูกค้าเห็นทันที)</option>
+              <option value="manual">🔧 แมนนวล (แอดมินเปิด/ปิด)</option>
+            </select>
+          </div>
+          <div id="cf_condition_wrap">
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">เงื่อนไข (auto เท่านั้น)</label>
+            <select id="cf_cond"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;background:#fff;">
+              <option value="always">🌐 ทุกคำสั่งซื้อ</option>
+              <option value="first_order">🆕 สั่งครั้งแรกเท่านั้น</option>
+            </select>
+          </div>
+
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">วันที่เริ่ม</label>
+            <input id="cf_start" type="datetime-local"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          </div>
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">วันที่สิ้นสุด</label>
+            <input id="cf_end" type="datetime-local"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          </div>
+
+          <div>
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">จำนวนสิทธิ์ทั้งหมด</label>
+            <input id="cf_limit" type="number" min="1" placeholder="ว่าง = ไม่จำกัด"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          </div>
+          <div style="display:flex;align-items:flex-end;gap:10px;">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600;color:#555;padding-bottom:9px;">
+              <input type="checkbox" id="cf_active" checked style="width:16px;height:16px;accent-color:var(--accent,#C0392B);">
+              เปิดใช้งาน (Active)
+            </label>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;">
+          <button onclick="saveCoupon()" id="couponSaveBtn"
+            style="padding:10px 24px;background:#C0392B;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">
+            💾 บันทึกคูปอง
+          </button>
+          <button onclick="resetCouponForm()"
+            style="padding:10px 18px;background:#f0f0f0;color:#555;border:none;border-radius:10px;font-size:13px;font-weight:600;font-family:'Sarabun',sans-serif;cursor:pointer;">
+            ล้างฟอร์ม
+          </button>
+        </div>
+      </div>
+
+      <!-- Coupon list -->
+      <div style="font-size:14px;font-weight:700;color:#2C3E50;margin-bottom:12px;">📋 คูปอง/ส่วนลดทั้งหมด</div>
+      <div id="couponList" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="text-align:center;color:#aaa;padding:20px;">⏳ กำลังโหลด...</div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
