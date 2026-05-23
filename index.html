@@ -1120,8 +1120,24 @@ async function updateStatus(orderId, status) {
     const o = allOrders.find(x => x.order_id === orderId);
     const oldStatus = o ? o.status : null;
 
-    const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
-    if (error) throw error;
+    // ── เรียก backend PATCH เพื่อให้ส่ง LINE Flex อัตโนมัติ ──
+    const bu = getBackendUrl();
+    if (bu) {
+      const r = await fetch(`${bu}/orders/${orderId}/status`, {
+        method : 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify({ status })
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        throw new Error(err.error || r.statusText);
+      }
+    } else {
+      // fallback: ถ้าไม่มี backend URL → อัปเดต Supabase ตรงๆ
+      const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
+      if (error) throw error;
+    }
+
     if (o) o.status = status;
     renderStats(allOrders);
     toast('อัปเดตสถานะแล้ว ✓', 'success');
