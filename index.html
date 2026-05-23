@@ -1120,22 +1120,11 @@ async function updateStatus(orderId, status) {
     const o = allOrders.find(x => x.order_id === orderId);
     const oldStatus = o ? o.status : null;
 
-    // 1) อัปเดต Supabase ตรงๆ (เหมือนเดิม — เร็ว ไม่มีปัญหา CORS)
     const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
     if (error) throw error;
     if (o) o.status = status;
     renderStats(allOrders);
     toast('อัปเดตสถานะแล้ว ✓', 'success');
-
-    // 2) แจ้ง backend ให้ส่ง LINE Flex (fire-and-forget — ถ้า fail ก็ไม่เป็นไร)
-    const bu = getBackendUrl();
-    if (bu && oldStatus !== status) {
-      fetch(`${bu}/orders/${orderId}/status`, {
-        method : 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body   : JSON.stringify({ status })
-      }).catch(() => {}); // ไม่ await — ไม่บล็อก UI
-    }
 
     // 🔔 Auto-notify: ส่งข้อความตามเทมเพลตให้ลูกค้า (ถ้าสถานะเปลี่ยนจริง และเปิด toggle)
     //  หมายเหตุ: ไม่เรียก backend PATCH /orders/:id/status เพราะ:
