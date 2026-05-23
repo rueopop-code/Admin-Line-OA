@@ -1088,6 +1088,7 @@ function renderOrders(orders) {
             <button class="icon-btn" title="แชท / ส่งข้อความ" onclick="openChatModal('${escapeAttr(o.order_id)}')">💬</button>
             ${(o.map_lat && o.map_lng) ? `<button class="icon-btn" title="📍 ดูแผนที่จัดส่ง" onclick="openMapModal('${escapeAttr(o.order_id)}')" style="background:#fff3e0;color:#e65100;">📍</button>` : ''}
             ${isGhost ? '' : `<button class="icon-btn" title="📤 ส่งออเดอร์ให้ลูกค้าใน LINE" onclick="resendOrder('${escapeAttr(o.order_id)}')" style="background:#e8f5e9;color:#2e7d32;">📤</button>`}
+            ${isGhost ? '' : `<button class="icon-btn" title="📣 ส่งสถานะปัจจุบันไป LINE ลูกค้า" onclick="notifyStatus('${escapeAttr(o.order_id)}')" style="background:#fff3e0;color:#e65100;">📣</button>`}
             ${isGhost ? '' : `<button class="icon-btn" title="🖨️ ปริ้นใบสั่งซื้อ" onclick="printOrder('${escapeAttr(o.order_id)}')" style="background:#f3e5f5;color:#6a1b9a;">🖨️</button>`}
             ${editBtn}
             <button class="icon-btn danger" title="ลบ" onclick="deleteOrder('${escapeAttr(o.order_id)}')">🗑️</button>
@@ -1120,11 +1121,22 @@ async function updateStatus(orderId, status) {
     const o = allOrders.find(x => x.order_id === orderId);
     const oldStatus = o ? o.status : null;
 
+    // 1) อัปเดต Supabase ตรงๆ (เหมือนเดิม — เร็ว ไม่มีปัญหา CORS)
     const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
     if (error) throw error;
     if (o) o.status = status;
     renderStats(allOrders);
     toast('อัปเดตสถานะแล้ว ✓', 'success');
+
+    // 2) แจ้ง backend ให้ส่ง LINE Flex (fire-and-forget — ถ้า fail ก็ไม่เป็นไร)
+    const bu = getBackendUrl();
+    if (bu && oldStatus !== status) {
+      fetch(`${bu}/orders/${orderId}/status`, {
+        method : 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body   : JSON.stringify({ status })
+      }).catch(() => {}); // ไม่ await — ไม่บล็อก UI
+    }
 
     // 🔔 Auto-notify: ส่งข้อความตามเทมเพลตให้ลูกค้า (ถ้าสถานะเปลี่ยนจริง และเปิด toggle)
     //  หมายเหตุ: ไม่เรียก backend PATCH /orders/:id/status เพราะ:
@@ -2254,6 +2266,29 @@ function toggleAdminSecretCodeField() {
   const isSecret = document.getElementById('cf_is_secret').checked;
   document.getElementById('cf_secret_code_wrap').style.display = isSecret ? 'block' : 'none';
   if (!isSecret) document.getElementById('cf_secret_code').value = '';
+}
+
+// ── ส่งสถานะปัจจุบันไป LINE ลูกค้า ──────────────────────
+async function notifyStatus(orderId) {
+  const bu = getBackendUrl();
+  if (!bu) { toast('กรุณากรอก Backend URL ก่อน', 'error'); return; }
+
+  const o = allOrders.find(x => x.order_id === orderId);
+  const statusTH = {
+    pending:'รอดำเนินการ', sent:'ส่ง LINE แล้ว', confirmed:'ยืนยันแล้ว',
+    shipped:'กำลังจัดส่ง', done:'เสร็จสิ้น', cancelled:'ยกเลิก', failed:'ผิดพลาด'
+  };
+  const st = o?.status || 'pending';
+  if (!confirm(`ส่งสถานะ "${statusTH[st] || st}" ไปให้ลูกค้าทาง LINE?`)) return;
+
+  try {
+    const r = await fetch(`${bu}/orders/${orderId}/notify-status`, { method: 'POST' });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || r.statusText);
+    toast('📣 ส่งสถานะไปแล้ว!', 'success');
+  } catch(e) {
+    toast('ส่งไม่สำเร็จ: ' + e.message, 'error');
+  }
 }
 
 </script>
