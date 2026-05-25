@@ -1547,7 +1547,7 @@ async function resendOrder(orderId) {
   toast('⏳ กำลังส่ง...', 'info');
 
   try {
-    const res = await fetch(`${backendUrl}/resend-order/${encodeURIComponent(orderId)}`, {
+    const res = await fetchWithRetry(`${backendUrl}/resend-order/${encodeURIComponent(orderId)}`, {
       method: 'POST'
     });
     const result = await res.json().catch(() => ({}));
@@ -2269,6 +2269,24 @@ function toggleAdminSecretCodeField() {
 }
 
 // ── ส่งสถานะปัจจุบันไป LINE ลูกค้า ──────────────────────
+// ─── fetchWithRetry: รอ Render ตื่นแล้วลองใหม่อัตโนมัติ ───
+async function fetchWithRetry(url, opts = {}, { retries = 4, baseDelay = 4000 } = {}) {
+  for (let i = 0; i <= retries; i++) {
+    try {
+      const r = await fetch(url, { ...opts, signal: AbortSignal.timeout(15000) });
+      // Render cold-start คืน HTML — ตรวจ content-type ด้วย
+      const ct = r.headers.get('content-type') || '';
+      if (!ct.includes('json') && !r.ok) throw new Error('Server ยังไม่พร้อม (HTTP ' + r.status + ')');
+      return r;
+    } catch (e) {
+      if (i === retries) throw e;
+      const delay = baseDelay * (i + 1); // 4s, 8s, 12s, 16s
+      console.warn(`fetchWithRetry attempt ${i+1} failed: ${e.message} — รอ ${delay/1000}s แล้วลองใหม่`);
+      await new Promise(res => setTimeout(res, delay));
+    }
+  }
+}
+
 async function notifyStatus(orderId) {
   const bu = getBackendUrl();
   if (!bu) { toast('กรุณากรอก Backend URL ก่อน', 'error'); return; }
@@ -2281,9 +2299,10 @@ async function notifyStatus(orderId) {
   const st = o?.status || 'pending';
   if (!confirm(`ส่งสถานะ "${statusTH[st] || st}" ไปให้ลูกค้าทาง LINE?`)) return;
 
+  toast('⏳ กำลังส่ง... (รอ Render ตื่นได้ถึง ~30 วิ)', 'info', 35000);
   try {
-    const r = await fetch(`${bu}/orders/${orderId}/notify-status`, { method: 'POST' });
-    const d = await r.json();
+    const r = await fetchWithRetry(`${bu}/orders/${orderId}/notify-status`, { method: 'POST' });
+    const d = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(d.error || r.statusText);
     toast('📣 ส่งสถานะไปแล้ว!', 'success');
   } catch(e) {
