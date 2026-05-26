@@ -624,6 +624,7 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
         📦 โหลดสินค้าแล้ว <span id="p3ProductCount">0</span> รายการ
       </div>
       <button onclick="loadProductsForPage3()" style="padding:8px 16px;background:#1976d2;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">📦 โหลดสินค้าหน้าร้าน</button>
+      <button onclick="debugProductFields()" style="padding:8px 16px;background:#795548;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">🔍 ดู fields</button>
       <button onclick="renderPage3Orders()" style="padding:8px 16px;background:var(--red);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;">🔄 รีเฟรช</button>
     </div>
   </div>
@@ -1547,37 +1548,187 @@ function renderPage3Orders() {
 }
 
 // ── Load products from products table ──
+// Auto-detect price/stock fields from product object
+// Fuzzy product name matching — strips brackets, extra spaces, special chars
+function normName(s) {
+  return (s||'').toLowerCase()
+    .replace(/[（）\(\)\[\]【】「」『』]/g, ' ') // remove all bracket types
+    .replace(/[×xX✕]/g, 'x')                    // normalize × to x
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+function findProduct(name) {
+  if (!name) return null;
+  const n = normName(name);
+  // 1. Exact
+  let p = allProducts.find(p => normName(p.name) === n);
+  if (p) return p;
+  // 2. One contains the other
+  p = allProducts.find(p => normName(p.name).includes(n) || n.includes(normName(p.name)));
+  if (p) return p;
+  // 3. All words in order name exist in product name
+  const words = n.split(' ').filter(w => w.length > 1);
+  p = allProducts.find(p => words.every(w => normName(p.name).includes(w)));
+  return p || null;
+}
+
+function detectProductFields(sample) {
+  if (!sample) return { priceField: null, stockField: null };
+  const keys = Object.keys(sample);
+  const isTimestamp = v => typeof v === 'number' && v > 9999999999; // ms timestamp > year 2286
+
+  // Price field candidates
+  const priceKeys = ['price','unit_price','selling_price','sale_price','harga','ราคา','price_thb','retail_price','cost_price','ราคาขาย','ราคาต่อหน่วย'];
+  let priceField = priceKeys.find(k => keys.includes(k) && sample[k] !== undefined && sample[k] !== null && !isTimestamp(parseFloat(sample[k]))) || null;
+  // Fallback: scan numeric fields, skip timestamps and id-like fields
+  if (!priceField) {
+    const skipNames = ['id','ts','timestamp','created','updated','stock','quantity','qty','inventory','count','sort','order_num'];
+    priceField = keys.find(k => {
+      if (skipNames.some(s => k.toLowerCase().includes(s))) return false;
+      const v = parseFloat(sample[k]);
+      return !isNaN(v) && v > 0 && !isTimestamp(v);
+    }) || null;
+  }
+
+  // Stock field candidates
+  const stockKeys = ['stock','quantity','qty','stock_qty','inventory','คงเหลือ','remaining','balance','stock_amount','จำนวน','คงคลัง'];
+  const stockField = stockKeys.find(k => keys.includes(k) && sample[k] !== undefined && sample[k] !== null) || null;
+
+  console.log('[Products] fields:', keys.join(', '));
+  console.log('[Products] detected price→', priceField, '| stock→', stockField);
+  if (sample.sizes) console.log('[Products] sizes sample:', JSON.stringify(sample.sizes).slice(0, 200));
+  return { priceField, stockField };
+}
+
+// Try to extract price from sizes field (array or object)
+function extractPriceFromSizes(sizesVal) {
+  if (!sizesVal) return null;
+  try {
+    const s = typeof sizesVal === 'string' ? JSON.parse(sizesVal) : sizesVal;
+    if (Array.isArray(s)) {
+      // [{price:15, ...}, ...]  or [{p:15}] etc.
+      for (const item of s) {
+        if (typeof item === 'object') {
+          const keys = Object.keys(item);
+          const pk = keys.find(k => ['price','p','ราคา','unit_price'].includes(k));
+          if (pk && !isNaN(parseFloat(item[pk]))) return parseFloat(item[pk]);
+        }
+      }
+    } else if (typeof s === 'object') {
+      // {s: {price:15}, m: {price:20}} or {price:15}
+      if (s.price && !isNaN(parseFloat(s.price))) return parseFloat(s.price);
+      // First sub-object with price
+      for (const key of Object.keys(s)) {
+        const sub = s[key];
+        if (typeof sub === 'object' && sub !== null) {
+          const pk = Object.keys(sub).find(k => ['price','p','ราคา'].includes(k));
+          if (pk && !isNaN(parseFloat(sub[pk]))) return parseFloat(sub[pk]);
+        }
+      }
+    }
+  } catch(e) {}
+  return null;
+}
+
+// Normalize product to standard shape { id, name, price, stock, emoji, _raw }
+function normalizeProducts(raw) {
+  if (!raw.length) return [];
+  const { priceField, stockField } = detectProductFields(raw[0]);
+  const isTimestamp = v => typeof v === 'number' && v > 9999999999;
+  return raw.map(p => {
+    let price = priceField ? parseFloat(p[priceField]) : 0;
+    if (isNaN(price) || isTimestamp(price)) price = 0;
+    // Fallback: try to get price from sizes
+    if (!price && p.sizes) price = extractPriceFromSizes(p.sizes) || 0;
+    const stock = stockField ? (p[stockField] ?? null) : null;
+    return {
+      ...p,
+      price,
+      stock,
+      quantity: stock,
+      name: p.name || p.product_name || p.item_name || p.ชื่อ || '',
+      emoji: p.emoji || p.icon || '📦',
+    };
+  });
+}
+
 async function loadProductsForPage3() {
   if (!sb) { toast('เชื่อมต่อ Supabase ก่อน', 'error'); return; }
-  try {
-    const { data, error } = await sb.from('products').select('*').order('name');
+  const tryLoad = async (table) => {
+    const { data, error } = await sb.from(table).select('*').order('name');
     if (error) throw error;
-    allProducts = data || [];
-    document.getElementById('p3StockStatus').style.display = 'flex';
-    document.getElementById('p3ProductCount').textContent = allProducts.length;
-    toast(`📦 โหลดสินค้าแล้ว ${allProducts.length} รายการ`, 'success');
+    return data || [];
+  };
+
+  let raw = [];
+  let tableName = '';
+  try {
+    raw = await tryLoad('products'); tableName = 'products';
   } catch(e) {
-    toast('โหลดสินค้าไม่ได้: ' + e.message, 'error');
-    // Try alternate table names
-    try {
-      const { data } = await sb.from('menu_items').select('*').order('name');
-      if (data) {
-        allProducts = data;
-        document.getElementById('p3StockStatus').style.display = 'flex';
-        document.getElementById('p3ProductCount').textContent = allProducts.length;
-        toast(`📦 โหลดสินค้าจาก menu_items: ${allProducts.length} รายการ`, 'success');
-      }
-    } catch(e2) {}
+    try { raw = await tryLoad('menu_items'); tableName = 'menu_items'; }
+    catch(e2) {
+      toast('โหลดสินค้าไม่ได้: ' + e.message, 'error'); return;
+    }
+  }
+
+  allProducts = normalizeProducts(raw);
+  document.getElementById('p3StockStatus').style.display = 'flex';
+  document.getElementById('p3ProductCount').textContent = allProducts.length;
+
+  // Debug info: show detected fields
+  if (raw.length) {
+    const { priceField, stockField } = detectProductFields(raw[0]);
+    const priceInfo = priceField ? `ราคา→${priceField}` : 'ไม่พบ field ราคา';
+    const stockInfo = stockField ? `สต็อก→${stockField}` : 'ไม่พบ field สต็อก';
+    toast(`📦 ${tableName}: ${allProducts.length} รายการ | ${priceInfo} | ${stockInfo}`, 'success');
   }
 }
 
 // ── Enhanced Edit Modal ──
+function debugProductFields() {
+  if (!allProducts.length) { toast('กรุณาโหลดสินค้าก่อน', 'warn'); return; }
+  const p = allProducts[0];
+  const keys = Object.keys(p);
+  const isTimestamp = v => typeof v === 'number' && v > 9999999999;
+  const rows = keys.map(k => {
+    let v = p[k];
+    let tag = '';
+    if (k === 'price') { tag = ` <b style="color:var(--red);">← ราคาที่ใช้ = ${p.price}</b>`; }
+    else if (k === 'stock' || k === 'quantity') { tag = ` <b style="color:#1976d2;">← สต็อก</b>`; }
+    else if (typeof v === 'number' && isTimestamp(v)) { tag = ' <span style="color:#aaa;">(timestamp)</span>'; }
+    else if (typeof v === 'number') { tag = ' <span style="color:#2e7d32;">(ตัวเลข)</span>'; }
+    if (k === 'sizes' && v && typeof v === 'object') v = JSON.stringify(v).slice(0, 120) + '…';
+    return `<tr style="border-bottom:1px solid #f5f5f5;"><td style="padding:4px 8px;font-family:monospace;color:#1976d2;white-space:nowrap;">${k}</td><td style="padding:4px 8px;word-break:break-all;">${v ?? '—'}${tag}</td></tr>`;
+  }).join('');
+  const priceFromSizes = p.sizes ? extractPriceFromSizes(p.sizes) : null;
+  const sizesHint = priceFromSizes ? `<div style="margin-top:8px;padding:8px 10px;background:#e8f5e9;border-radius:8px;font-size:12px;">✅ ดึงราคาจาก <b>sizes</b> ได้: <b style="color:#2e7d32;">฿${priceFromSizes}</b></div>` : '';
+  const html = `<div id="dbg-modal" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:1px solid var(--border);border-radius:12px;padding:20px;z-index:9999;max-width:520px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,.2);max-height:80vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+      <div style="font-weight:700;font-size:15px;">🔍 Fields ของตารางสินค้า (แถวแรก)</div>
+      <button onclick="document.getElementById('dbg-modal').remove();document.getElementById('dbg-overlay').remove();" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border);background:#f5f5f7;cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">×</button>
+    </div>
+    <div style="font-size:12px;color:var(--sub);margin-bottom:12px;">ราคาปัจจุบันที่ระบบใช้: <b style="color:var(--red);">฿${p.price || '—'}</b></div>
+    ${sizesHint}
+    <table style="width:100%;font-size:12px;border-collapse:collapse;margin-top:10px;">${rows}</table>
+    <div style="margin-top:14px;text-align:right;"><button onclick="document.getElementById('dbg-modal').remove();document.getElementById('dbg-overlay').remove();" style="padding:6px 16px;background:var(--red);color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:14px;">ปิด</button></div>
+  </div><div id="dbg-overlay" onclick="document.getElementById('dbg-modal').remove();document.getElementById('dbg-overlay').remove();" style="position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998;"></div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
 function openEnhancedEdit(orderId) {
   const o = allOrders.find(x => x.order_id === orderId);
   if (!o) return;
 
   eeEditingOrderId = orderId;
-  eeOriginalItems = JSON.parse(JSON.stringify(o.items || [])); // deep copy
+  // Deep copy + backfill price from allProducts if missing
+  eeOriginalItems = JSON.parse(JSON.stringify(o.items || []));
+  eeOriginalItems = eeOriginalItems.map(i => {
+    if ((!i.price || i.price === 0) && i.name) {
+      const prod = findProduct(i.name);
+      if (prod) i.price = prod.price || 0;
+    }
+    return i;
+  });
 
   document.getElementById('eeOrderId').textContent = `ออเดอร์ #${orderId} — ${o.customer_name || ''}`;
   document.getElementById('eeCustomer').value = o.customer_name || '';
@@ -1599,11 +1750,13 @@ function closeEnhancedEdit() {
 function renderEnhancedItems(items) {
   const list = document.getElementById('eeItemsList');
   list.innerHTML = items.map((it, idx) => {
-    const prod = allProducts.find(p => p.name?.toLowerCase().trim() === (it.name||'').toLowerCase().trim());
+    const prod = findProduct((it.name||''));
+    // *** Always use catalog price if product found ***
+    if (prod && prod.price) it.price = prod.price;
     const stockNum = prod ? (prod.stock ?? prod.quantity ?? null) : null;
     const stockBadge = stockNum !== null
-      ? `<div style="font-size:10px;color:${stockNum < 5 ? '#e53935' : '#2e7d32'};margin-top:2px;padding-left:2px;">📦 สต็อก: ${stockNum}</div>`
-      : (it.name ? `<div style="font-size:10px;color:#aaa;margin-top:2px;padding-left:2px;">ไม่พบในร้าน</div>` : '');
+      ? `<div class="stock-badge-inline" style="font-size:10px;color:${stockNum < 5 ? '#e53935' : '#2e7d32'};margin-top:2px;padding-left:2px;">📦 สต็อก: ${stockNum}</div>`
+      : (it.name ? `<div class="stock-badge-inline" style="font-size:10px;color:#aaa;margin-top:2px;padding-left:2px;">ไม่พบในร้าน</div>` : '<div class="stock-badge-inline"></div>');
     return `
       <div class="enhanced-item-row" data-idx="${idx}">
         <div style="display:flex;flex-direction:column;min-width:0;">
@@ -1734,13 +1887,25 @@ function hideProductSuggestions(idx) {
 function selectProduct(idx, name, price) {
   const rows = document.querySelectorAll('#eeItemsList .enhanced-item-row');
   if (!rows[idx]) return;
-  rows[idx].querySelector('[data-field="name"]').value = name;
-  rows[idx].querySelector('[data-field="price"]').value = price;
+  const row = rows[idx];
+
+  // Update name field
+  row.querySelector('[data-field="name"]').value = name;
+  // Always use catalog price
+  const priceField = row.querySelector('[data-field="price"]');
+  priceField.value = price;
   hideProductSuggestions(idx);
+
+  // Update stock badge in this row
+  const prod = findProduct(name);
+  const stockNum = prod ? (prod.stock ?? prod.quantity ?? null) : null;
+  const badgeEl = row.querySelector('.stock-badge-inline');
+  if (badgeEl) {
+    badgeEl.textContent = stockNum !== null ? `📦 สต็อก: ${stockNum}` : 'ไม่พบในร้าน';
+    badgeEl.style.color = stockNum !== null ? (stockNum < 5 ? '#e53935' : '#2e7d32') : '#aaa';
+  }
+
   recalcEETotal();
-  // Refresh stock badge
-  const items = getCurrentEEItems();
-  renderEnhancedItems(items);
   setTimeout(() => updateStockPreview(), 50);
 }
 
@@ -1789,7 +1954,7 @@ function updateStockPreview() {
 
   document.getElementById('eeStockPreview').style.display = 'block';
   document.getElementById('eeStockChanges').innerHTML = diff.map(d => {
-    const prod = allProducts.find(p => p.name?.toLowerCase().trim() === d.name.toLowerCase().trim());
+    const prod = findProduct(d.name);
     const currentStock = prod ? (prod.stock ?? prod.quantity ?? '?') : '?';
     const arrow = d.change > 0 ? '↑' : '↓';
     const cls = d.change > 0 ? 'stock-change-up' : 'stock-change-down';
@@ -1859,7 +2024,7 @@ async function adjustStock(originalItems, newItems) {
   if (!diff.length) return;
 
   for (const d of diff) {
-    const prod = allProducts.find(p => p.name?.toLowerCase().trim() === d.name.toLowerCase().trim());
+    const prod = findProduct(d.name);
     if (!prod) continue;
 
     const stockField = 'stock' in prod ? 'stock' : ('quantity' in prod ? 'quantity' : null);
