@@ -74,6 +74,7 @@ header {
 
 /* ════════════ PAGE ════════════ */
 .admin-page { max-width: 1280px; margin: 0 auto; padding: 20px 16px 60px; }
+@media (max-width: 768px) { .admin-page { padding: 12px 10px 60px; } }
 
 /* ════════════ CONFIG BAR ════════════ */
 .config-bar {
@@ -86,6 +87,12 @@ header {
   padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px;
   font-size: 13px; font-family: inherit; min-width: 240px; background: var(--bg);
 }
+@media (max-width: 768px) {
+  .config-bar { flex-direction: column; align-items: stretch; padding: 12px; gap: 8px; }
+  .config-field { width: 100%; }
+  .config-field input { min-width: unset; width: 100%; }
+  .load-btn { width: 100%; }
+}
 .config-field input:focus { outline: none; border-color: var(--red); }
 .load-btn {
   padding: 8px 18px; background: var(--red); color: #fff; border: none;
@@ -95,6 +102,7 @@ header {
 
 /* ════════════ STATS ════════════ */
 .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px,1fr)); gap: 10px; margin-bottom: 18px; }
+@media (max-width: 768px) { .stats { grid-template-columns: repeat(2,1fr); gap: 8px; } }
 .stat-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); padding: 14px 16px; }
 .stat-num { font-size: 26px; font-weight: 700; line-height: 1; }
 .stat-label { font-size: 11px; color: var(--sub); margin-top: 4px; letter-spacing:.2px; }
@@ -118,6 +126,7 @@ mark.search-hl { background:#fff59d; color:#d84315; padding:0 2px; border-radius
 
 /* ════════════ ORDERS TABLE ════════════ */
 .orders-card { background: var(--card); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+@media (max-width: 768px) { .orders-card { overflow-x: auto; } table { min-width: 560px; } th,td { padding: 8px 10px; font-size: 11px; } }
 .orders-head { padding: 12px 18px; border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between; gap:10px; flex-wrap:wrap; }
 .orders-head h2 { font-size: 15px; font-weight: 600; }
@@ -212,6 +221,18 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
 .modal {
   background: #fff; border-radius: 14px; width: 100%; max-width: 640px;
   max-height: 90vh; overflow-y: auto; animation: slideUp .25s ease;
+}
+@media (max-width: 768px) {
+  .modal-bg { padding: 0; align-items: flex-end; }
+  .modal {
+    max-width: 100% !important; width: 100% !important;
+    max-height: 92vh; border-radius: 20px 20px 0 0;
+    animation: slideUpMobile .25s ease;
+  }
+  @keyframes slideUpMobile { from{transform:translateY(100%);} to{transform:translateY(0);} }
+  .modal-hdr { padding: 14px 16px; border-radius: 20px 20px 0 0; }
+  .modal-body { padding: 14px 16px; }
+  .modal-ftr { padding: 12px 16px; }
 }
 @keyframes slideUp { from{transform:translateY(20px); opacity:0;} to{transform:translateY(0); opacity:1;} }
 .modal-hdr {
@@ -448,73 +469,10 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
   .pr-note { background:#fff8e1; border:1px solid #ffa726; padding:3px 8px; margin-top:2mm; font-size:10pt; border-radius:2mm; }
 }
 
-
-/* ════════════ MOBILE RESPONSIVE ════════════ */
-@media (max-width: 768px) {
-  /* Header */
-  .admin-header { padding: 0 12px; height: 50px; gap: 6px; }
-  .admin-title { font-size: 13px; }
-  .header-actions { gap: 6px; }
-  .header-btn { padding: 5px 10px; font-size: 11px; }
-  .header-btn span:not(.status-dot) { display: none; }
-  
-  /* Nav tabs scroll */
-  .admin-nav { padding: 0 8px; }
-  .nav-tab { padding: 10px 14px; font-size: 12px; }
-
-  /* Page padding */
-  .admin-page { padding: 12px 10px 60px; }
-
-  /* Config bar */
-  .config-bar { flex-direction: column; gap: 8px; padding: 12px; }
-  .config-field input { min-width: unset; width: 100%; }
-  .load-btn { width: 100%; height: 38px; }
-
-  /* Stats — 2 คอลัมน์ */
-  .stats { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  .stat-card { padding: 10px 12px; }
-  .stat-num { font-size: 22px; }
-
-  /* Filter chips wrap */
-  .filter-bar { gap: 5px; }
-  .fchip { padding: 5px 10px; font-size: 11px; }
-
-  /* Table — scroll แนวนอน */
-  .orders-card { overflow-x: auto; }
-  table { min-width: 600px; }
-  th, td { padding: 9px 10px; font-size: 12px; }
-  .items-list { max-width: 140px; font-size: 11px; }
-
-  /* Modal */
-  .modal-overlay .modal { width: 96% !important; max-width: 96% !important; padding: 16px !important; }
-  .modal h3 { font-size: 15px; }
-
-  /* Action buttons ใน table */
-  .action-btn { width: 30px; height: 30px; font-size: 14px; }
-
-  /* Chart */
-  .chart-grid { grid-template-columns: 1fr; }
-  .chart-card { padding: 12px; }
-
-  /* Orders head */
-  .orders-head { padding: 10px 12px; }
-  .orders-head h2 { font-size: 13px; }
-
-  /* Print btn */
-  #printAllBtn { padding: 7px 12px; font-size: 12px; }
+@media (max-width:640px) {
+  .chart-grid { grid-template-columns:1fr; }
+  .items-list { max-width:140px; font-size:11px; }
 }
-
-@media (max-width: 480px) {
-  .admin-header { height: 46px; padding: 0 10px; }
-  .admin-title { font-size: 12px; }
-  .stats { grid-template-columns: repeat(2, 1fr); gap: 6px; }
-  .stat-num { font-size: 20px; }
-  .stat-label { font-size: 10px; }
-  .nav-tab { padding: 8px 12px; font-size: 11px; }
-  .admin-page { padding: 10px 8px 60px; }
-  th, td { padding: 8px 8px; font-size: 11px; }
-}
-
 </style>
 <!-- PWA -->
 <meta name="mobile-web-app-capable" content="yes">
