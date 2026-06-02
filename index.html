@@ -603,6 +603,11 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
     <div class="orders-head">
       <h2>รายการออเดอร์</h2>
       <div style="display:flex;align-items:center;gap:10px;">
+        <button onclick="autoLinkAllOrders()" id="autoLinkBtn"
+          style="padding:6px 12px;background:#e8f5e9;border:1.5px solid #43a047;color:#2e7d32;border-radius:8px;font-size:12px;font-family:'Sarabun',sans-serif;font-weight:700;cursor:pointer;"
+          title="สแกนและผูก line_user_id ให้ออเดอร์ที่ชื่อ+เบอร์ตรงกับ LINE OA อัตโนมัติ">
+          🔗 ผูก LINE อัตโนมัติ
+        </button>
         <button onclick="printAllVisible()" style="padding:6px 12px;background:#f3e5f5;border:1.5px solid #6a1b9a;color:#6a1b9a;border-radius:8px;font-size:12px;font-family:'Sarabun',sans-serif;font-weight:700;cursor:pointer;">
           🖨️ ปริ้นทั้งหมด
         </button>
@@ -856,6 +861,22 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
         <button class="add-item-btn" onclick="addOrderItem()">+ เพิ่มรายการ</button>
       </div>
       <div class="total-display">รวม: <span id="emTotal">฿0</span></div>
+
+      <!-- ── DISCOUNT SECTION ── -->
+      <div id="emDiscountSection" style="margin-top:14px;padding:12px 14px;background:#fff8f0;border:1.5px solid #ffd0a0;border-radius:12px;">
+        <div style="font-size:12px;font-weight:700;color:#c0392b;margin-bottom:10px;">🎟️ ส่วนลด / คูปอง</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px;">รหัสคูปอง (ถ้ามี)</label>
+            <input type="text" id="emCouponCode" placeholder="เช่น SAVE20" style="width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;font-family:inherit;outline:none;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px;">ส่วนลด (บาท)</label>
+            <input type="number" id="emDiscountAmount" min="0" placeholder="0" style="width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;font-family:inherit;outline:none;" oninput="recalcTotal()">
+          </div>
+        </div>
+        <div id="emDiscountPreview" style="margin-top:8px;font-size:12px;color:#888;display:none;"></div>
+      </div>
     </div>
     <div class="modal-ftr">
       <button class="btn btn-danger" onclick="deleteCurrentOrder()">🗑️ ลบออเดอร์</button>
@@ -892,6 +913,54 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
   </div>
 </div>
 
+
+<!-- MERGE ORDERS MODAL — ผูกออเดอร์ชื่อ+เบอร์เดียวกัน -->
+<div class="modal-bg" id="mergeOrdersModal">
+  <div class="modal" style="max-width:600px;width:95%;max-height:92vh;display:flex;flex-direction:column;">
+    <div class="modal-hdr" style="background:linear-gradient(135deg,#1565c0,#0d47a1);color:#fff;border-radius:14px 14px 0 0;">
+      <div>
+        <h3>🔗 ผูกออเดอร์ชื่อ + เบอร์เดียวกัน</h3>
+        <div id="moSourceLabel" style="font-size:11px;opacity:.8;margin-top:2px;"></div>
+      </div>
+      <button class="x" onclick="closeMergeOrdersModal()" style="color:#fff;">×</button>
+    </div>
+    <div class="modal-body" style="overflow-y:auto;flex:1;padding:18px 20px;">
+      <!-- ออเดอร์ต้นทาง -->
+      <div id="moSourceCard" style="background:#e3f2fd;border:1.5px solid #90caf9;border-radius:12px;padding:12px 14px;margin-bottom:14px;font-size:13px;"></div>
+
+      <!-- ช่องค้นหา -->
+      <div style="background:#f8f9fa;border:1.5px solid #e0e0e0;border-radius:12px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:10px;">🔍 ค้นหาออเดอร์ที่ต้องการผูก</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px;">ชื่อลูกค้า</label>
+            <input type="text" id="moSearchName" placeholder="เช่น โรงแรมแม่ยมพาเลส"
+              style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;outline:none;"
+              oninput="updateMergeSearch()">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px;">เบอร์โทร</label>
+            <input type="text" id="moSearchPhone" placeholder="เช่น 0812345678"
+              style="width:100%;padding:8px 10px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;outline:none;"
+              inputmode="tel" oninput="updateMergeSearch()">
+          </div>
+        </div>
+        <button onclick="runMergeSearch()" style="margin-top:10px;padding:8px 18px;background:#1565c0;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;">🔍 ค้นหา</button>
+      </div>
+
+      <!-- ผลการค้นหา -->
+      <div id="moSearchResults" style="min-height:60px;"></div>
+    </div>
+    <div class="modal-ftr">
+      <button class="btn" onclick="closeMergeOrdersModal()">ยกเลิก</button>
+      <button class="btn btn-primary" id="moMergeBtn" onclick="saveMergeOrders()"
+        style="background:linear-gradient(135deg,#1565c0,#0d47a1);" disabled>
+        🔗 ผูกออเดอร์ที่เลือก
+      </button>
+    </div>
+  </div>
+</div>
+
 <!-- CHAT MODAL -->
 <div class="modal-bg" id="chatModal">
   <div class="modal">
@@ -903,11 +972,22 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
       <div id="cmCustomerInfo" style="font-size:12px;color:var(--sub);margin-bottom:10px;"></div>
       <div class="quick-templates" id="cmQuickTpls"></div>
       <div class="chat-list" id="cmChatList"></div>
+      <!-- Toggle ส่งไป LINE หรือ Note ภายใน -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+        <label id="cmSendModeLabel" style="display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;
+               background:#e8f5e9;border:1.5px solid #a5d6a7;border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;color:#2e7d32;transition:all .2s;">
+          <input type="checkbox" id="cmSendToLine" checked
+            style="width:14px;height:14px;accent-color:#06C755;cursor:pointer;"
+            onchange="updateChatSendMode()">
+          <span id="cmSendModeText">📲 ส่งไป LINE ลูกค้า</span>
+        </label>
+        <span id="cmSendModeHint" style="font-size:11px;color:#888;"></span>
+      </div>
       <div class="chat-input-row">
         <textarea id="cmInput" placeholder="พิมพ์ข้อความ... (Enter ส่ง / Shift+Enter ขึ้นบรรทัดใหม่)" rows="2"></textarea>
         <button class="chat-send" id="cmSendBtn" onclick="sendChatMessage()">ส่ง</button>
       </div>
-      <div style="font-size:11px;color:var(--sub);margin-top:6px;">💡 ข้อความจะส่งไป LINE ลูกค้าและบันทึกใน Supabase</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:6px;">💡 เปิด toggle = ส่งไป LINE ลูกค้า | ปิด toggle = บันทึก Note ภายในเท่านั้น</div>
     </div>
   </div>
 </div>
@@ -987,6 +1067,22 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
         <button class="add-item-btn" onclick="addEnhancedItem()">+ เพิ่มรายการสินค้า</button>
       </div>
       <div class="total-display">รวม: <span id="eeTotal">฿0</span></div>
+
+      <!-- ── DISCOUNT SECTION ── -->
+      <div id="eeDiscountSection" style="margin-top:14px;padding:12px 14px;background:#fff8f0;border:1.5px solid #ffd0a0;border-radius:12px;">
+        <div style="font-size:12px;font-weight:700;color:#c0392b;margin-bottom:10px;">🎟️ ส่วนลด / คูปอง</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px;">รหัสคูปอง (ถ้ามี)</label>
+            <input type="text" id="eeCouponCode" placeholder="เช่น SAVE20" style="width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;font-family:inherit;outline:none;text-transform:uppercase;" oninput="this.value=this.value.toUpperCase()">
+          </div>
+          <div>
+            <label style="font-size:11px;font-weight:600;color:#555;display:block;margin-bottom:3px;">ส่วนลด (บาท)</label>
+            <input type="number" id="eeDiscountAmount" min="0" placeholder="0" style="width:100%;padding:7px 10px;border:1.5px solid #ddd;border-radius:7px;font-size:13px;font-family:inherit;outline:none;" oninput="recalcEETotal()">
+          </div>
+        </div>
+        <div id="eeDiscountPreview" style="margin-top:8px;font-size:12px;color:#888;display:none;"></div>
+      </div>
 
       <!-- Stock preview -->
       <div id="eeStockPreview" class="stock-preview" style="display:none;margin-top:12px;">
@@ -1412,7 +1508,8 @@ function renderOrders(orders) {
           ).join('')}
         </select>`;
     const editBtn = isGhost
-      ? `<button class="icon-btn" onclick="openLinkModal('${escapeAttr(o.order_id)}')" style="background:#e3f2fd;color:#1565c0;">🔗</button>`
+      ? `<button class="icon-btn" onclick="openLinkModal('${escapeAttr(o.order_id)}')" style="background:#e3f2fd;color:#1565c0;" title="ผูกบัญชี LINE กับออเดอร์">🔗</button>
+         <button class="icon-btn" onclick="openMergeOrdersModal('${escapeAttr(o.order_id)}')" style="background:#e8f5e9;color:#06C755;" title="ผูกกับออเดอร์จริง">🔁</button>`
       : `<button class="icon-btn" onclick="openEditModal('${escapeAttr(o.order_id)}')">✏️</button>`;
     const lineNameDisplay = (o.line_name && o.line_name !== o.customer_name)
       ? `<small style="color:#06C755;font-size:10px;font-weight:600;">📱 ${escapeHtml(o.line_name)}</small><br>`
@@ -1436,6 +1533,7 @@ function renderOrders(orders) {
             ${isGhost ? '' : `<button class="icon-btn" onclick="notifyStatus('${escapeAttr(o.order_id)}')" style="background:#fff3e0;color:#e65100;">📣</button>`}
             ${isGhost ? '' : `<button class="icon-btn" onclick="printOrder('${escapeAttr(o.order_id)}')" style="background:#f3e5f5;color:#6a1b9a;">🖨️</button>`}
             ${editBtn}
+            ${!isGhost ? `<button class="icon-btn" onclick="openMergeOrdersModal('${escapeAttr(o.order_id)}')" style="background:#e8eaf6;color:#3949ab;" title="ผูกออเดอร์ชื่อ/เบอร์เดียวกัน">🔁</button>` : ''}
             <button class="icon-btn danger" onclick="deleteOrder('${escapeAttr(o.order_id)}')">🗑️</button>
           </div>
         </td>
@@ -1790,9 +1888,13 @@ function openEnhancedEdit(orderId) {
   document.getElementById('eePhone').value = o.phone || '';
   document.getElementById('eeAddress').value = o.address || '';
   document.getElementById('eeNote').value = o.note || '';
+  // โหลดค่าส่วนลด/คูปองเดิม
+  document.getElementById('eeCouponCode').value    = o.coupon_code || '';
+  document.getElementById('eeDiscountAmount').value = (o.discount_amount > 0) ? o.discount_amount : '';
 
   renderEnhancedItems(eeOriginalItems.map(i => ({...i})));
   document.getElementById('enhancedEditModal').classList.add('show');
+  updateEeDiscountPreview();
 }
 
 function closeEnhancedEdit() {
@@ -1800,6 +1902,13 @@ function closeEnhancedEdit() {
   eeEditingOrderId = null;
   eeOriginalItems = [];
   document.getElementById('eeStockPreview').style.display = 'none';
+  // ล้าง discount fields
+  const dc = document.getElementById('eeDiscountAmount');
+  const cc = document.getElementById('eeCouponCode');
+  const prev = document.getElementById('eeDiscountPreview');
+  if (dc) dc.value = '';
+  if (cc) cc.value = '';
+  if (prev) prev.style.display = 'none';
 }
 
 function renderEnhancedItems(items) {
@@ -1989,8 +2098,32 @@ function removeEnhancedItem(idx) {
 
 function recalcEETotal() {
   const items = getCurrentEEItems();
-  const total = items.reduce((s, i) => s + (i.qty * i.price), 0);
-  document.getElementById('eeTotal').textContent = '฿' + total.toLocaleString();
+  const subtotal = items.reduce((s, i) => s + (i.qty * i.price), 0);
+  // อ่านส่วนลดจาก input field
+  const discountInput = document.getElementById('eeDiscountAmount');
+  const discountAmount = discountInput ? (parseFloat(discountInput.value) || 0) : 0;
+  const net = Math.max(0, subtotal - discountAmount);
+  document.getElementById('eeTotal').textContent = '฿' + net.toLocaleString();
+  if (discountAmount > 0) {
+    document.getElementById('eeTotal').title = 'ยอดสินค้า ฿' + subtotal.toLocaleString() + ' - ส่วนลด ฿' + discountAmount.toLocaleString();
+  }
+  updateEeDiscountPreview();
+}
+
+function updateEeDiscountPreview() {
+  const items = getCurrentEEItems();
+  const subtotal = items.reduce((s, i) => s + (i.qty * i.price), 0);
+  const discountInput = document.getElementById('eeDiscountAmount');
+  const discountAmount = discountInput ? (parseFloat(discountInput.value) || 0) : 0;
+  const preview = document.getElementById('eeDiscountPreview');
+  if (!preview) return;
+  if (discountAmount > 0) {
+    const net = Math.max(0, subtotal - discountAmount);
+    preview.style.display = 'block';
+    preview.innerHTML = `<span style="color:#666;">ยอดสินค้า ฿${subtotal.toLocaleString()}</span> <span style="color:#e8593c;font-weight:700;">- ส่วนลด ฿${discountAmount.toLocaleString()}</span> = <strong style="color:#c0392b;">฿${net.toLocaleString()}</strong>`;
+  } else {
+    preview.style.display = 'none';
+  }
 }
 
 function updateStockPreview() {
@@ -2040,15 +2173,23 @@ function calcStockDiff(originalItems, newItems) {
 async function saveEnhancedEdit() {
   if (!sb || !eeEditingOrderId) return;
   const newItems = getCurrentEEItems();
-  const total = newItems.reduce((s, i) => s + (i.qty * i.price), 0);
+  const subtotal = newItems.reduce((s, i) => s + (i.qty * i.price), 0);
+
+  // อ่านค่า discount จาก input field ที่ admin แก้ไขได้
+  const discountAmount = parseFloat(document.getElementById('eeDiscountAmount').value) || 0;
+  const couponCode     = document.getElementById('eeCouponCode').value.trim() || null;
+  // ยอดรวมสุทธิ = ยอดสินค้า - ส่วนลด (ไม่ให้ติดลบ)
+  const total = Math.max(0, subtotal - discountAmount);
 
   const update = {
-    customer_name: document.getElementById('eeCustomer').value.trim(),
-    phone        : document.getElementById('eePhone').value.trim(),
-    address      : document.getElementById('eeAddress').value.trim(),
-    note         : document.getElementById('eeNote').value.trim(),
-    items        : newItems,
-    total        : total
+    customer_name  : document.getElementById('eeCustomer').value.trim(),
+    phone          : document.getElementById('eePhone').value.trim(),
+    address        : document.getElementById('eeAddress').value.trim(),
+    note           : document.getElementById('eeNote').value.trim(),
+    items          : newItems,
+    total,
+    discount_amount: discountAmount,
+    coupon_code    : couponCode,
   };
 
   try {
@@ -2294,9 +2435,20 @@ async function updateStatus(orderId, status) {
       const tpls = getTemplates();
       const tpl = tpls[status];
       if (tpl && tpl.trim()) {
-        const text = fillTemplate(tpl, o);
-        await sendMessage(o, text, { kind: 'system', silent: true });
-        toast('🔔 ส่งแจ้งเตือนแล้ว', 'success');
+        // มี LINE ผูกอยู่ → ถามก่อนส่ง ไม่ยิงอัตโนมัติเงียบๆ
+        const hasLine = !!(o.line_user_id);
+        const STATUS_TH_NOTIFY = { pending:'รอดำเนินการ', sent:'ส่ง LINE แล้ว', confirmed:'ยืนยันแล้ว', shipped:'กำลังจัดส่ง', done:'เสร็จสิ้น', cancelled:'ยกเลิก' };
+        const stLabel = STATUS_TH_NOTIFY[status] || status;
+        const shouldSend = hasLine
+          ? confirm(`🔔 ส่งแจ้งเตือน "${stLabel}" ไปหาลูกค้าทาง LINE หรือไม่?
+
+👤 ${o.customer_name||'—'}`)
+          : true; // ถ้าไม่มี LINE ก็บันทึก chat history ได้ตามปกติ (silent)
+        if (shouldSend) {
+          const text = fillTemplate(tpl, o);
+          await sendMessage(o, text, { kind: 'system', silent: true });
+          toast('🔔 ส่งแจ้งเตือนแล้ว', 'success');
+        }
       }
     }
   } catch (e) {
@@ -2441,8 +2593,12 @@ function openEditModal(orderId) {
   document.getElementById('emPhone').value    = o.phone || '';
   document.getElementById('emAddress').value  = o.address || '';
   document.getElementById('emNote').value     = o.note || '';
+  // โหลดค่าส่วนลด/คูปองเดิม
+  document.getElementById('emCouponCode').value    = o.coupon_code || '';
+  document.getElementById('emDiscountAmount').value = (o.discount_amount > 0) ? o.discount_amount : '';
   renderEditItems(o.items || []);
   document.getElementById('editModal').classList.add('show');
+  updateEmDiscountPreview();
 }
 
 function renderEditItems(items) {
@@ -2480,22 +2636,65 @@ function removeOrderItem(idx) {
 }
 
 function recalcTotal() {
-  const total = getCurrentItems().reduce((s, i) => s + (i.qty * i.price), 0);
-  document.getElementById('emTotal').textContent = '฿' + total.toLocaleString();
+  const subtotal = getCurrentItems().reduce((s, i) => s + (i.qty * i.price), 0);
+  // อ่านส่วนลดจาก input field (ที่ admin แก้ไขได้แล้ว)
+  const discountInput = document.getElementById('emDiscountAmount');
+  const discountAmount = discountInput ? (parseFloat(discountInput.value) || 0) : 0;
+  const net = Math.max(0, subtotal - discountAmount);
+  document.getElementById('emTotal').textContent = '฿' + net.toLocaleString();
+  if (discountAmount > 0) {
+    document.getElementById('emTotal').title = 'ยอดสินค้า ฿' + subtotal.toLocaleString() + ' - ส่วนลด ฿' + discountAmount.toLocaleString();
+  }
+  updateEmDiscountPreview();
 }
 
-function closeEditModal() { document.getElementById('editModal').classList.remove('show'); editingOrderId = null; }
+function updateEmDiscountPreview() {
+  const subtotal = getCurrentItems().reduce((s, i) => s + (i.qty * i.price), 0);
+  const discountInput = document.getElementById('emDiscountAmount');
+  const discountAmount = discountInput ? (parseFloat(discountInput.value) || 0) : 0;
+  const preview = document.getElementById('emDiscountPreview');
+  if (!preview) return;
+  if (discountAmount > 0) {
+    const net = Math.max(0, subtotal - discountAmount);
+    preview.style.display = 'block';
+    preview.innerHTML = `<span style="color:#666;">ยอดสินค้า ฿${subtotal.toLocaleString()}</span> <span style="color:#e8593c;font-weight:700;">- ส่วนลด ฿${discountAmount.toLocaleString()}</span> = <strong style="color:#c0392b;">฿${net.toLocaleString()}</strong>`;
+  } else {
+    preview.style.display = 'none';
+  }
+}
+
+function closeEditModal() {
+  document.getElementById('editModal').classList.remove('show');
+  editingOrderId = null;
+  // ล้าง discount fields
+  const dc = document.getElementById('emDiscountAmount');
+  const cc = document.getElementById('emCouponCode');
+  const prev = document.getElementById('emDiscountPreview');
+  if (dc) dc.value = '';
+  if (cc) cc.value = '';
+  if (prev) prev.style.display = 'none';
+}
 
 async function saveOrderEdit() {
   if (!sb || !editingOrderId) return;
   const items = getCurrentItems();
-  const total = items.reduce((s, i) => s + (i.qty * i.price), 0);
+  const subtotal = items.reduce((s, i) => s + (i.qty * i.price), 0);
+
+  // อ่านค่า discount จาก input field ที่ admin แก้ไขได้
+  const discountAmount = parseFloat(document.getElementById('emDiscountAmount').value) || 0;
+  const couponCode     = document.getElementById('emCouponCode').value.trim() || null;
+  // ยอดรวมสุทธิ = ยอดสินค้า - ส่วนลด (ไม่ให้ติดลบ)
+  const total = Math.max(0, subtotal - discountAmount);
+
   const update = {
-    customer_name: document.getElementById('emCustomer').value.trim(),
-    phone        : document.getElementById('emPhone').value.trim(),
-    address      : document.getElementById('emAddress').value.trim(),
-    note         : document.getElementById('emNote').value.trim(),
-    items, total
+    customer_name  : document.getElementById('emCustomer').value.trim(),
+    phone          : document.getElementById('emPhone').value.trim(),
+    address        : document.getElementById('emAddress').value.trim(),
+    note           : document.getElementById('emNote').value.trim(),
+    items,
+    total,
+    discount_amount: discountAmount,
+    coupon_code    : couponCode,
   };
   try {
     const { error } = await sb.from('orders').update(update).eq('order_id', editingOrderId);
@@ -2597,6 +2796,393 @@ async function resendOrder(orderId) {
     if (res.ok && result.success) toast(`✅ ส่งออเดอร์แล้ว`, 'success');
     else toast(`❌ ${result.error || 'ส่งไม่สำเร็จ'}`, 'error');
   } catch (e) { toast('❌ เชื่อมต่อไม่ได้: ' + e.message, 'error'); }
+}
+
+// ═══════════════════════════════════════════
+//  AUTO-LINK LINE — ผูก LINE อัตโนมัติ (NEW)
+//  สแกนออเดอร์จริงทั้งหมดที่ยังไม่มี line_user_id
+//  จับคู่กับ ghost LINE ที่ชื่อ + เบอร์ตรงกัน
+// ═══════════════════════════════════════════
+async function autoLinkAllOrders() {
+  if (!sb) { toast('ยังไม่ได้เชื่อมต่อ', 'error'); return; }
+
+  const _normP = p => String(p||'').replace(/\D/g,'');
+  const _normN = n => String(n||'').trim().toLowerCase();
+  const _isGhost = o => /^(LINE-|LINK-CUST-|LINK-)/.test(String(o.order_id||''));
+
+  // แยก ghost กับ real
+  const ghosts = allOrders.filter(o => _isGhost(o) && o.line_user_id);
+  const reals  = allOrders.filter(o => !_isGhost(o) && !o.line_user_id);
+
+  if (!ghosts.length) { toast('ไม่พบบัญชี LINE OA ที่ผูกไว้', 'warn'); return; }
+  if (!reals.length)  { toast('✅ ออเดอร์ทั้งหมดมี LINE แล้ว', 'success'); return; }
+
+  // จับคู่: real ↔ ghost ที่ชื่อ หรือ เบอร์ตรงกัน
+  const pairs = []; // [ { real, ghost } ]
+
+  for (const real of reals) {
+    const rPhone = _normP(real.phone);
+    const rName  = _normN(real.customer_name);
+
+    for (const ghost of ghosts) {
+      const gPhone = _normP(ghost.phone);
+      const gName  = _normN(ghost.customer_name || ghost.line_name || '');
+
+      const phoneMatch = rPhone && gPhone && rPhone === gPhone;
+      const nameMatch  = rName.length >= 2 && gName.length >= 2 && (rName === gName || rName.includes(gName) || gName.includes(rName));
+
+      // "ผูกบัญชี" = ghost เพิ่งผูกใหม่ ไม่มีชื่อจริง → จับคู่ด้วยเบอร์เท่านั้น
+      const isJustLinked = !gName || gName === 'ผูกบัญชี';
+      const matched = isJustLinked ? phoneMatch : (phoneMatch || nameMatch);
+
+      if (matched) {
+        // ไม่ซ้ำ real เดิม
+        if (!pairs.find(p => p.real.order_id === real.order_id)) {
+          pairs.push({ real, ghost });
+        }
+        break;
+      }
+    }
+  }
+
+  if (!pairs.length) {
+    toast('ไม่พบออเดอร์ที่ชื่อหรือเบอร์ตรงกับ LINE OA', 'warn');
+    return;
+  }
+
+  // แสดง confirm พร้อมรายการที่จะผูก
+  const preview = pairs.slice(0,10).map(({ real, ghost }) => {
+    const gDisplay = ghost.line_name || ghost.customer_name || ghost.order_id;
+    return `• #${real.order_id} (${real.customer_name||'—'}) ← 📱 ${gDisplay}`;
+  }).join('\n') + (pairs.length > 10 ? `\n... และอีก ${pairs.length - 10} รายการ` : '');
+
+  if (!confirm(`🔗 พบออเดอร์ที่สามารถผูกได้ ${pairs.length} รายการ:\n\n${preview}\n\nยืนยันผูกอัตโนมัติ?`)) return;
+
+  // ดำเนินการผูก
+  const btn = document.getElementById('autoLinkBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังผูก...'; }
+
+  let successCount = 0;
+  const errors = [];
+
+  for (const { real, ghost } of pairs) {
+    const updates = { line_user_id: ghost.line_user_id };
+    if (ghost.line_name && !real.line_name) updates.line_name = ghost.line_name;
+    // sync ชื่อ/เบอร์จาก real ไปยัง ghost ด้วย (ถ้า ghost ไม่มีชื่อ)
+    const ghostUpdates = {};
+    if ((!ghost.customer_name || ghost.customer_name === 'ผูกบัญชี') && real.customer_name) ghostUpdates.customer_name = real.customer_name;
+    if (!ghost.phone && real.phone) ghostUpdates.phone = real.phone;
+
+    try {
+      const { error } = await sb.from('orders').update(updates).eq('order_id', real.order_id);
+      if (error) throw error;
+      Object.assign(real, updates);
+      // อัปเดต ghost ด้วยถ้ามีข้อมูลเพิ่ม
+      if (Object.keys(ghostUpdates).length) {
+        await sb.from('orders').update(ghostUpdates).eq('order_id', ghost.order_id).then(() => {
+          Object.assign(ghost, ghostUpdates);
+        }).catch(() => {});
+      }
+      successCount++;
+    } catch(e) {
+      errors.push(`#${real.order_id}: ${e.message}`);
+    }
+  }
+
+  if (btn) { btn.disabled = false; btn.textContent = '🔗 ผูก LINE อัตโนมัติ'; }
+
+  if (successCount > 0) {
+    toast(`✅ ผูกสำเร็จ ${successCount} ออเดอร์!`, 'success');
+    renderOrders(allOrders);
+    renderStats(allOrders);
+    if (typeof renderPage3Orders === 'function') renderPage3Orders();
+  }
+  if (errors.length) {
+    toast(`⚠️ ผูกไม่สำเร็จ ${errors.length} รายการ`, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════
+//  MERGE ORDERS MODAL — ผูกออเดอร์ชื่อ+เบอร์เดียวกัน (NEW)
+// ═══════════════════════════════════════════
+let _mergeSourceId      = null;   // order_id ของออเดอร์ต้นทาง
+let _mergeSelectedIds   = new Set(); // order_ids ที่เลือกจะผูก
+
+const _normPhoneMerge = p => String(p||'').replace(/\D/g,'');
+const _normNameMerge  = n => String(n||'').trim().toLowerCase();
+
+function openMergeOrdersModal(orderId) {
+  const o = allOrders.find(x => x.order_id === orderId);
+  if (!o) return;
+  _mergeSourceId    = orderId;
+  _mergeSelectedIds = new Set();
+
+  const _isSrcGhost = String(o.order_id||'').startsWith('LINE-') || String(o.order_id||'').startsWith('LINK-CUST-') || String(o.order_id||'').startsWith('LINK-');
+
+  // แสดงข้อมูลออเดอร์ต้นทาง
+  document.getElementById('moSourceLabel').textContent = _isSrcGhost ? `LINE OA: ${orderId}` : `ออเดอร์ #${orderId}`;
+  document.getElementById('moSourceCard').innerHTML = _isSrcGhost
+    ? `<div style="font-weight:700;font-size:13px;margin-bottom:4px;color:#06C755;">
+         📱 ${escapeHtml(o.line_name||o.customer_name||'LINE User')}
+         ${o.phone ? `&nbsp;📞 ${escapeHtml(o.phone)}` : ''}
+       </div>
+       ${o.line_user_id ? `<div style="font-size:11px;color:#888;font-family:monospace;">${escapeHtml(o.line_user_id.slice(0,20))}…</div>` : ''}
+       <div style="font-size:11px;color:#888;margin-top:4px;">💡 เลือกออเดอร์จริงด้านล่างเพื่อผูก line_user_id</div>`
+    : `<div style="font-weight:700;font-size:13px;margin-bottom:4px;">
+         👤 ${escapeHtml(o.customer_name||'—')}
+         ${o.phone ? `&nbsp;📞 ${escapeHtml(o.phone)}` : ''}
+         ${o.line_user_id ? '<span style="font-size:10px;background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:4px;margin-left:4px;font-weight:700;">✅ มี LINE แล้ว</span>' : '<span style="font-size:10px;background:#fff3e0;color:#e65100;padding:1px 6px;border-radius:4px;margin-left:4px;font-weight:700;">⚠️ ยังไม่มี LINE</span>'}
+       </div>
+       <div style="font-size:12px;color:#1565c0;">
+         ${(o.items||[]).slice(0,3).map(i => `${escapeHtml(i.name)} ×${i.qty}`).join(' • ')}
+         ${(o.items||[]).length > 3 ? ` +${(o.items||[]).length-3} รายการ` : ''}
+       </div>
+       <div style="font-size:11px;color:#555;margin-top:4px;">
+         ฿${(o.total||0).toLocaleString()} &nbsp;|&nbsp;
+         ${new Date(o.created_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'})}
+       </div>`;
+
+  // pre-fill ช่องค้นหาด้วยชื่อและเบอร์ของออเดอร์ต้นทาง
+  document.getElementById('moSearchName').value  = o.line_name || o.customer_name || '';
+  document.getElementById('moSearchPhone').value = o.phone || '';
+  document.getElementById('moSearchResults').innerHTML = '';
+  document.getElementById('moMergeBtn').disabled = true;
+
+  document.getElementById('mergeOrdersModal').classList.add('show');
+  // ค้นหาอัตโนมัติทันที
+  // ถ้า src เป็นออเดอร์จริงที่ยังไม่มี line_user_id ให้ล้าง search เพื่อดู ghost ทั้งหมด
+  if (!_isSrcGhost && !o.line_user_id) {
+    // ยังคงใช้ชื่อ/เบอร์เป็น hint แต่ ghost "ผูกบัญชี" จะแสดงด้วยเสมอ
+  }
+  runMergeSearch();
+}
+
+function closeMergeOrdersModal() {
+  document.getElementById('mergeOrdersModal').classList.remove('show');
+  _mergeSourceId    = null;
+  _mergeSelectedIds = new Set();
+  document.getElementById('moSearchResults').innerHTML = '';
+  document.getElementById('moMergeBtn').disabled = true;
+}
+
+function updateMergeSearch() {
+  // debounce เล็กน้อย
+  clearTimeout(updateMergeSearch._t);
+  updateMergeSearch._t = setTimeout(runMergeSearch, 300);
+}
+
+function runMergeSearch() {
+  if (!_mergeSourceId) return;
+  const rawName  = document.getElementById('moSearchName').value.trim();
+  const rawPhone = document.getElementById('moSearchPhone').value.trim();
+  const srcPhone = _normPhoneMerge(rawPhone);
+  const srcName  = _normNameMerge(rawName);
+  const resultsEl = document.getElementById('moSearchResults');
+
+  if (!srcPhone && !srcName) {
+    resultsEl.innerHTML = '<div style="text-align:center;color:#aaa;padding:16px;font-size:13px;">กรอกชื่อหรือเบอร์เพื่อค้นหา</div>';
+    return;
+  }
+
+  // หาออเดอร์ที่ตรงกัน — แยกเป็น 2 กลุ่ม: ghost LINE- และออเดอร์จริง
+  const _isGhostOrder = o => String(o.order_id||'').startsWith('LINE-') || String(o.order_id||'').startsWith('LINK-CUST-') || String(o.order_id||'').startsWith('LINK-');
+
+  // กลุ่ม 1: บัญชี LINE OA (ghost) — ค้นด้วยชื่อ/เบอร์
+  // รวม ghost ที่ชื่อ "ผูกบัญชี" (ลูกค้าเพิ่งกดผูก ยังไม่มีชื่อ) เสมอ
+  const ghostMatches = allOrders.filter(o => {
+    if (o.order_id === _mergeSourceId) return false;
+    if (!_isGhostOrder(o)) return false;
+    // ghost ที่ชื่อ "ผูกบัญชี" หรือไม่มีชื่อ = เพิ่งผูกบัญชีใหม่ แสดงเสมอ
+    const oRawName = (o.customer_name||o.line_name||'').trim();
+    if (!oRawName || oRawName === 'ผูกบัญชี') return true;
+    const oPhone = _normPhoneMerge(o.phone);
+    const oName  = _normNameMerge(oRawName);
+    const phoneMatch = srcPhone && oPhone && oPhone === srcPhone;
+    const nameMatch  = srcName.length >= 2 && oName && (oName.includes(srcName) || srcName.includes(oName));
+    return phoneMatch || nameMatch;
+  }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  // กลุ่ม 2: ออเดอร์จริงอื่น — ยกเว้น ghost
+  const realMatches = allOrders.filter(o => {
+    if (o.order_id === _mergeSourceId) return false;
+    if (_isGhostOrder(o)) return false;
+    const oPhone = _normPhoneMerge(o.phone);
+    const oName  = _normNameMerge(o.customer_name);
+    const phoneMatch = srcPhone && oPhone && oPhone === srcPhone;
+    const nameMatch  = srcName.length >= 2 && oName && oName.includes(srcName);
+    return phoneMatch || nameMatch;
+  }).sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+
+  const totalMatches = ghostMatches.length + realMatches.length;
+
+  if (!totalMatches) {
+    resultsEl.innerHTML = `<div style="background:#fff3e0;color:#e65100;padding:12px;border-radius:10px;font-size:13px;text-align:center;">
+      ⚠️ ไม่พบออเดอร์หรือบัญชี LINE OA ที่มีชื่อหรือเบอร์ตรงกัน
+    </div>`;
+    _mergeSelectedIds = new Set();
+    document.getElementById('moMergeBtn').disabled = true;
+    return;
+  }
+
+  // helper สร้าง row card
+  function _buildMergeRow(o, isGhost) {
+    const isSel = _mergeSelectedIds.has(o.order_id);
+    const date = new Date(o.created_at).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'});
+    const phoneMatch = srcPhone && _normPhoneMerge(o.phone) === srcPhone;
+    const nameMatch  = srcName.length >= 2 && _normNameMerge(o.customer_name||o.line_name||'').includes(srcName);
+    const matchBadge = [
+      phoneMatch ? '<span style="background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">📞 เบอร์ตรง</span>' : '',
+      nameMatch  ? '<span style="background:#e3f2fd;color:#1565c0;padding:1px 6px;border-radius:4px;font-size:10px;font-weight:700;">👤 ชื่อตรง</span>' : '',
+    ].filter(Boolean).join(' ');
+
+    const borderSel = isGhost ? '#06C755' : '#1565c0';
+    const bgSel     = isGhost ? '#e8f5ec' : '#e8f0fe';
+    const checkSel  = isGhost ? '#06C755' : '#1565c0';
+
+    const isJustLinked = isGhost && (!(o.customer_name||o.line_name||'').trim() || (o.customer_name||'').trim() === 'ผูกบัญชี');
+    const lineInfo = isGhost
+      ? `<div style="font-size:11px;color:#06C755;margin-top:2px;">
+           ${isJustLinked
+             ? `<span style="background:#e8f5e9;color:#2e7d32;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:700;">🆕 เพิ่งผูกบัญชีใหม่</span>`
+             : `📱 LINE: ${o.line_name ? escapeHtml(o.line_name) : '—'}`}
+           ${o.line_user_id ? `<code style="font-size:9px;color:#888;margin-left:4px;">${escapeHtml(o.line_user_id.slice(0,14))}…</code>` : ''}
+         </div>
+         <div style="font-size:11px;color:#999;margin-top:1px;">${date}</div>`
+      : `<div style="font-size:11px;color:#777;">${(o.items||[]).slice(0,3).map(i=>`${escapeHtml(i.name)} ×${i.qty}`).join(' • ')}${(o.items||[]).length>3?` +${(o.items||[]).length-3}`:''}</div>
+         <div style="font-size:11px;color:#999;margin-top:2px;">฿${(o.total||0).toLocaleString()} · ${date}</div>`;
+
+    return `<div class="mo-result-row" data-id="${escapeAttr(o.order_id)}"
+        style="border:1.5px solid ${isSel ? borderSel : '#e0e0e0'};border-radius:10px;padding:10px 12px;
+               margin-bottom:8px;cursor:pointer;background:${isSel ? bgSel : '#fff'};
+               display:flex;align-items:flex-start;gap:10px;transition:all .15s;"
+        onclick="toggleMergeSelect('${escapeAttr(o.order_id)}')">
+      <div style="width:18px;height:18px;border-radius:4px;border:2px solid ${isSel ? checkSel : '#bbb'};
+           background:${isSel ? checkSel : '#fff'};flex-shrink:0;margin-top:2px;display:flex;align-items:center;justify-content:center;">
+        ${isSel ? '<span style="color:#fff;font-size:13px;line-height:1;">✓</span>' : ''}
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-weight:700;color:${isGhost?'#0d7f40':'#222'};margin-bottom:2px;">
+          ${isGhost ? '📱' : '#'}${escapeHtml(o.order_id)} &nbsp;${matchBadge}
+        </div>
+        <div style="font-size:12px;color:#444;margin-bottom:2px;">
+          👤 ${escapeHtml(o.customer_name||o.line_name||'—')}
+          ${o.phone ? `&nbsp;📞 ${escapeHtml(o.phone)}` : ''}
+        </div>
+        ${lineInfo}
+      </div>
+    </div>`;
+  }
+
+  const ghostRows = ghostMatches.map(o => _buildMergeRow(o, true)).join('');
+  const realRows  = realMatches.map(o => _buildMergeRow(o, false)).join('');
+
+  resultsEl.innerHTML = `
+    ${ghostMatches.length ? `
+      <div style="font-size:12px;font-weight:700;color:#06C755;margin-bottom:6px;">
+        📱 บัญชี LINE OA (${ghostMatches.length}) — เลือกเพื่อผูก line_user_id
+      </div>
+      <div style="font-size:11px;color:#888;margin-bottom:8px;background:#f1f8e9;padding:7px 10px;border-radius:7px;">
+        💡 กรณีลูกค้ากด "ผูกบัญชี" ใน LINE OA แล้ว เลือกรายการ <strong style="color:#2e7d32;">🆕 เพิ่งผูกบัญชีใหม่</strong> เพื่อรับ line_user_id มาผูกกับออเดอร์จริง
+      </div>
+      ${ghostRows}
+    ` : ''}
+    ${realMatches.length ? `
+      <div style="font-size:12px;font-weight:700;color:#1565c0;margin:${ghostMatches.length?'14px':0} 0 6px;">
+        📋 ออเดอร์จริงอื่น (${realMatches.length}) — ผูกชื่อ/เบอร์ให้ตรงกัน
+      </div>
+      ${realRows}
+    ` : ''}`;
+}
+
+function toggleMergeSelect(orderId) {
+  if (_mergeSelectedIds.has(orderId)) {
+    _mergeSelectedIds.delete(orderId);
+  } else {
+    _mergeSelectedIds.add(orderId);
+  }
+  // อัปเดต UI ของแถวที่คลิก (re-render ผลลัพธ์)
+  runMergeSearch();
+  document.getElementById('moMergeBtn').disabled = _mergeSelectedIds.size === 0;
+  // อัปเดตข้อความปุ่ม
+  if (_mergeSelectedIds.size > 0) {
+    document.getElementById('moMergeBtn').textContent = `🔗 ผูก ${_mergeSelectedIds.size} ออเดอร์`;
+  } else {
+    document.getElementById('moMergeBtn').textContent = '🔗 ผูกออเดอร์ที่เลือก';
+  }
+}
+
+async function saveMergeOrders() {
+  if (!_mergeSourceId || _mergeSelectedIds.size === 0) return;
+  const src = allOrders.find(x => x.order_id === _mergeSourceId);
+  if (!src) return;
+
+  const btn = document.getElementById('moMergeBtn');
+  btn.disabled = true;
+  btn.textContent = '⏳ กำลังผูก...';
+
+  // ข้อมูลหลักจากออเดอร์ต้นทาง
+  const srcName  = (src.customer_name || '').trim();
+  const srcPhone = (src.phone || '').trim();
+
+  let successCount = 0;
+  const errors = [];
+
+  const _isGhostForSave = o => String(o.order_id||'').startsWith('LINE-') || String(o.order_id||'').startsWith('LINK-CUST-') || String(o.order_id||'').startsWith('LINK-');
+
+  for (const targetId of _mergeSelectedIds) {
+    const target = allOrders.find(x => x.order_id === targetId);
+    if (!target) continue;
+
+    const updates = {};
+
+    if (_isGhostForSave(target)) {
+      // ── กรณี target เป็น ghost LINE OA ──
+      // ดึง line_user_id จาก ghost มาใส่ src (ออเดอร์จริง)
+      // อัปเดต ghost ให้มีชื่อ/เบอร์ตรงกับ src ด้วย
+      if (srcName  && srcName  !== target.customer_name) updates.customer_name = srcName;
+      if (srcPhone && srcPhone !== target.phone)          updates.phone         = srcPhone;
+
+      // อัปเดต src ด้วย line_user_id จาก ghost
+      if (target.line_user_id && src.line_user_id !== target.line_user_id) {
+        const srcUpdates = { line_user_id: target.line_user_id };
+        if (target.line_name && !src.line_name) srcUpdates.line_name = target.line_name;
+        try {
+          const { error: srcErr } = await sb.from('orders').update(srcUpdates).eq('order_id', src.order_id);
+          if (!srcErr) Object.assign(src, srcUpdates);
+        } catch(e) {}
+      }
+    } else {
+      // ── กรณี target เป็นออเดอร์จริง — อัปเดตชื่อ/เบอร์/id ให้ตรงกับ src ──
+      if (srcName  && srcName  !== target.customer_name) updates.customer_name = srcName;
+      if (srcPhone && srcPhone !== target.phone)          updates.phone         = srcPhone;
+      if (src.customer_id  && src.customer_id  !== target.customer_id)  updates.customer_id  = src.customer_id;
+      if (src.line_user_id && src.line_user_id !== target.line_user_id) updates.line_user_id = src.line_user_id;
+    }
+
+    if (Object.keys(updates).length === 0) { successCount++; continue; }
+
+    try {
+      const { error } = await sb.from('orders').update(updates).eq('order_id', targetId);
+      if (error) throw error;
+      Object.assign(target, updates);
+      successCount++;
+    } catch(e) {
+      errors.push(`#${targetId}: ${e.message}`);
+    }
+  }
+
+  if (successCount > 0) {
+    toast(`✅ ผูก ${successCount} ออเดอร์สำเร็จ!`, 'success');
+    closeMergeOrdersModal();
+    renderOrders(allOrders);
+    renderStats(allOrders);
+    if (typeof renderPage3Orders === 'function') renderPage3Orders();
+  }
+  if (errors.length) {
+    toast('⚠️ บางออเดอร์ผูกไม่สำเร็จ: ' + errors.join(', '), 'error');
+    btn.disabled = false;
+    btn.textContent = `🔗 ผูก ${_mergeSelectedIds.size} ออเดอร์`;
+  }
 }
 
 // ═══════════════════════════════════════════
@@ -2757,6 +3343,9 @@ async function openChatModal(orderId) {
     `<button class="qt-chip" onclick="useTemplate('custom_thanks')">🙏 ขอบคุณ</button>` +
     `<button class="qt-chip" onclick="useTemplate('custom_ask')">❓ สอบถาม</button>`;
   document.getElementById('chatModal').classList.add('show');
+  // reset toggle กลับเป็น "ส่งไป LINE" เสมอเมื่อเปิด chat ใหม่
+  const tog = document.getElementById('cmSendToLine');
+  if (tog) { tog.checked = true; updateChatSendMode(); }
   await loadChatHistory(orderId);
   setupChatRealtime(orderId);
 }
@@ -2786,6 +3375,10 @@ function renderChatList(messages) {
   list.innerHTML = messages.map(m => {
     const time = new Date(m.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' });
     if (m.sender === 'system') return `<div class="chat-bubble system">🔔 ${escapeHtml(m.text)}<div class="chat-meta">${time}</div></div>`;
+    // admin_note = Note ภายใน ไม่ส่งไป LINE
+    if (m.sender === 'admin_note') return `<div class="chat-bubble from-admin" style="background:#fff9c4;border:1.5px dashed #f9a825;opacity:.85;">
+      📝 <em style="color:#795548;">${escapeHtml(m.text)}</em>
+      <div class="chat-meta" style="color:#a1887f;">Note ภายใน • ${time}</div></div>`;
     const cls = m.sender === 'admin' ? 'from-admin' : 'from-customer';
     const who = m.sender === 'admin' ? 'แอดมิน' : 'ลูกค้า';
     return `<div class="chat-bubble ${cls}">${escapeHtml(m.text)}<div class="chat-meta">${who} • ${time}</div></div>`;
@@ -2800,6 +3393,29 @@ function setupChatRealtime(orderId) {
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`order_id=eq.${orderId}` },
       () => { if (currentChatOrderId === orderId) loadChatHistory(orderId); }
     ).subscribe();
+}
+
+function updateChatSendMode() {
+  const sendToLine = document.getElementById('cmSendToLine')?.checked;
+  const label  = document.getElementById('cmSendModeLabel');
+  const text   = document.getElementById('cmSendModeText');
+  const hint   = document.getElementById('cmSendModeHint');
+  const btn    = document.getElementById('cmSendBtn');
+  if (sendToLine) {
+    label.style.background    = '#e8f5e9';
+    label.style.borderColor   = '#a5d6a7';
+    label.style.color         = '#2e7d32';
+    text.textContent          = '📲 ส่งไป LINE ลูกค้า';
+    hint.textContent          = '';
+    btn.style.background      = '';
+  } else {
+    label.style.background    = '#fff9c4';
+    label.style.borderColor   = '#f9a825';
+    label.style.color         = '#795548';
+    text.textContent          = '📝 Note ภายใน (ไม่ส่ง LINE)';
+    hint.textContent          = 'บันทึกไว้ดูเองเท่านั้น';
+    btn.style.background      = '#f9a825';
+  }
 }
 
 function useTemplate(key) {
@@ -2820,7 +3436,10 @@ async function sendChatMessage() {
   if (!o) return;
   const btn = document.getElementById('cmSendBtn');
   btn.disabled = true; btn.textContent = 'กำลังส่ง...';
-  await sendMessage(o, text, { kind: 'admin' });
+  // ตรวจ toggle — ถ้าเปิด = ส่งไป LINE (kind:'admin'), ถ้าปิด = note ภายใน (kind:'admin_note')
+  const sendToLine = document.getElementById('cmSendToLine')?.checked !== false;
+  const kind = sendToLine ? 'admin' : 'admin_note';
+  await sendMessage(o, text, { kind });
   document.getElementById('cmInput').value = '';
   await loadChatHistory(currentChatOrderId);
   btn.disabled = false; btn.textContent = 'ส่ง';
@@ -3057,7 +3676,7 @@ function toast(msg, type = '', duration = 3000) {
 // Keyboard shortcuts
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['mapModal','editModal','chatModal','tplModal','couponModal','itemsPopup','linkModal','enhancedEditModal'].forEach(id => {
+    ['mapModal','editModal','chatModal','tplModal','couponModal','itemsPopup','linkModal','enhancedEditModal','mergeOrdersModal'].forEach(id => {
       document.getElementById(id)?.classList.remove('show');
     });
     eeEditingOrderId = null;
