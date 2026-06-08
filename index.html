@@ -766,6 +766,35 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
   <!-- Legend + Stats -->
   <div id="route-legend-wrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;"></div>
 
+
+  <!-- Customer Detail Modal -->
+  <div id="cust-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:5000;align-items:center;justify-content:center;padding:16px;">
+    <div style="background:#fff;border-radius:20px;width:100%;max-width:420px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25);">
+      <!-- header สีเซล -->
+      <div id="cdm-header" style="padding:16px 20px;border-radius:20px 20px 0 0;display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div id="cdm-name" style="font-size:17px;font-weight:700;color:#fff;"></div>
+          <div id="cdm-sales" style="font-size:12px;color:rgba(255,255,255,.8);margin-top:2px;"></div>
+        </div>
+        <button onclick="closeCustDetail()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:32px;height:32px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
+      </div>
+      <!-- แผนที่จุด -->
+      <div id="cdm-map" style="height:180px;"></div>
+      <!-- ข้อมูล -->
+      <div style="padding:16px 20px;">
+        <div id="cdm-info" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;"></div>
+        <div id="cdm-note-wrap" style="display:none;margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">หมายเหตุ</div>
+          <div id="cdm-note" style="background:#f9f9f9;border-radius:8px;padding:10px;font-size:13px;line-height:1.6;"></div>
+        </div>
+        <!-- ปุ่ม action -->
+        <div style="display:flex;gap:8px;">
+          <a id="cdm-phone-btn" href="" style="flex:1;padding:10px;border-radius:10px;background:#e8f5e9;color:#27ae60;border:1.5px solid #27ae60;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:none;">📞 โทร</a>
+          <a id="cdm-maps-btn" href="" target="_blank" style="flex:1;padding:10px;border-radius:10px;background:#e3f2fd;color:#1565c0;border:1.5px solid #1565c0;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:none;">🗺️ Google Maps</a>
+        </div>
+      </div>
+    </div>
+  </div>
 </div><!-- /page-7 -->
 
 <!-- ════════════════════════════════════════
@@ -4413,11 +4442,13 @@ function renderRouteLegend() {
 
     const custList = pins.slice(0,5).map((p,i) => {
       const ic = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
-      return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#f9f9f9;border-radius:7px;margin-bottom:4px;font-size:12px;">
-        <span style="background:${color};color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;">${i+1}</span>
+      const custJson = JSON.stringify({...p, salesName:s.name, salesId:sid, color}).replace(/'/g,"&#39;").replace(/"/g,'&quot;');
+      return `<div onclick="openCustDetail('${sid}',${i})" style="display:flex;align-items:center;gap:6px;padding:7px 8px;background:#f9f9f9;border-radius:7px;margin-bottom:4px;font-size:12px;cursor:pointer;transition:.15s;" onmouseenter="this.style.background='${color}18'" onmouseleave="this.style.background='#f9f9f9'">
+        <span style="background:${color};color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;">${i+1}</span>
         <span>${ic[p.type]||'📍'}</span>
         <span style="flex:1;font-weight:600;">${p.name}</span>
         ${p.phone?`<span style="color:${color};font-size:11px;">${p.phone}</span>`:''}
+        <span style="color:#ccc;font-size:14px;">›</span>
       </div>`;
     }).join('');
 
@@ -4457,6 +4488,89 @@ function renderRouteLegend() {
   }).join('');
 
   wrap.innerHTML = cards || '<div style="text-align:center;padding:40px;color:var(--sub);grid-column:1/-1;">ยังไม่มีข้อมูลเซล</div>';
+}
+
+// ─── Customer Detail Modal ────────────────────────────
+let _cdmMap = null;
+
+function openCustDetail(salesId, pinIdx) {
+  const s   = allSalesStaff.find(x => (x.salesId||x.id) === salesId);
+  if (!s) return;
+  const idx  = allSalesStaff.indexOf(s);
+  const color = SALES_COLORS[idx % SALES_COLORS.length];
+  const pins  = getSalesPins(salesId);
+  const p     = pins[pinIdx];
+  if (!p) return;
+
+  const typeLabels = { shop:'🏪 ร้านค้า', home:'🏠 บ้าน', business:'🏢 ธุรกิจ', other:'📍 อื่นๆ' };
+
+  // header
+  const header = document.getElementById('cdm-header');
+  header.style.background = `linear-gradient(120deg, ${color}dd, ${color})`;
+  document.getElementById('cdm-name').textContent  = (typeLabels[p.type]||'📍') + ' ' + p.name;
+  document.getElementById('cdm-sales').textContent = '💼 เซล: ' + s.name + ' (' + salesId + ')';
+
+  // ข้อมูล
+  const addedDate = p.createdAt ? new Date(p.createdAt).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'}) : '—';
+  document.getElementById('cdm-info').innerHTML = [
+    { icon:'📋', label:'ประเภท',    val: typeLabels[p.type]||'—' },
+    { icon:'📞', label:'เบอร์โทร',  val: p.phone||'—' },
+    { icon:'📍', label:'พิกัด',     val: p.lat ? p.lat.toFixed(5)+', '+p.lng.toFixed(5) : '—' },
+    { icon:'📅', label:'บันทึกเมื่อ', val: addedDate },
+  ].map(x => `
+    <div style="background:#f9f9f9;border-radius:10px;padding:10px;">
+      <div style="font-size:11px;color:var(--sub);margin-bottom:3px;">${x.icon} ${x.label}</div>
+      <div style="font-size:13px;font-weight:600;">${x.val}</div>
+    </div>`).join('');
+
+  // หมายเหตุ
+  const noteWrap = document.getElementById('cdm-note-wrap');
+  if (p.note) {
+    noteWrap.style.display = 'block';
+    document.getElementById('cdm-note').textContent = p.note;
+  } else { noteWrap.style.display = 'none'; }
+
+  // ปุ่ม โทร
+  const phoneBtn = document.getElementById('cdm-phone-btn');
+  if (p.phone) { phoneBtn.style.display='block'; phoneBtn.href = 'tel:' + p.phone; }
+  else { phoneBtn.style.display = 'none'; }
+
+  // ปุ่ม Google Maps
+  const mapsBtn = document.getElementById('cdm-maps-btn');
+  if (p.lat) {
+    mapsBtn.style.display = 'block';
+    mapsBtn.href = `https://www.google.com/maps?q=${p.lat},${p.lng}`;
+  } else { mapsBtn.style.display = 'none'; }
+
+  // แสดง modal
+  const modal = document.getElementById('cust-detail-modal');
+  modal.style.display = 'flex';
+
+  // แผนที่จุด
+  setTimeout(() => {
+    if (!window.L) return;
+    if (!_cdmMap) {
+      _cdmMap = L.map('cdm-map', { attributionControl:false, zoomControl:true })
+        .setView([18.145, 100.14], 14);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(_cdmMap);
+    }
+    _cdmMap.eachLayer(l => { if (l instanceof L.Marker) _cdmMap.removeLayer(l); });
+    if (p.lat) {
+      const ic = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
+      L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+          html: `<div style="width:32px;height:32px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:16px;">${ic[p.type]||'📍'}</div>`,
+          iconSize:[32,32], iconAnchor:[16,16], className:''
+        })
+      }).addTo(_cdmMap);
+      _cdmMap.setView([p.lat, p.lng], 15);
+    }
+    _cdmMap.invalidateSize();
+  }, 200);
+}
+
+function closeCustDetail() {
+  document.getElementById('cust-detail-modal').style.display = 'none';
 }
 
 // hook showPage 7
