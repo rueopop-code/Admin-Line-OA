@@ -3885,6 +3885,9 @@ async function loadSalesPage() {
     allSalesOrders = await res.json();
     if (!Array.isArray(allSalesOrders)) allSalesOrders = [];
 
+    // ล้าง cache ก่อนโหลดใหม่
+    Object.keys(_pinsCache).forEach(k => delete _pinsCache[k]);
+    await loadAllPins();
     renderSalesStats();
     renderSalesList();
     loadLeafletThenMap();
@@ -3905,17 +3908,39 @@ function renderSalesStats() {
 
 function getAllSalesPins() {
   const all = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith('sales_customers')) {
-      try { JSON.parse(localStorage.getItem(k)).forEach(c => c.lat && all.push(c)); } catch(_) {}
-    }
-  }
+  Object.values(_pinsCache).forEach(pins => pins.forEach(p => all.push(p)));
   return all;
 }
 
+// cache pins ต่อ salesId
+const _pinsCache = {};
+
+async function fetchSalesPins(salesId) {
+  if (_pinsCache[salesId]) return _pinsCache[salesId];
+  try {
+    const res = await fetch(SB_URL_SALES + '/rest/v1/sales_pins?sales_id=eq.' + salesId + '&order=created_at.asc', {
+      headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES }
+    });
+    const data = await res.json();
+    const pins = Array.isArray(data) ? data.map(r => ({
+      id: r.id, name: r.name, phone: r.phone||'',
+      type: r.type||'shop', note: r.note||'',
+      lat: parseFloat(r.lat), lng: parseFloat(r.lng),
+      createdAt: r.created_at
+    })).filter(p => p.lat) : [];
+    _pinsCache[salesId] = pins;
+    return pins;
+  } catch(_) { return []; }
+}
+
 function getSalesPins(salesId) {
-  try { return JSON.parse(localStorage.getItem('sales_customers_' + salesId)||'[]').filter(c => c.lat); } catch(_) { return []; }
+  // ใช้ cache ถ้ามี, ไม่งั้นคืน []
+  return _pinsCache[salesId] || [];
+}
+
+async function loadAllPins() {
+  // โหลด pins ทุกเซลพร้อมกัน
+  await Promise.all(allSalesStaff.map(s => fetchSalesPins(s.salesId||s.id||'')));
 }
 
 function renderSalesList() {
@@ -4297,6 +4322,10 @@ async function loadRoutePage() {
       allSalesStaff = d.ok ? (d.staff||[]) : [];
     } catch(_) {}
   }
+
+  // โหลด pins จาก Supabase
+  Object.keys(_pinsCache).forEach(k => delete _pinsCache[k]);
+  await loadAllPins();
 
   renderRouteMap('all');
   renderRouteLegend();
