@@ -542,6 +542,7 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
   <button class="nav-tab" data-page="3" onclick="showPage(3)">📦 แก้ไขออเดอร์</button>
   <button class="nav-tab" data-page="4" onclick="showPage(4)">📊 สรุปยอดขาย</button>
   <button class="nav-tab" data-page="5" onclick="showPage(5)">💼 จัดการเซล</button>
+  <button class="nav-tab" data-page="6" onclick="showPage(6)">📡 GPS เซล</button>
 </nav>
 
 <!-- ════════════════════════════════════════
@@ -711,6 +712,35 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
   </div>
 
 </div><!-- /page-5 -->
+
+<!-- ════════════════════════════════════════
+     PAGE 6: GPS เซล Realtime
+════════════════════════════════════════ -->
+<div id="page-6" class="admin-page" style="display:none;">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+    <h2 style="font-size:20px;font-weight:700;">📡 ติดตาม GPS เซล (Realtime)</h2>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div id="gps-admin-status" style="display:flex;align-items:center;gap:6px;font-size:13px;">
+        <div id="gps-admin-dot" style="width:10px;height:10px;border-radius:50%;background:#ccc;"></div>
+        <span id="gps-admin-text" style="color:#888;">กำลังโหลด...</span>
+      </div>
+      <button onclick="loadGpsPage()" style="padding:7px 14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">🔄 รีเฟรช</button>
+    </div>
+  </div>
+
+  <!-- Legend -->
+  <div id="gps-legend" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding:10px 14px;background:#fff;border:1px solid var(--border);border-radius:10px;min-height:42px;"></div>
+
+  <!-- Map -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;">
+    <div id="gps-admin-map" style="height:500px;"></div>
+  </div>
+
+  <!-- Sales online list -->
+  <div id="gps-sales-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;"></div>
+
+</div><!-- /page-6 -->
 
 <!-- ════════════════════════════════════════
      PAGE 2: ฐานข้อมูลลูกค้า
@@ -4004,10 +4034,202 @@ async function saveEditSales() {
   } catch(e) { toast('Error: '+e.message,'error'); }
 }
 
-// hook showPage
+// ═══════════════════════════════════════════════════════
+//  PAGE 6: GPS เซล Realtime
+// ═══════════════════════════════════════════════════════
+let gpsAdminMap  = null;
+let gpsMarkers   = {};   // salesId → L.marker
+let gpsRoutes    = {};   // salesId → L.polyline
+let gpsInterval  = null;
+const GPS_REFRESH_MS = 15000; // รีเฟรชทุก 15 วิ
+
+async function loadGpsPage() {
+  setGpsAdminStatus('loading');
+  if (!window.L) { loadLeafletThenGps(); return; }
+  initGpsAdminMap();
+  await refreshGpsData();
+  // auto refresh
+  clearInterval(gpsInterval);
+  gpsInterval = setInterval(refreshGpsData, GPS_REFRESH_MS);
+}
+
+function loadLeafletThenGps() {
+  if (!document.querySelector('link[href*="leaflet"]')) {
+    const l = document.createElement('link');
+    l.rel='stylesheet'; l.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(l);
+  }
+  if (!document.querySelector('script[src*="leaflet"]')) {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = () => { initGpsAdminMap(); refreshGpsData(); };
+    document.head.appendChild(s);
+  } else { setTimeout(() => { initGpsAdminMap(); refreshGpsData(); }, 500); }
+}
+
+function initGpsAdminMap() {
+  const el = document.getElementById('gps-admin-map');
+  if (!el || !window.L || gpsAdminMap) return;
+  gpsAdminMap = L.map('gps-admin-map', { attributionControl:false })
+    .setView([18.145, 100.14], 12);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(gpsAdminMap);
+}
+
+async function refreshGpsData() {
+  if (!gpsAdminMap) return;
+  try {
+    // โหลด staff list (ถ้ายังไม่มี)
+    if (!allSalesStaff.length) {
+      const d = await gasCallAdmin({ action:'getSalesStaffList' });
+      allSalesStaff = d.ok ? (d.staff||[]) : [];
+    }
+
+    // โหลดตำแหน่งปัจจุบัน
+    const locRes = await fetch(`${SB_URL_SALES}/rest/v1/sales_locations?select=*`, {
+      headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES }
+    });
+    const locations = await locRes.json();
+
+    // โหลดเส้นทางวันนี้
+    const today = new Date().toISOString().split('T')[0];
+    const routeRes = await fetch(`${SB_URL_SALES}/rest/v1/sales_routes?select=*&recorded_at=gte.${today}T00:00:00&order=sales_id,recorded_at.asc`, {
+      headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES }
+    });
+    const routes = await routeRes.json();
+
+    renderGpsMap(locations, routes);
+    renderGpsSalesList(locations);
+    setGpsAdminStatus('ok', 'อัปเดต ' + new Date().toLocaleTimeString('th-TH'));
+  } catch(e) {
+    setGpsAdminStatus('err', 'โหลดไม่สำเร็จ');
+  }
+}
+
+function renderGpsMap(locations, routes) {
+  if (!gpsAdminMap) return;
+  const legend = document.getElementById('gps-legend');
+  legend.innerHTML = '';
+  const allBounds = [];
+
+  allSalesStaff.forEach((s, idx) => {
+    const color = SALES_COLORS[idx % SALES_COLORS.length];
+    const sid   = s.salesId || s.id || '';
+    const loc   = Array.isArray(locations) ? locations.find(l => l.sales_id === sid) : null;
+    const myRoutes = Array.isArray(routes) ? routes.filter(r => r.sales_id === sid) : [];
+
+    const isOnline = loc && (Date.now() - new Date(loc.updated_at).getTime()) < 3 * 60 * 1000; // online ถ้าอัปเดตใน 3 นาที
+
+    // Legend
+    legend.innerHTML += `<span style="display:flex;align-items:center;gap:5px;background:${color}18;color:${color};border:1px solid ${color}44;border-radius:20px;padding:4px 10px;font-size:12px;font-weight:700;">
+      <span style="width:8px;height:8px;border-radius:50%;background:${isOnline?color:'#ccc'};flex-shrink:0;${isOnline?'box-shadow:0 0 6px '+color:''}"></span>
+      💼 ${s.name} ${isOnline?'🟢':'⚫'}
+    </span>`;
+
+    // เส้นทางวันนี้
+    if (myRoutes.length >= 2) {
+      const pts = myRoutes.map(r => [parseFloat(r.lat), parseFloat(r.lng)]);
+      if (gpsRoutes[sid]) gpsAdminMap.removeLayer(gpsRoutes[sid]);
+      gpsRoutes[sid] = L.polyline(pts, {
+        color, weight:3, opacity:.75, dashArray:'8,4'
+      }).addTo(gpsAdminMap);
+      pts.forEach(p => allBounds.push(p));
+    }
+
+    // marker ตำแหน่งปัจจุบัน
+    if (loc && loc.lat) {
+      const lat = parseFloat(loc.lat), lng = parseFloat(loc.lng);
+      const timeAgo = getTimeAgo(loc.updated_at);
+      const popupHtml = `<div style="font-family:'Sarabun',sans-serif;min-width:140px;">
+        <div style="font-size:14px;font-weight:700;color:${color};">💼 ${s.name}</div>
+        <div style="font-size:12px;color:#666;margin-top:3px;">รหัส: ${sid}</div>
+        <div style="font-size:11px;color:${isOnline?'#27ae60':'#e74c3c'};margin-top:3px;">${isOnline?'🟢 ออนไลน์':'⚫ ออฟไลน์'} · ${timeAgo}</div>
+        <div style="font-size:11px;color:#888;margin-top:2px;">จุดวันนี้: ${myRoutes.length} จุด</div>
+      </div>`;
+
+      if (gpsMarkers[sid]) {
+        gpsMarkers[sid].setLatLng([lat, lng]);
+        gpsMarkers[sid].setPopupContent(popupHtml);
+      } else {
+        gpsMarkers[sid] = L.marker([lat, lng], {
+          icon: L.divIcon({
+            html: `<div style="position:relative;">
+              <div style="width:36px;height:36px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 0 0 3px ${color}44,0 3px 12px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:16px;">💼</div>
+              <div style="position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:${isOnline?'#27ae60':'#ccc'};border:2px solid #fff;${isOnline?'box-shadow:0 0 6px #27ae60':''}"></div>
+            </div>`,
+            iconSize:[36,36], iconAnchor:[18,18], className:''
+          }),
+          zIndexOffset: 1000 + idx
+        }).addTo(gpsAdminMap).bindPopup(popupHtml);
+      }
+      allBounds.push([lat, lng]);
+    }
+  });
+
+  if (allBounds.length && Object.keys(gpsMarkers).length === 0) {
+    gpsAdminMap.fitBounds(allBounds, { padding:[40,40] });
+  }
+  setTimeout(() => gpsAdminMap.invalidateSize(), 200);
+}
+
+function renderGpsSalesList(locations) {
+  const list = document.getElementById('gps-sales-list');
+  if (!list) return;
+  list.innerHTML = allSalesStaff.map((s, idx) => {
+    const color = SALES_COLORS[idx % SALES_COLORS.length];
+    const sid   = s.salesId || s.id || '';
+    const loc   = Array.isArray(locations) ? locations.find(l => l.sales_id === sid) : null;
+    const isOnline = loc && (Date.now() - new Date(loc.updated_at).getTime()) < 3 * 60 * 1000;
+    const timeAgo  = loc ? getTimeAgo(loc.updated_at) : 'ไม่มีข้อมูล';
+    const photo    = localStorage.getItem('sales_photo_' + sid) || '';
+    const avatar   = photo
+      ? `<img src="${photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2.5px solid ${color};">`
+      : `<div style="width:40px;height:40px;border-radius:50%;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;">${(s.name||'?')[0]}</div>`;
+    return `<div style="background:#fff;border:1.5px solid ${isOnline?color:'#ddd'};border-radius:12px;padding:12px;cursor:pointer;" onclick="centerOnSales('${sid}')">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="position:relative;">${avatar}<div style="position:absolute;bottom:0;right:0;width:12px;height:12px;border-radius:50%;background:${isOnline?'#27ae60':'#ccc'};border:2px solid #fff;${isOnline?'box-shadow:0 0 5px #27ae60':''}"></div></div>
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;">${s.name}</div>
+          <div style="font-size:11px;color:${color};font-weight:700;">${sid}</div>
+          <div style="font-size:11px;color:${isOnline?'#27ae60':'#999'};margin-top:2px;">${isOnline?'🟢 ออนไลน์ · ':'⚫ '} ${timeAgo}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function centerOnSales(salesId) {
+  const m = gpsMarkers[salesId];
+  if (m && gpsAdminMap) { gpsAdminMap.flyTo(m.getLatLng(), 15, {duration:0.8}); m.openPopup(); }
+}
+
+function getTimeAgo(isoStr) {
+  if (!isoStr) return '—';
+  const diff = Date.now() - new Date(isoStr).getTime();
+  const m = Math.floor(diff / 60000);
+  if (m < 1)  return 'เมื่อกี้';
+  if (m < 60) return m + ' นาทีที่แล้ว';
+  return Math.floor(m/60) + ' ชม.ที่แล้ว';
+}
+
+function setGpsAdminStatus(state, msg) {
+  const dot  = document.getElementById('gps-admin-dot');
+  const text = document.getElementById('gps-admin-text');
+  if (!dot||!text) return;
+  if (state==='ok')      { dot.style.background='#27ae60'; dot.style.boxShadow='0 0 6px #27ae60'; text.style.color='#27ae60'; }
+  else if (state==='err'){ dot.style.background='#e74c3c'; dot.style.boxShadow='none'; text.style.color='#e74c3c'; }
+  else                   { dot.style.background='#ffa94d'; dot.style.boxShadow='none'; text.style.color='#888'; }
+  if (msg) text.textContent = msg;
+}
+
+// hook showPage 6
 (function() {
-  const _orig = showPage;
-  window.showPage = function(n) { _orig(n); if (n===5) loadSalesPage(); };
+  const _prev = window.showPage;
+  window.showPage = function(n) {
+    _prev(n);
+    if (n === 5) loadSalesPage();
+    if (n === 6) loadGpsPage();
+    else { clearInterval(gpsInterval); gpsInterval = null; }
+  };
 })();
 </script>
 
