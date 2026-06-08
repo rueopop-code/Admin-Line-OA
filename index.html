@@ -690,6 +690,19 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
         <button onclick="closeEditSales()" style="background:#f0f0f0;border:none;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer;">×</button>
       </div>
       <input type="hidden" id="es-id">
+      <!-- รูปโปรไฟล์ -->
+      <div style="text-align:center;margin-bottom:14px;">
+        <div style="position:relative;display:inline-block;">
+          <div id="es-avatar" style="width:72px;height:72px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;margin:0 auto;overflow:hidden;border:3px solid var(--red);">?</div>
+          <button onclick="document.getElementById('es-photo-input').click()" style="position:absolute;bottom:0;right:0;width:24px;height:24px;border-radius:50%;background:var(--red);border:2px solid #fff;color:#fff;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;">📷</button>
+          <input type="file" id="es-photo-input" accept="image/*" style="display:none" onchange="uploadAdminPhoto(this)">
+        </div>
+        <div id="es-photo-status" style="font-size:11px;color:var(--sub);margin-top:4px;"></div>
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">รหัสเซล</label>
+        <input type="text" id="es-new-id" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;font-weight:700;color:var(--red);">
+      </div>
       <div style="margin-bottom:10px;">
         <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">ชื่อ</label>
         <input type="text" id="es-name" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;">
@@ -3955,7 +3968,7 @@ function renderSalesList() {
     const myOrders = allSalesOrders.filter(o => o.sales_id === sid);
     const revenue  = myOrders.reduce((sum,o) => sum + (parseFloat(o.total)||0), 0);
     const pins     = getSalesPins(sid);
-    const photo    = localStorage.getItem('sales_photo_' + sid) || '';
+    const photo    = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
     const avatarHtml = photo
       ? `<img src="${photo}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:3px solid ${color};">`
       : `<div style="width:48px;height:48px;border-radius:50%;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;">${(s.name||'?')[0]}</div>`;
@@ -4092,25 +4105,67 @@ function closeSalesDetail() { document.getElementById('sales-detail-modal').styl
 
 function openEditSales(s) {
   if (typeof s==='string') { try { s=JSON.parse(s); } catch(_) { return; } }
-  document.getElementById('es-id').value    = s.salesId||s.id||'';
-  document.getElementById('es-name').value  = s.name||'';
-  document.getElementById('es-phone').value = s.phone||'';
-  document.getElementById('es-active').value= String(s.isActive!==false);
+  document.getElementById('es-id').value      = s.salesId||s.id||'';
+  document.getElementById('es-new-id').value  = s.salesId||s.id||'';
+  document.getElementById('es-name').value    = s.name||'';
+  document.getElementById('es-phone').value   = s.phone||'';
+  document.getElementById('es-active').value  = String(s.isActive!==false);
+  document.getElementById('es-photo-status').textContent = '';
+  // แสดงรูป
+  const av = document.getElementById('es-avatar');
+  const photo = s.photo || localStorage.getItem('sales_photo_' + (s.salesId||s.id||'')) || '';
+  if (photo) {
+    av.innerHTML = `<img src="${photo}" style="width:100%;height:100%;object-fit:cover;">`;
+  } else {
+    av.innerHTML = (s.name||'?')[0];
+    av.style.background = 'var(--red)';
+  }
   document.getElementById('edit-sales-modal').style.display='flex';
 }
 
-function closeEditSales() { document.getElementById('edit-sales-modal').style.display='none'; }
+async function uploadAdminPhoto(input) {
+  if (!input.files[0]) return;
+  const sid = document.getElementById('es-id').value;
+  document.getElementById('es-photo-status').textContent = '⏳ กำลังอัปโหลด...';
+  try {
+    const fd = new FormData();
+    fd.append('file', input.files[0]);
+    fd.append('upload_preset', 'monshin');
+    fd.append('folder', 'sales_profiles');
+    const res  = await fetch('https://api.cloudinary.com/v1_1/dwet6be8c/image/upload', { method:'POST', body:fd });
+    const data = await res.json();
+    if (!data.secure_url) throw new Error('อัปโหลดไม่สำเร็จ');
+    const photoUrl = data.secure_url;
+    // บันทึกลง GAS
+    await gasCallAdmin({ action:'adminUpdatePhoto', salesId:sid, photoUrl });
+    // อัปเดต staff cache
+    const s = allSalesStaff.find(x=>(x.salesId||x.id)===sid);
+    if (s) s.photo = photoUrl;
+    // แสดงรูปใน modal
+    const av = document.getElementById('es-avatar');
+    av.innerHTML = `<img src="${photoUrl}" style="width:100%;height:100%;object-fit:cover;">`;
+    document.getElementById('es-photo-status').textContent = '✅ อัปโหลดรูปแล้ว';
+  } catch(e) {
+    document.getElementById('es-photo-status').textContent = '⚠️ ' + e.message;
+  }
+}
 
 async function saveEditSales() {
-  const id    = document.getElementById('es-id').value;
-  const name  = document.getElementById('es-name').value.trim();
-  const phone = document.getElementById('es-phone').value.trim();
-  const active= document.getElementById('es-active').value==='true';
+  const id     = document.getElementById('es-id').value;
+  const newId  = document.getElementById('es-new-id').value.trim().toUpperCase();
+  const name   = document.getElementById('es-name').value.trim();
+  const phone  = document.getElementById('es-phone').value.trim();
+  const active = document.getElementById('es-active').value==='true';
   if (!name) { toast('กรุณากรอกชื่อ','error'); return; }
   try {
-    const data = await gasCallAdmin({ action:'adminUpdateSales', salesId:id, name, phone, isActive:active });
-    if (data.ok) { toast('✅ บันทึกแล้ว'); closeEditSales(); loadSalesPage(); }
-    else { toast(data.msg||'บันทึกไม่สำเร็จ','error'); }
+    const data = await gasCallAdmin({ action:'adminUpdateSales', salesId:id, newSalesId:newId, name, phone, isActive:active });
+    if (data.ok) {
+      toast('✅ บันทึกแล้ว');
+      closeEditSales();
+      // ล้าง cache แล้วโหลดใหม่
+      Object.keys(_pinsCache).forEach(k => delete _pinsCache[k]);
+      loadSalesPage();
+    } else { toast(data.msg||'บันทึกไม่สำเร็จ','error'); }
   } catch(e) { toast('Error: '+e.message,'error'); }
 }
 
@@ -4260,7 +4315,7 @@ function renderGpsSalesList(locations) {
     const loc   = Array.isArray(locations) ? locations.find(l => l.sales_id === sid) : null;
     const isOnline = loc && (Date.now() - new Date(loc.updated_at).getTime()) < 3 * 60 * 1000;
     const timeAgo  = loc ? getTimeAgo(loc.updated_at) : 'ไม่มีข้อมูล';
-    const photo    = localStorage.getItem('sales_photo_' + sid) || '';
+    const photo    = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
     const avatar   = photo
       ? `<img src="${photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2.5px solid ${color};">`
       : `<div style="width:40px;height:40px;border-radius:50%;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;">${(s.name||'?')[0]}</div>`;
@@ -4464,7 +4519,7 @@ function renderRouteLegend() {
     const pins  = getSalesPins(sid);
     const myOrders = allSalesOrders.filter(o => o.sales_id === sid);
     const revenue  = myOrders.reduce((sum,o) => sum + (parseFloat(o.total)||0), 0);
-    const photo    = localStorage.getItem('sales_photo_' + sid) || '';
+    const photo    = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
     const avatar   = photo
       ? `<img src="${photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:3px solid ${color};">`
       : `<div style="width:40px;height:40px;border-radius:50%;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;">${(s.name||'?')[0]}</div>`;
