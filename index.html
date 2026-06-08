@@ -543,6 +543,7 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
   <button class="nav-tab" data-page="4" onclick="showPage(4)">📊 สรุปยอดขาย</button>
   <button class="nav-tab" data-page="5" onclick="showPage(5)">💼 จัดการเซล</button>
   <button class="nav-tab" data-page="6" onclick="showPage(6)">📡 GPS เซล</button>
+  <button class="nav-tab" data-page="7" onclick="showPage(7)">🗺️ เส้นทางเซล</button>
 </nav>
 
 <!-- ════════════════════════════════════════
@@ -741,6 +742,31 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
   <div id="gps-sales-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;"></div>
 
 </div><!-- /page-6 -->
+
+<!-- ════════════════════════════════════════
+     PAGE 7: เส้นทางลูกค้าเซล
+════════════════════════════════════════ -->
+<div id="page-7" class="admin-page" style="display:none;">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
+    <h2 style="font-size:20px;font-weight:700;">🗺️ เส้นทางลูกค้าของเซล</h2>
+    <button onclick="loadRoutePage()" style="padding:7px 14px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">🔄 โหลดใหม่</button>
+  </div>
+
+  <!-- Filter เซล -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;" id="route-filter-bar">
+    <button onclick="filterRouteMap('all')" id="rfbtn-all" style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--red);background:var(--red);color:#fff;font-family:'Sarabun',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">ทั้งหมด</button>
+  </div>
+
+  <!-- แผนที่หลัก -->
+  <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;">
+    <div id="route-main-map" style="height:460px;"></div>
+  </div>
+
+  <!-- Legend + Stats -->
+  <div id="route-legend-wrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;"></div>
+
+</div><!-- /page-7 -->
 
 <!-- ════════════════════════════════════════
      PAGE 2: ฐานข้อมูลลูกค้า
@@ -4221,14 +4247,224 @@ function setGpsAdminStatus(state, msg) {
   if (msg) text.textContent = msg;
 }
 
-// hook showPage 6
+// ═══════════════════════════════════════════════════════
+//  PAGE 7: เส้นทางลูกค้าเซล
+// ═══════════════════════════════════════════════════════
+let routeMainMap     = null;
+let routeLayersMap   = {};   // salesId → { markers:[], polyline }
+let activeRouteFilter = 'all';
+
+async function loadRoutePage() {
+  const wrap = document.getElementById('route-legend-wrap');
+  if (wrap) wrap.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--sub)"><span class="spinner-sm"></span> กำลังโหลด...</div>';
+
+  if (!window.L) { loadLeafletForRoute(); return; }
+  initRouteMainMap();
+
+  // โหลด staff ถ้ายังไม่มี
+  if (!allSalesStaff.length) {
+    try {
+      const d = await gasCallAdmin({ action:'getSalesStaffList' });
+      allSalesStaff = d.ok ? (d.staff||[]) : [];
+    } catch(_) {}
+  }
+
+  renderRouteMap('all');
+  renderRouteLegend();
+  renderRouteFilterBar();
+}
+
+function loadLeafletForRoute() {
+  if (!document.querySelector('link[href*="leaflet"]')) {
+    const l = document.createElement('link');
+    l.rel='stylesheet'; l.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(l);
+  }
+  if (!document.querySelector('script[src*="leaflet"]')) {
+    const s = document.createElement('script');
+    s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = () => loadRoutePage();
+    document.head.appendChild(s);
+  } else { setTimeout(loadRoutePage, 500); }
+}
+
+function initRouteMainMap() {
+  const el = document.getElementById('route-main-map');
+  if (!el || !window.L || routeMainMap) return;
+  routeMainMap = L.map('route-main-map', { attributionControl:false })
+    .setView([18.145, 100.14], 11);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(routeMainMap);
+}
+
+function renderRouteFilterBar() {
+  const bar = document.getElementById('route-filter-bar');
+  if (!bar) return;
+  bar.innerHTML = `<button onclick="filterRouteMap('all')" id="rfbtn-all"
+    style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--red);
+    background:${activeRouteFilter==='all'?'var(--red)':'#fff'};
+    color:${activeRouteFilter==='all'?'#fff':'var(--red)'};
+    font-family:'Sarabun',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">ทั้งหมด</button>`;
+
+  allSalesStaff.forEach((s, idx) => {
+    const color = SALES_COLORS[idx % SALES_COLORS.length];
+    const sid   = s.salesId || s.id || '';
+    const pins  = getSalesPins(sid);
+    if (!pins.length) return;
+    const active = activeRouteFilter === sid;
+    bar.innerHTML += `<button onclick="filterRouteMap('${sid}')"
+      style="padding:6px 14px;border-radius:20px;border:1.5px solid ${color};
+      background:${active?color:'#fff'};color:${active?'#fff':color};
+      font-family:'Sarabun',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">
+      💼 ${s.name} (${pins.length})
+    </button>`;
+  });
+}
+
+function filterRouteMap(filter) {
+  activeRouteFilter = filter;
+  renderRouteFilterBar();
+  renderRouteMap(filter);
+}
+
+function renderRouteMap(filter) {
+  if (!routeMainMap) return;
+
+  // ลบ layers เดิม
+  Object.values(routeLayersMap).forEach(obj => {
+    if (obj.polyline) routeMainMap.removeLayer(obj.polyline);
+    obj.markers.forEach(m => routeMainMap.removeLayer(m));
+  });
+  routeLayersMap = {};
+
+  const allBounds = [];
+  const typeIcons = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
+
+  allSalesStaff.forEach((s, idx) => {
+    const color = SALES_COLORS[idx % SALES_COLORS.length];
+    const sid   = s.salesId || s.id || '';
+    const pins  = getSalesPins(sid);
+
+    if (!pins.length) return;
+    if (filter !== 'all' && filter !== sid) return;
+
+    routeLayersMap[sid] = { markers:[], polyline:null };
+
+    // วาดเส้นทาง
+    if (pins.length >= 2) {
+      const polyline = L.polyline(
+        pins.map(p => [p.lat, p.lng]),
+        { color, weight:4, opacity:.8, dashArray:'8,4',
+          className:'route-line-' + idx }
+      ).addTo(routeMainMap);
+      routeLayersMap[sid].polyline = polyline;
+    }
+
+    // วาง markers
+    pins.forEach((p, pidx) => {
+      const icon = typeIcons[p.type] || '📍';
+      const marker = L.marker([p.lat, p.lng], {
+        icon: L.divIcon({
+          html: `<div style="position:relative;">
+            <div style="width:28px;height:28px;border-radius:50%;background:${color};border:2.5px solid #fff;
+              box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:12px;">
+              ${icon}
+            </div>
+            <div style="position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+              background:${color};color:#fff;border-radius:8px;padding:0 4px;font-size:9px;font-weight:700;white-space:nowrap;">
+              ${pidx+1}
+            </div>
+          </div>`,
+          iconSize:[28,28], iconAnchor:[14,14], className:''
+        })
+      }).addTo(routeMainMap)
+        .bindPopup(`
+          <div style="font-family:'Sarabun',sans-serif;min-width:150px;">
+            <div style="font-size:13px;font-weight:700;">${icon} ${p.name}</div>
+            <div style="font-size:12px;color:${color};font-weight:700;margin-top:2px;">💼 ${s.name}</div>
+            ${p.phone?`<div style="font-size:12px;color:#666;margin-top:2px;">📞 ${p.phone}</div>`:''}
+            ${p.note?`<div style="font-size:11px;color:#888;margin-top:2px;">${p.note}</div>`:''}
+            <div style="font-size:10px;color:#aaa;margin-top:4px;">จุดที่ ${pidx+1} จาก ${pins.length}</div>
+          </div>`);
+      routeLayersMap[sid].markers.push(marker);
+      allBounds.push([p.lat, p.lng]);
+    });
+  });
+
+  if (allBounds.length) {
+    routeMainMap.fitBounds(allBounds, { padding:[40,40] });
+  }
+  setTimeout(() => routeMainMap.invalidateSize(), 200);
+}
+
+function renderRouteLegend() {
+  const wrap = document.getElementById('route-legend-wrap');
+  if (!wrap) return;
+
+  const cards = allSalesStaff.map((s, idx) => {
+    const color = SALES_COLORS[idx % SALES_COLORS.length];
+    const sid   = s.salesId || s.id || '';
+    const pins  = getSalesPins(sid);
+    const myOrders = allSalesOrders.filter(o => o.sales_id === sid);
+    const revenue  = myOrders.reduce((sum,o) => sum + (parseFloat(o.total)||0), 0);
+    const photo    = localStorage.getItem('sales_photo_' + sid) || '';
+    const avatar   = photo
+      ? `<img src="${photo}" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:3px solid ${color};">`
+      : `<div style="width:40px;height:40px;border-radius:50%;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;">${(s.name||'?')[0]}</div>`;
+
+    const custList = pins.slice(0,5).map((p,i) => {
+      const ic = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
+      return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;background:#f9f9f9;border-radius:7px;margin-bottom:4px;font-size:12px;">
+        <span style="background:${color};color:#fff;border-radius:50%;width:18px;height:18px;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:700;flex-shrink:0;">${i+1}</span>
+        <span>${ic[p.type]||'📍'}</span>
+        <span style="flex:1;font-weight:600;">${p.name}</span>
+        ${p.phone?`<span style="color:${color};font-size:11px;">${p.phone}</span>`:''}
+      </div>`;
+    }).join('');
+
+    return `<div style="background:#fff;border:1.5px solid ${color}44;border-radius:14px;padding:14px;cursor:pointer;"
+      onclick="filterRouteMap('${sid}')">
+      <!-- header -->
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        ${avatar}
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;">${s.name}</div>
+          <div style="font-size:12px;color:${color};font-weight:700;">${sid}</div>
+        </div>
+        <div style="width:14px;height:14px;border-radius:50%;background:${color};box-shadow:0 0 8px ${color};"></div>
+      </div>
+      <!-- stats -->
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;">
+        <div style="background:${color}12;border-radius:8px;padding:7px;text-align:center;">
+          <div style="font-size:16px;font-weight:700;color:${color};">${pins.length}</div>
+          <div style="font-size:10px;color:var(--sub);">หมุด</div>
+        </div>
+        <div style="background:${color}12;border-radius:8px;padding:7px;text-align:center;">
+          <div style="font-size:16px;font-weight:700;color:${color};">${myOrders.length}</div>
+          <div style="font-size:10px;color:var(--sub);">ออเดอร์</div>
+        </div>
+        <div style="background:${color}12;border-radius:8px;padding:7px;text-align:center;">
+          <div style="font-size:13px;font-weight:700;color:${color};">฿${revenue.toLocaleString()}</div>
+          <div style="font-size:10px;color:var(--sub);">ยอดขาย</div>
+        </div>
+      </div>
+      <!-- เส้นสี -->
+      <div style="height:4px;background:${color};border-radius:2px;margin-bottom:10px;"></div>
+      <!-- รายชื่อลูกค้า -->
+      <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📍 ลูกค้า ${pins.length} คน</div>
+      ${pins.length ? custList + (pins.length > 5 ? `<div style="font-size:11px;color:var(--sub);text-align:center;padding:4px;">+${pins.length-5} เพิ่มเติม</div>` : '') : '<div style="font-size:12px;color:var(--sub);padding:6px 0;">ยังไม่มีหมุด</div>'}
+      <button onclick="event.stopPropagation();filterRouteMap('${sid}')" style="width:100%;margin-top:8px;padding:8px;border-radius:8px;border:1.5px solid ${color};background:#fff;color:${color};font-family:'Sarabun',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">🗺️ ดูเส้นทางเซลนี้</button>
+    </div>`;
+  }).join('');
+
+  wrap.innerHTML = cards || '<div style="text-align:center;padding:40px;color:var(--sub);grid-column:1/-1;">ยังไม่มีข้อมูลเซล</div>';
+}
+
+// hook showPage 7
 (function() {
-  const _prev = window.showPage;
+  const _prev7 = window.showPage;
   window.showPage = function(n) {
-    _prev(n);
-    if (n === 5) loadSalesPage();
-    if (n === 6) loadGpsPage();
-    else { clearInterval(gpsInterval); gpsInterval = null; }
+    _prev7(n);
+    if (n === 7) loadRoutePage();
   };
 })();
 </script>
