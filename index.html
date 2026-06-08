@@ -541,6 +541,7 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
   <button class="nav-tab" data-page="2" onclick="showPage(2)">👥 ฐานข้อมูลลูกค้า</button>
   <button class="nav-tab" data-page="3" onclick="showPage(3)">📦 แก้ไขออเดอร์</button>
   <button class="nav-tab" data-page="4" onclick="showPage(4)">📊 สรุปยอดขาย</button>
+  <button class="nav-tab" data-page="5" onclick="showPage(5)">💼 จัดการเซล</button>
 </nav>
 
 <!-- ════════════════════════════════════════
@@ -618,7 +619,7 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
       <table>
         <thead>
           <tr>
-            <th>ออเดอร์</th><th>ลูกค้า</th><th>สินค้า</th><th>ยอด</th>
+            <th>ออเดอร์</th><th>ลูกค้า</th><th>เซล</th><th>สินค้า</th><th>ยอด</th>
             <th>สถานะ</th><th>เวลา</th><th>จัดการ</th>
           </tr>
         </thead>
@@ -630,6 +631,86 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
   </div>
 
 </div><!-- /page-1 -->
+
+<!-- ════════════════════════════════════════
+     PAGE 5: จัดการเซล
+════════════════════════════════════════ -->
+<div id="page-5" class="admin-page" style="display:none;">
+
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+    <h2 style="font-size:20px;font-weight:700;">💼 จัดการพนักงานขาย</h2>
+    <button onclick="loadSalesPage()" style="padding:8px 16px;background:var(--red);color:#fff;border:none;border-radius:8px;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">🔄 โหลดใหม่</button>
+  </div>
+
+  <!-- Sales Stats -->
+  <div class="stats" id="sales-stats" style="margin-bottom:16px;">
+    <div class="stat-card red"><div class="stat-num" id="ss-total">—</div><div class="stat-label">เซลทั้งหมด</div></div>
+    <div class="stat-card orange"><div class="stat-num" id="ss-orders">—</div><div class="stat-label">ออเดอร์จากเซล</div></div>
+    <div class="stat-card green"><div class="stat-num" id="ss-revenue">—</div><div class="stat-label">ยอดขายรวม (฿)</div></div>
+    <div class="stat-card blue"><div class="stat-num" id="ss-customers">—</div><div class="stat-label">ลูกค้าที่ปักหมุด</div></div>
+  </div>
+
+  <!-- Sales map (แผนที่รวมทุกเซล) -->
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+      <h3 style="font-size:15px;font-weight:700;">🗺️ แผนที่ลูกค้าของเซลทุกคน</h3>
+      <div id="sales-map-legend" style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;"></div>
+    </div>
+    <div id="admin-sales-map" style="height:320px;border-radius:10px;overflow:hidden;"></div>
+  </div>
+
+  <!-- Sales list -->
+  <div id="sales-list-wrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
+    <div style="text-align:center;padding:40px;color:var(--sub);grid-column:1/-1;">กด "โหลดใหม่" เพื่อดูข้อมูลเซล</div>
+  </div>
+
+  <!-- Sales detail modal -->
+  <div id="sales-detail-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:3000;overflow-y:auto;padding:20px;">
+    <div style="background:#fff;border-radius:20px;max-width:700px;margin:0 auto;overflow:hidden;">
+      <div style="background:linear-gradient(120deg,#96281B,#C0392B);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;">
+        <h2 style="color:#fff;font-size:16px;font-weight:700;" id="sd-title">รายละเอียดเซล</h2>
+        <button onclick="closeSalesDetail()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:30px;height:30px;border-radius:50%;font-size:18px;cursor:pointer;">×</button>
+      </div>
+      <div style="padding:20px;" id="sd-body">
+        <div id="sd-map" style="height:260px;border-radius:10px;overflow:hidden;margin-bottom:16px;"></div>
+        <div id="sd-stats" style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;"></div>
+        <div id="sd-orders" style="margin-bottom:16px;"></div>
+        <div id="sd-customers"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit sales modal -->
+  <div id="edit-sales-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:4000;display:none;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:400px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h3 style="font-size:15px;font-weight:700;">✏️ แก้ไขข้อมูลเซล</h3>
+        <button onclick="closeEditSales()" style="background:#f0f0f0;border:none;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer;">×</button>
+      </div>
+      <input type="hidden" id="es-id">
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">ชื่อ</label>
+        <input type="text" id="es-name" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">เบอร์โทร</label>
+        <input type="tel" id="es-phone" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">สถานะ</label>
+        <select id="es-active" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;">
+          <option value="true">✅ ใช้งานได้</option>
+          <option value="false">❌ ระงับ</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button onclick="closeEditSales()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:#f5f5f5;font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;">ยกเลิก</button>
+        <button onclick="saveEditSales()" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--red);color:#fff;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /page-5 -->
 
 <!-- ════════════════════════════════════════
      PAGE 2: ฐานข้อมูลลูกค้า
@@ -1515,10 +1596,16 @@ function renderOrders(orders) {
       ? `<small style="color:#06C755;font-size:10px;font-weight:600;">📱 ${escapeHtml(o.line_name)}</small><br>`
       : '';
 
+    const salesId = o.sales_id || o.ref_code || '';
+    const salesBadge = salesId
+      ? `<span style="display:inline-block;background:rgba(192,57,43,.1);color:#C0392B;border:1px solid rgba(192,57,43,.3);border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;">💼 ${escapeHtml(salesId)}</span>`
+      : `<span style="font-size:11px;color:var(--sub);">—</span>`;
+
     return `
       <tr class="${isNew ? 'row-new' : ''}">
         <td>${orderIdDisplay}</td>
         <td><strong>${escapeHtml(o.customer_name || '-')}</strong><br>${lineNameDisplay}${cidDisplay}</td>
+        <td>${salesBadge}</td>
         <td class="${isGhost ? '' : 'items-cell-clickable'}" ${isGhost ? '' : `onclick="openItemsPopup('${escapeAttr(o.order_id)}')"`}>
           <div class="items-list">${shortItems || '<em>—</em>'}</div>
         </td>
@@ -3683,6 +3770,245 @@ document.addEventListener('keydown', e => {
     editingOrderId = null;
   }
 });
+
+// ═══════════════════════════════════════════════════════
+//  PAGE 5: จัดการเซล
+// ═══════════════════════════════════════════════════════
+const SALES_GAS_URL = 'https://script.google.com/macros/s/AKfycbw8PT4PBw0AVXiYiyp9LW4mZexvHxkBiohODVoTkq26Tu4YskhyDsbA821E2MBaLJjl/exec';
+const SB_URL_SALES  = 'https://ckfzscprxighfxztmgct.supabase.co';
+const SB_KEY_SALES  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrZnpzY3ByeGlnaGZ4enRtZ2N0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNTU0NDIsImV4cCI6MjA5MjYzMTQ0Mn0.nQ_LhPz9GsehqRSNx67G5cqxCKHD-cM1gbs2edTqUpw';
+const SALES_COLORS  = ['#C0392B','#2980b9','#27ae60','#8e44ad','#e67e22','#16a085','#d35400','#1abc9c','#2c3e50','#7f8c8d'];
+
+let allSalesStaff = [], allSalesOrders = [], adminSalesMap = null, sdMap = null;
+
+async function gasCallAdmin(body) {
+  const res = await fetch(SALES_GAS_URL, { method:'POST', body:JSON.stringify(body), headers:{'Content-Type':'text/plain'} });
+  return await res.json();
+}
+
+async function loadSalesPage() {
+  const wrap = document.getElementById('sales-list-wrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<div style="text-align:center;padding:40px;grid-column:1/-1;"><span class="spinner-sm"></span> กำลังโหลด...</div>';
+  try {
+    const staffData = await gasCallAdmin({ action:'getSalesStaffList' });
+    allSalesStaff = staffData.ok ? (staffData.staff||[]) : [];
+
+    const res = await fetch(`${SB_URL_SALES}/rest/v1/orders?select=order_id,customer_name,total,status,sales_id,created_at&order=created_at.desc&limit=500`, {
+      headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES }
+    });
+    allSalesOrders = await res.json();
+    if (!Array.isArray(allSalesOrders)) allSalesOrders = [];
+
+    renderSalesStats();
+    renderSalesList();
+    loadLeafletThenMap();
+  } catch(e) {
+    wrap.innerHTML = '<div style="text-align:center;padding:40px;color:#e74c3c;grid-column:1/-1;">โหลดไม่สำเร็จ: ' + e.message + '</div>';
+  }
+}
+
+function renderSalesStats() {
+  const salesOrders = allSalesOrders.filter(o => o.sales_id);
+  const revenue     = salesOrders.reduce((s,o) => s + (parseFloat(o.total)||0), 0);
+  const pins        = getAllSalesPins().length;
+  document.getElementById('ss-total').textContent    = allSalesStaff.length;
+  document.getElementById('ss-orders').textContent   = salesOrders.length;
+  document.getElementById('ss-revenue').textContent  = revenue.toLocaleString();
+  document.getElementById('ss-customers').textContent= pins;
+}
+
+function getAllSalesPins() {
+  const all = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const k = localStorage.key(i);
+    if (k && k.startsWith('sales_customers')) {
+      try { JSON.parse(localStorage.getItem(k)).forEach(c => c.lat && all.push(c)); } catch(_) {}
+    }
+  }
+  return all;
+}
+
+function getSalesPins(salesId) {
+  try { return JSON.parse(localStorage.getItem('sales_customers_' + salesId)||'[]').filter(c => c.lat); } catch(_) { return []; }
+}
+
+function renderSalesList() {
+  const wrap = document.getElementById('sales-list-wrap');
+  if (!allSalesStaff.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--sub);grid-column:1/-1;">ยังไม่มีข้อมูลเซล</div>';
+    return;
+  }
+  wrap.innerHTML = allSalesStaff.map((s, idx) => {
+    const color    = SALES_COLORS[idx % SALES_COLORS.length];
+    const sid      = s.salesId || s.id || '';
+    const myOrders = allSalesOrders.filter(o => o.sales_id === sid);
+    const revenue  = myOrders.reduce((sum,o) => sum + (parseFloat(o.total)||0), 0);
+    const pins     = getSalesPins(sid);
+    const photo    = localStorage.getItem('sales_photo_' + sid) || '';
+    const avatarHtml = photo
+      ? `<img src="${photo}" style="width:48px;height:48px;border-radius:50%;object-fit:cover;border:3px solid ${color};">`
+      : `<div style="width:48px;height:48px;border-radius:50%;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;">${(s.name||'?')[0]}</div>`;
+    const esc = (v) => String(v||'').replace(/"/g,'&quot;');
+    return `<div style="background:#fff;border:1.5px solid ${color}33;border-radius:14px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.06);">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+        ${avatarHtml}
+        <div style="flex:1;">
+          <div style="font-size:15px;font-weight:700;">${s.name||'—'}</div>
+          <div style="font-size:12px;color:${color};font-weight:700;">💼 ${sid}</div>
+          <div style="font-size:11px;color:var(--sub);">${s.phone||''}</div>
+        </div>
+        <span style="background:${s.isActive!==false?'#e8f5e9':'#ffeaea'};color:${s.isActive!==false?'#27ae60':'#e74c3c'};border-radius:20px;padding:3px 10px;font-size:11px;font-weight:700;">${s.isActive!==false?'✅ ใช้งาน':'❌ ระงับ'}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;">
+        <div style="background:#f9f9f9;border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:17px;font-weight:700;color:${color};">${myOrders.length}</div>
+          <div style="font-size:10px;color:var(--sub);">ออเดอร์</div>
+        </div>
+        <div style="background:#f9f9f9;border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:13px;font-weight:700;color:${color};">฿${revenue.toLocaleString()}</div>
+          <div style="font-size:10px;color:var(--sub);">ยอดขาย</div>
+        </div>
+        <div style="background:#f9f9f9;border-radius:8px;padding:8px;text-align:center;">
+          <div style="font-size:17px;font-weight:700;color:${color};">${pins.length}</div>
+          <div style="font-size:10px;color:var(--sub);">หมุดลูกค้า</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="openSalesDetail('${esc(sid)}')" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${color};background:#fff;color:${color};font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">📊 รายละเอียด</button>
+        <button onclick='openEditSales(${JSON.stringify(s).replace(/'/g,"&#39;")})' style="flex:1;padding:8px;border-radius:8px;border:1px solid #ddd;background:#f5f5f5;font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;">✏️ แก้ไข</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function loadLeafletThenMap() {
+  if (window.L) { renderAdminSalesMap(); return; }
+  if (!document.querySelector('link[href*="leaflet"]')) {
+    const link = document.createElement('link');
+    link.rel = 'stylesheet'; link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+  }
+  if (!document.querySelector('script[src*="leaflet"]')) {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.onload = renderAdminSalesMap;
+    document.head.appendChild(s);
+  } else { setTimeout(renderAdminSalesMap, 500); }
+}
+
+function renderAdminSalesMap() {
+  const el = document.getElementById('admin-sales-map');
+  if (!el || !window.L) return;
+  if (!adminSalesMap) {
+    adminSalesMap = L.map('admin-sales-map', { attributionControl:false }).setView([18.145,100.14],11);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(adminSalesMap);
+  }
+  adminSalesMap.eachLayer(l => { if (l instanceof L.Marker || l instanceof L.Polyline) adminSalesMap.removeLayer(l); });
+
+  const legend = document.getElementById('sales-map-legend');
+  legend.innerHTML = '';
+  const allBounds = [];
+
+  allSalesStaff.forEach((s, idx) => {
+    const color = SALES_COLORS[idx % SALES_COLORS.length];
+    const sid   = s.salesId || s.id || '';
+    const pins  = getSalesPins(sid);
+    if (!pins.length) return;
+
+    legend.innerHTML += `<span style="background:${color}22;color:${color};border:1px solid ${color}55;border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;">💼 ${s.name}</span>`;
+
+    pins.forEach(p => {
+      const icons = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
+      L.marker([p.lat,p.lng], {
+        icon: L.divIcon({
+          html: `<div style="width:22px;height:22px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;">${icons[p.type]||'📍'}</div>`,
+          iconSize:[22,22], iconAnchor:[11,11], className:''
+        })
+      }).addTo(adminSalesMap).bindPopup(`<b>${p.name}</b><br><small style="color:${color};font-weight:700;">💼 ${s.name}</small>`);
+      allBounds.push([p.lat,p.lng]);
+    });
+    if (pins.length >= 2) L.polyline(pins.map(p=>[p.lat,p.lng]),{color,weight:3,opacity:.75,dashArray:'7,4'}).addTo(adminSalesMap);
+  });
+
+  if (allBounds.length) adminSalesMap.fitBounds(allBounds,{padding:[30,30]});
+  setTimeout(()=>adminSalesMap.invalidateSize(),200);
+}
+
+function openSalesDetail(salesId) {
+  const s   = allSalesStaff.find(x=>(x.salesId||x.id)===salesId);
+  if (!s) return;
+  const idx  = allSalesStaff.indexOf(s);
+  const color= SALES_COLORS[idx%SALES_COLORS.length];
+  const myOrders = allSalesOrders.filter(o=>o.sales_id===salesId);
+  const revenue  = myOrders.reduce((sum,o)=>sum+(parseFloat(o.total)||0),0);
+  const pins     = getSalesPins(salesId);
+
+  document.getElementById('sd-title').textContent = '💼 ' + s.name + ' (' + salesId + ')';
+  document.getElementById('sd-stats').innerHTML = [
+    {val:myOrders.length,lbl:'ออเดอร์',color},
+    {val:'฿'+revenue.toLocaleString(),lbl:'ยอดขาย',color},
+    {val:pins.length,lbl:'หมุดลูกค้า',color}
+  ].map(x=>`<div style="background:#f9f9f9;border-radius:10px;padding:12px;text-align:center;"><div style="font-size:20px;font-weight:700;color:${x.color};">${x.val}</div><div style="font-size:12px;color:var(--sub);">${x.lbl}</div></div>`).join('');
+
+  document.getElementById('sd-orders').innerHTML = `<h4 style="font-size:14px;font-weight:700;margin-bottom:8px;">📋 ออเดอร์ล่าสุด</h4>` +
+    (myOrders.slice(0,10).map(o=>`<div style="display:flex;justify-content:space-between;padding:8px 10px;background:#f9f9f9;border-radius:8px;margin-bottom:6px;font-size:13px;"><span><code style="font-size:11px;">#${(o.order_id||'').slice(-8)}</code> ${o.customer_name||'—'}</span><span style="font-weight:700;color:${color};">฿${(o.total||0).toLocaleString()}</span></div>`).join('')||'<div style="color:var(--sub);font-size:13px;padding:8px 0;">ยังไม่มีออเดอร์</div>');
+
+  document.getElementById('sd-customers').innerHTML = `<h4 style="font-size:14px;font-weight:700;margin-bottom:8px;">📍 ลูกค้าที่ปักหมุด (${pins.length} คน)</h4>` +
+    (pins.slice(0,15).map(p=>{const ic={shop:'🏪',home:'🏠',business:'🏢',other:'📍'};return `<div style="display:flex;align-items:center;gap:8px;padding:7px 10px;background:#f9f9f9;border-radius:8px;margin-bottom:6px;font-size:13px;"><span>${ic[p.type]||'📍'}</span><span style="flex:1;font-weight:600;">${p.name}</span>${p.phone?`<span style="color:${color};font-size:12px;">📞 ${p.phone}</span>`:''}</div>`;}).join('')||'<div style="color:var(--sub);font-size:13px;padding:8px 0;">ยังไม่มีหมุด</div>');
+
+  document.getElementById('sales-detail-modal').style.display = 'block';
+
+  setTimeout(() => {
+    if (!window.L) return;
+    if (!sdMap) {
+      sdMap = L.map('sd-map',{attributionControl:false}).setView([18.145,100.14],11);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(sdMap);
+    }
+    sdMap.eachLayer(l=>{if(l instanceof L.Marker||l instanceof L.Polyline)sdMap.removeLayer(l);});
+    const bounds=[];
+    pins.forEach(p=>{
+      const ic={shop:'🏪',home:'🏠',business:'🏢',other:'📍'};
+      L.marker([p.lat,p.lng],{icon:L.divIcon({html:`<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;">${ic[p.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''})}).addTo(sdMap).bindPopup(`<b>${p.name}</b>${p.phone?'<br>📞 '+p.phone:''}`);
+      bounds.push([p.lat,p.lng]);
+    });
+    if(pins.length>=2)L.polyline(pins.map(p=>[p.lat,p.lng]),{color,weight:4,opacity:.85}).addTo(sdMap);
+    if(bounds.length)sdMap.fitBounds(bounds,{padding:[30,30]});
+    sdMap.invalidateSize();
+  },300);
+}
+
+function closeSalesDetail() { document.getElementById('sales-detail-modal').style.display='none'; }
+
+function openEditSales(s) {
+  if (typeof s==='string') { try { s=JSON.parse(s); } catch(_) { return; } }
+  document.getElementById('es-id').value    = s.salesId||s.id||'';
+  document.getElementById('es-name').value  = s.name||'';
+  document.getElementById('es-phone').value = s.phone||'';
+  document.getElementById('es-active').value= String(s.isActive!==false);
+  document.getElementById('edit-sales-modal').style.display='flex';
+}
+
+function closeEditSales() { document.getElementById('edit-sales-modal').style.display='none'; }
+
+async function saveEditSales() {
+  const id    = document.getElementById('es-id').value;
+  const name  = document.getElementById('es-name').value.trim();
+  const phone = document.getElementById('es-phone').value.trim();
+  const active= document.getElementById('es-active').value==='true';
+  if (!name) { toast('กรุณากรอกชื่อ','error'); return; }
+  try {
+    const data = await gasCallAdmin({ action:'adminUpdateSales', salesId:id, name, phone, isActive:active });
+    if (data.ok) { toast('✅ บันทึกแล้ว'); closeEditSales(); loadSalesPage(); }
+    else { toast(data.msg||'บันทึกไม่สำเร็จ','error'); }
+  } catch(e) { toast('Error: '+e.message,'error'); }
+}
+
+// hook showPage
+(function() {
+  const _orig = showPage;
+  window.showPage = function(n) { _orig(n); if (n===5) loadSalesPage(); };
+})();
 </script>
 
 </body>
