@@ -3999,7 +3999,7 @@ function renderSalesList() {
       </div>
       <div style="display:flex;gap:8px;">
         <button onclick="openSalesDetail('${esc(sid)}')" style="flex:1;padding:8px;border-radius:8px;border:1.5px solid ${color};background:#fff;color:${color};font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">📊 รายละเอียด</button>
-        <button onclick='openEditSales(${JSON.stringify(s).replace(/'/g,"&#39;")})' style="flex:1;padding:8px;border-radius:8px;border:1px solid #ddd;background:#f5f5f5;font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;">✏️ แก้ไข</button>
+        <button data-salesid="${sid}" onclick="openEditSalesById(this.dataset.salesid)" style="flex:1;padding:8px;border-radius:8px;border:1px solid #ddd;background:#f5f5f5;font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;">✏️ แก้ไข</button>
       </div>
     </div>`;
   }).join('');
@@ -4102,6 +4102,15 @@ function openSalesDetail(salesId) {
 }
 
 function closeSalesDetail() { document.getElementById('sales-detail-modal').style.display='none'; }
+
+function openEditSalesById(salesId) {
+  const s = allSalesStaff.find(x => (x.salesId||x.id) === salesId);
+  if (s) openEditSales(s);
+}
+
+function closeEditSales() {
+  document.getElementById('edit-sales-modal').style.display = 'none';
+}
 
 function openEditSales(s) {
   if (typeof s==='string') { try { s=JSON.parse(s); } catch(_) { return; } }
