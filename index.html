@@ -796,6 +796,11 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
       <!-- ข้อมูล -->
       <div style="padding:16px 20px;">
         <div id="cdm-info" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;"></div>
+        <!-- รูปสถานที่ -->
+        <div id="cdm-photo-wrap" style="display:none;margin-bottom:14px;">
+          <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📸 รูปสถานที่</div>
+          <img id="cdm-photo-img" src="" style="width:100%;border-radius:10px;object-fit:cover;max-height:180px;display:block;" onerror="document.getElementById('cdm-photo-wrap').style.display='none'">
+        </div>
         <div id="cdm-note-wrap" style="display:none;margin-bottom:14px;">
           <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">หมายเหตุ</div>
           <div id="cdm-note" style="background:#f9f9f9;border-radius:8px;padding:10px;font-size:13px;line-height:1.6;"></div>
@@ -3939,7 +3944,8 @@ async function fetchSalesPins(salesId) {
       id: r.id, name: r.name, phone: r.phone||'',
       type: r.type||'shop', note: r.note||'',
       lat: parseFloat(r.lat), lng: parseFloat(r.lng),
-      createdAt: r.created_at
+      createdAt: r.created_at,
+      photo_url: r.photo_url || null
     })).filter(p => p.lat) : [];
     _pinsCache[salesId] = pins;
     return pins;
@@ -4631,6 +4637,14 @@ function openCustDetail(salesId, pinIdx) {
     noteWrap.style.display = 'block';
     document.getElementById('cdm-note').textContent = p.note;
   } else { noteWrap.style.display = 'none'; }
+
+  // รูปสถานที่
+  const photoWrap = document.getElementById('cdm-photo-wrap');
+  const photoImg  = document.getElementById('cdm-photo-img');
+  if (p.photo_url) {
+    photoImg.src = p.photo_url;
+    photoWrap.style.display = 'block';
+  } else { photoWrap.style.display = 'none'; }
 
   // ปุ่ม โทร
   const phoneBtn = document.getElementById('cdm-phone-btn');
