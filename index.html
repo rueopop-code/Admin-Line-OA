@@ -4387,13 +4387,22 @@ async function loadRoutePage() {
     } catch(_) {}
   }
 
-  // โหลด pins จาก Supabase
-  Object.keys(_pinsCache).forEach(k => delete _pinsCache[k]);
-  await loadAllPins();
+  // โหลด pins เฉพาะถ้า cache ยังว่างอยู่ (ไม่ล้าง cache ที่ Tab5 โหลดไว้แล้ว)
+  const hasPins = Object.keys(_pinsCache).length > 0;
+  if (!hasPins) {
+    await loadAllPins();
+  } else {
+    // reload ใหม่เสมอเพื่อให้ข้อมูล fresh
+    Object.keys(_pinsCache).forEach(k => delete _pinsCache[k]);
+    await loadAllPins();
+  }
 
   renderRouteMap('all');
   renderRouteLegend();
   renderRouteFilterBar();
+  // sync Tab5 stats ด้วย
+  if (typeof renderSalesStats === 'function') renderSalesStats();
+  if (typeof renderSalesList === 'function') renderSalesList();
 }
 
 function loadLeafletForRoute() {
