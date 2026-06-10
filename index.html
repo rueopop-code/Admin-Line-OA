@@ -3880,6 +3880,48 @@ document.addEventListener('keydown', e => {
 const SALES_GAS_URL = 'https://script.google.com/macros/s/AKfycbw8PT4PBw0AVXiYiyp9LW4mZexvHxkBiohODVoTkq26Tu4YskhyDsbA821E2MBaLJjl/exec';
 const SB_URL_SALES  = 'https://ckfzscprxighfxztmgct.supabase.co';
 const SB_KEY_SALES  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNrZnpzY3ByeGlnaGZ4enRtZ2N0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNTU0NDIsImV4cCI6MjA5MjYzMTQ0Mn0.nQ_LhPz9GsehqRSNx67G5cqxCKHD-cM1gbs2edTqUpw';
+
+// ── Road routing helpers (Admin) ──────────────────────────────────
+const _adminRoadLayers = {};
+
+function _adminSamplePoints(pts, max) {
+  if (pts.length <= max) return pts;
+  const step = (pts.length - 1) / (max - 1);
+  const out = [];
+  for (let i = 0; i < max; i++) out.push(pts[Math.round(i * step)]);
+  return out;
+}
+
+async function adminDrawRoadRoute(map, points, color, key) {
+  const sampled = _adminSamplePoints(points, 25);
+  const coords  = sampled.map(p => p[1] + ',' + p[0]).join(';');
+  try {
+    const res  = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+    const data = await res.json();
+    if (!data.routes || !data.routes[0]) return;
+    if (_adminRoadLayers[key]) { try { map.removeLayer(_adminRoadLayers[key]); } catch(_){} }
+    _adminRoadLayers[key] = L.geoJSON(data.routes[0].geometry, {
+      style: { color, weight: 4, opacity: .85 }
+    }).addTo(map);
+  } catch(_) {}
+}
+
+async function adminDrawRoadRouteFromPins(map, pins, color, key) {
+  if (!pins || pins.length < 2) return;
+  const pts     = pins.map(p => [p.lat, p.lng]);
+  const sampled = _adminSamplePoints(pts, 25);
+  const coords  = sampled.map(p => p[1] + ',' + p[0]).join(';');
+  try {
+    const res  = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+    const data = await res.json();
+    if (!data.routes || !data.routes[0]) return;
+    if (_adminRoadLayers[key]) { try { map.removeLayer(_adminRoadLayers[key]); } catch(_){} }
+    _adminRoadLayers[key] = L.geoJSON(data.routes[0].geometry, {
+      style: { color, weight: 4, opacity: .85 }
+    }).addTo(map);
+  } catch(_) {}
+}
+// ─────────────────────────────────────────────────────────────────
 const SALES_COLORS  = ['#C0392B','#2980b9','#27ae60','#8e44ad','#e67e22','#16a085','#d35400','#1abc9c','#2c3e50','#7f8c8d'];
 
 let allSalesStaff = [], allSalesOrders = [], adminSalesMap = null, sdMap = null;
@@ -4057,7 +4099,10 @@ function renderAdminSalesMap() {
       }).addTo(adminSalesMap).bindPopup(`<div style="font-family:'Sarabun',sans-serif;min-width:140px;"><b>${p.name}</b><br><small style="color:${color};font-weight:700;">💼 ${s.name}</small>${p.photo_url?`<br><img src="${p.photo_url}" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-top:4px;display:block;" onerror="this.style.display='none'">`:''}</div>`);
       allBounds.push([p.lat,p.lng]);
     });
-    if (pins.length >= 2) L.polyline(pins.map(p=>[p.lat,p.lng]),{color,weight:3,opacity:.75,dashArray:'7,4'}).addTo(adminSalesMap);
+    if (pins.length >= 2) {
+      L.polyline(pins.map(p=>[p.lat,p.lng]),{color,weight:2,opacity:.2,dashArray:'5,4'}).addTo(adminSalesMap);
+      adminDrawRoadRouteFromPins(adminSalesMap, pins, color, 'adminmap_' + sid);
+    }
   });
 
   if (allBounds.length) adminSalesMap.fitBounds(allBounds,{padding:[30,30]});
@@ -4101,7 +4146,7 @@ function openSalesDetail(salesId) {
       L.marker([p.lat,p.lng],{icon:L.divIcon({html:`<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;">${ic[p.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''})}).addTo(sdMap).bindPopup(`<div style="font-family:'Sarabun',sans-serif;min-width:130px;"><b>${p.name}</b>${p.phone?'<br>📞 '+p.phone:''}${p.photo_url?`<br><img src="${p.photo_url}" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-top:4px;display:block;" onerror="this.style.display='none'">`:''}</div>`);
       bounds.push([p.lat,p.lng]);
     });
-    if(pins.length>=2)L.polyline(pins.map(p=>[p.lat,p.lng]),{color,weight:4,opacity:.85}).addTo(sdMap);
+    if(pins.length>=2){ L.polyline(pins.map(p=>[p.lat,p.lng]),{color,weight:2,opacity:.2,dashArray:'5,4'}).addTo(sdMap); adminDrawRoadRouteFromPins(sdMap, pins, color, 'sdmap_' + (s.salesId||s.id||'x')); }
     if(bounds.length)sdMap.fitBounds(bounds,{padding:[30,30]});
     sdMap.invalidateSize();
   },300);
@@ -4278,10 +4323,10 @@ function renderGpsMap(locations, routes) {
     // เส้นทางวันนี้
     if (myRoutes.length >= 2) {
       const pts = myRoutes.map(r => [parseFloat(r.lat), parseFloat(r.lng)]);
-      if (gpsRoutes[sid]) gpsAdminMap.removeLayer(gpsRoutes[sid]);
-      gpsRoutes[sid] = L.polyline(pts, {
-        color, weight:3, opacity:.75, dashArray:'8,4'
-      }).addTo(gpsAdminMap);
+      if (gpsRoutes[sid]) { try { gpsAdminMap.removeLayer(gpsRoutes[sid]); } catch(_){} }
+      // วาด polyline เบื้องต้นก่อน แล้ว road route ทับ
+      gpsRoutes[sid] = L.polyline(pts, { color, weight:3, opacity:.3, dashArray:'6,4' }).addTo(gpsAdminMap);
+      adminDrawRoadRoute(gpsAdminMap, pts, color, 'gps_' + sid);
       pts.forEach(p => allBounds.push(p));
     }
 
@@ -4497,12 +4542,13 @@ function renderRouteMap(filter) {
 
     // วาดเส้นทาง
     if (pins.length >= 2) {
+      // polyline เบื้องต้นก่อน (แสดงทันที) แล้ว road route ทับ
       const polyline = L.polyline(
         pins.map(p => [p.lat, p.lng]),
-        { color, weight:4, opacity:.8, dashArray:'8,4',
-          className:'route-line-' + idx }
+        { color, weight:3, opacity:.25, dashArray:'6,4', className:'route-line-' + idx }
       ).addTo(routeMainMap);
       routeLayersMap[sid].polyline = polyline;
+      adminDrawRoadRouteFromPins(routeMainMap, pins, color, 'route_' + sid);
     }
 
     // วาง markers
