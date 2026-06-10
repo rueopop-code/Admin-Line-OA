@@ -621,12 +621,12 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
       <table>
         <thead>
           <tr>
-            <th>ออเดอร์</th><th>ลูกค้า</th><th>เซล</th><th>สินค้า</th><th>ยอด</th>
+            <th>ออเดอร์</th><th>ลูกค้า</th><th>เซล</th><th>ผู้เชิญ</th><th>สินค้า</th><th>ยอด</th>
             <th>สถานะ</th><th>เวลา</th><th>จัดการ</th>
           </tr>
         </thead>
         <tbody id="orders-tbody">
-          <tr class="empty-row"><td colspan="7">กดปุ่ม "เชื่อมต่อ" เพื่อโหลดออเดอร์</td></tr>
+          <tr class="empty-row"><td colspan="8">กดปุ่ม "เชื่อมต่อ" เพื่อโหลดออเดอร์</td></tr>
         </tbody>
       </table>
     </div>
@@ -900,7 +900,7 @@ tr.row-new td { background:#fce4ec !important; animation: flashNew 2.5s ease-out
           </tr>
         </thead>
         <tbody id="p3-tbody">
-          <tr class="empty-row"><td colspan="7">โหลดข้อมูลจากหน้าหลักก่อน</td></tr>
+          <tr class="empty-row"><td colspan="8">โหลดข้อมูลจากหน้าหลักก่อน</td></tr>
         </tbody>
       </table>
     </div>
@@ -1491,7 +1491,7 @@ async function loadOrders() {
   if (!sb) { toast('ยังไม่ได้เชื่อมต่อ Supabase', 'error'); return; }
 
   const tbody = document.getElementById('orders-tbody');
-  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;"><span class="spinner-sm"></span></td></tr>';
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:32px;"><span class="spinner-sm"></span></td></tr>';
 
   const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
   if (backendUrl) {
@@ -1512,7 +1512,7 @@ async function loadOrders() {
     if (currentPage === 3) renderPage3Orders();
     if (currentPage === 4) renderCharts();
   } catch (e) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">⚠️ โหลดไม่ได้: ${e.message}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">⚠️ โหลดไม่ได้: ${e.message}</td></tr>`;
     toast('โหลดออเดอร์ไม่ได้: ' + e.message, 'error');
   }
 }
@@ -1641,7 +1641,7 @@ function renderOrders(orders) {
 
   if (!list.length) {
     const msg = searchTerm ? `ไม่พบรายการที่ตรงกับ "${escapeHtml(searchTerm)}"` : 'ยังไม่มีออเดอร์';
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${msg}</td></tr>`;
     return;
   }
 
@@ -1699,9 +1699,20 @@ function renderOrders(orders) {
       ? `<small style="color:#06C755;font-size:10px;font-weight:600;">📱 ${escapeHtml(o.line_name)}</small><br>`
       : '';
 
-    const salesId = o.sales_id || o.ref_code || '';
-    const salesBadge = salesId
-      ? `<span style="display:inline-block;background:rgba(192,57,43,.1);color:#C0392B;border:1px solid rgba(192,57,43,.3);border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;">💼 ${escapeHtml(salesId)}</span>`
+    // แยก salesId (S001, S002…) กับ referralCode (REFxxx… = เพื่อนชวนเพื่อน)
+    const rawSalesId = o.sales_id || '';
+    const rawRefCode = o.ref_code || '';
+    // ref_code ที่ขึ้นต้น REF = ระบบชวนเพื่อน, ที่ขึ้น S = รหัสเซล
+    const isSalesRef = /^S\d+$/i.test(rawRefCode);
+    const effectiveSalesId = rawSalesId || (isSalesRef ? rawRefCode : '');
+    const effectiveRefCode = (!isSalesRef && rawRefCode) ? rawRefCode : '';
+
+    const salesBadge = effectiveSalesId
+      ? `<span style="display:inline-block;background:rgba(192,57,43,.1);color:#C0392B;border:1px solid rgba(192,57,43,.3);border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;">💼 ${escapeHtml(effectiveSalesId)}</span>`
+      : `<span style="font-size:11px;color:var(--sub);">—</span>`;
+
+    const referralBadge = effectiveRefCode
+      ? `<span title="${escapeAttr(effectiveRefCode)}" style="display:inline-block;background:rgba(6,199,85,.1);color:#059944;border:1px solid rgba(6,199,85,.35);border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;">🎁 ${escapeHtml(effectiveRefCode.slice(0,10))}${effectiveRefCode.length>10?'…':''}</span>`
       : `<span style="font-size:11px;color:var(--sub);">—</span>`;
 
     return `
@@ -1709,6 +1720,7 @@ function renderOrders(orders) {
         <td>${orderIdDisplay}</td>
         <td><strong>${escapeHtml(o.customer_name || '-')}</strong><br>${lineNameDisplay}${cidDisplay}</td>
         <td>${salesBadge}</td>
+        <td>${referralBadge}</td>
         <td class="${isGhost ? '' : 'items-cell-clickable'}" ${isGhost ? '' : `onclick="openItemsPopup('${escapeAttr(o.order_id)}')"`}>
           <div class="items-list">${shortItems || '<em>—</em>'}</div>
         </td>
@@ -1858,7 +1870,7 @@ function renderPage3Orders() {
   let list = p3Filter === 'all' ? real : real.filter(o => (o.status||'pending') === p3Filter);
 
   if (!list.length) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">${allOrders.length ? 'ไม่มีออเดอร์ในฟิลเตอร์นี้' : 'โหลดข้อมูลจากหน้าหลักก่อน'}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${allOrders.length ? 'ไม่มีออเดอร์ในฟิลเตอร์นี้' : 'โหลดข้อมูลจากหน้าหลักก่อน'}</td></tr>`;
     return;
   }
 
