@@ -3939,7 +3939,7 @@ async function loadSalesPage() {
     const staffData = await gasCallAdmin({ action:'getSalesStaffList' });
     allSalesStaff = staffData.ok ? (staffData.staff||[]) : [];
 
-    const res = await fetch(`${SB_URL_SALES}/rest/v1/orders?select=order_id,customer_name,total,status,sales_id,created_at&order=created_at.desc&limit=500`, {
+    const res = await fetch(`${SB_URL_SALES}/rest/v1/orders?select=order_id,customer_name,total,status,sales_id,ref_code,created_at&order=created_at.desc&limit=500`, {
       headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES }
     });
     allSalesOrders = await res.json();
@@ -3957,7 +3957,7 @@ async function loadSalesPage() {
 }
 
 function renderSalesStats() {
-  const salesOrders = allSalesOrders.filter(o => o.sales_id);
+  const salesOrders = allSalesOrders.filter(o => o.sales_id || o.ref_code);
   const revenue     = salesOrders.reduce((s,o) => s + (parseFloat(o.total)||0), 0);
   const pins        = getAllSalesPins().length;
   document.getElementById('ss-total').textContent    = allSalesStaff.length;
@@ -4013,7 +4013,7 @@ function renderSalesList() {
   wrap.innerHTML = allSalesStaff.map((s, idx) => {
     const color    = SALES_COLORS[idx % SALES_COLORS.length];
     const sid      = s.salesId || s.id || '';
-    const myOrders = allSalesOrders.filter(o => o.sales_id === sid);
+    const myOrders = allSalesOrders.filter(o => o.sales_id === sid || o.ref_code === sid);
     const revenue  = myOrders.reduce((sum,o) => sum + (parseFloat(o.total)||0), 0);
     const pins     = getSalesPins(sid);
     const photo    = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
@@ -4597,7 +4597,7 @@ function renderRouteLegend() {
     const color = SALES_COLORS[idx % SALES_COLORS.length];
     const sid   = s.salesId || s.id || '';
     const pins  = getSalesPins(sid);
-    const myOrders = allSalesOrders.filter(o => o.sales_id === sid);
+    const myOrders = allSalesOrders.filter(o => o.sales_id === sid || o.ref_code === sid);
     const revenue  = myOrders.reduce((sum,o) => sum + (parseFloat(o.total)||0), 0);
     const photo    = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
     const avatar   = photo
