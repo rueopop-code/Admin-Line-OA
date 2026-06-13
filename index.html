@@ -735,15 +735,17 @@ mark.search-hl { background: #fff59d; color: #d84315; padding: 0 2px; border-rad
             <th>ออเดอร์</th>
             <th>ลูกค้า</th>
             <th>เซล</th>
+            <th>โค้ด</th>
             <th>สินค้า</th>
             <th>ยอด</th>
+            <th>ชำระ</th>
             <th>สถานะ</th>
             <th>เวลา</th>
             <th>จัดการ</th>
           </tr>
         </thead>
         <tbody id="orders-tbody">
-          <tr class="empty-row"><td colspan="8">กรอก URL และ Key แล้วกด "เชื่อมต่อ"</td></tr>
+          <tr class="empty-row"><td colspan="10">กรอก URL และ Key แล้วกด "เชื่อมต่อ"</td></tr>
         </tbody>
       </table>
     </div>
@@ -1168,6 +1170,25 @@ mark.search-hl { background: #fff59d; color: #d84315; padding: 0 2px; border-rad
       </div>
       <div class="total-display">รวม: <span id="emTotal">฿0</span></div>
 
+      <!-- ── PAYMENT METHOD SECTION ── -->
+      <div style="margin-top:14px;padding:12px 14px;background:#f0f7ff;border:1.5px solid #b3d4f0;border-radius:12px;">
+        <div style="font-size:12px;font-weight:700;color:#1a5276;margin-bottom:10px;">💳 วิธีชำระเงิน</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+          <div id="em-pay-none" onclick="selectEditPayment('')"
+            style="border:2px solid #ccc;border-radius:10px;padding:9px 6px;text-align:center;cursor:pointer;font-size:12px;font-weight:700;transition:all .2s;background:#f5f5f5;color:#888;">
+            ❓ ไม่ระบุ
+          </div>
+          <div id="em-pay-cod" onclick="selectEditPayment('cod')"
+            style="border:2px solid #ccc;border-radius:10px;padding:9px 6px;text-align:center;cursor:pointer;font-size:12px;font-weight:700;transition:all .2s;background:#fff;">
+            🏍️ ปลายทาง
+          </div>
+          <div id="em-pay-transfer" onclick="selectEditPayment('transfer')"
+            style="border:2px solid #ccc;border-radius:10px;padding:9px 6px;text-align:center;cursor:pointer;font-size:12px;font-weight:700;transition:all .2s;background:#fff;">
+            📲 โอน/QR
+          </div>
+        </div>
+      </div>
+
       <!-- ── DISCOUNT SECTION ── -->
       <div id="emDiscountSection" style="margin-top:14px;padding:12px 14px;background:#fff8f0;border:1.5px solid #ffd0a0;border-radius:12px;">
         <div style="font-size:12px;font-weight:700;color:#c0392b;margin-bottom:10px;">🎟️ ส่วนลด / คูปอง</div>
@@ -1276,6 +1297,24 @@ mark.search-hl { background: #fff59d; color: #d84315; padding: 0 2px; border-rad
     </div>
     <div class="modal-body">
       <div id="cmCustomerInfo" style="font-size:12px;color:var(--sub);margin-bottom:10px;"></div>
+      <!-- 🧾 Payment confirmation bar (แสดงเมื่อ payment_method=transfer) -->
+      <div id="cmPaymentBar" style="display:none;background:#eaf4fd;border:1.5px solid #b3d4f0;border-radius:10px;padding:10px 12px;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+          <div>
+            <div id="cmPaymentStatus" style="font-size:13px;font-weight:700;color:#1a5276;"></div>
+            <div id="cmSlipInfo" style="font-size:11px;color:#888;margin-top:2px;"></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button id="cmConfirmPayBtn" onclick="adminConfirmPayment()"
+              style="padding:7px 14px;background:#27ae60;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">
+              ✅ ยืนยันชำระแล้ว
+            </button>
+            <button id="cmViewSlipBtn" onclick="adminViewSlip()" style="display:none;padding:7px 14px;background:#2980b9;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">
+              🖼️ ดูสลิป
+            </button>
+          </div>
+        </div>
+      </div>
       <div class="quick-templates" id="cmQuickTpls"></div>
       <div class="chat-list" id="cmChatList"></div>
       <!-- Toggle ส่งไป LINE หรือ Note ภายใน -->
@@ -1295,6 +1334,21 @@ mark.search-hl { background: #fff59d; color: #d84315; padding: 0 2px; border-rad
       </div>
       <div style="font-size:11px;color:var(--sub);margin-top:6px;">💡 เปิด toggle = ส่งไป LINE ลูกค้า | ปิด toggle = บันทึก Note ภายในเท่านั้น</div>
     </div>
+  </div>
+</div>
+
+<!-- SLIP VIEW MODAL -->
+<div id="slipViewModal" onclick="if(event.target===this)document.getElementById('slipViewModal').style.display='none'"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9500;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:16px;max-width:480px;width:100%;padding:16px;position:relative;max-height:90vh;overflow-y:auto;">
+    <button onclick="document.getElementById('slipViewModal').style.display='none'"
+      style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:22px;color:#aaa;cursor:pointer;line-height:1;">×</button>
+    <div style="font-weight:700;font-size:15px;color:#2C3E50;margin-bottom:12px;">🖼️ สลิปโอนเงิน</div>
+    <img id="slipViewImg" src="" alt="สลิป" style="width:100%;border-radius:10px;object-fit:contain;max-height:70vh;">
+    <a id="slipViewDownload" href="" download="slip.jpg" target="_blank"
+      style="display:block;margin-top:10px;text-align:center;padding:8px;background:#2980b9;color:#fff;border-radius:8px;font-size:13px;font-weight:700;text-decoration:none;">
+      ⬇️ ดาวน์โหลดสลิป
+    </a>
   </div>
 </div>
 
@@ -1823,7 +1877,7 @@ function renderOrders(orders) {
 
   if (!list.length) {
     const msg = searchTerm ? `ไม่พบรายการที่ตรงกับ "${escapeHtml(searchTerm)}"` : 'ยังไม่มีออเดอร์';
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">${msg}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="10">${msg}</td></tr>`;
     return;
   }
 
@@ -1897,6 +1951,24 @@ function renderOrders(orders) {
       ? `<span title="${escapeAttr(effectiveRefCode)}" style="display:inline-block;background:rgba(6,199,85,.1);color:#059944;border:1px solid rgba(6,199,85,.35);border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;">🎁 ${escapeHtml(effectiveRefCode.slice(0,10))}${effectiveRefCode.length>10?'…':''}</span>`
       : `<span style="font-size:11px;color:var(--sub);">—</span>`;
 
+    // 💳 วิธีชำระเงิน
+    const pm = o.payment_method || null;
+    // fallback: ออเดอร์เก่าที่ payment_method=null → parse จาก note
+    let pmResolved = pm;
+    let plResolved = o.payment_label || null;
+    if (!pmResolved && o.note) {
+      if (/ปลายทาง|COD|cod/.test(o.note))             { pmResolved = 'cod';      plResolved = '🏍️ ปลายทาง'; }
+      else if (/โอน|QR|Transfer|transfer/.test(o.note)) { pmResolved = 'transfer'; plResolved = '📲 โอน/QR'; }
+    }
+    const pl = plResolved || (pmResolved === 'cod' ? '🏍️ ปลายทาง' : pmResolved === 'transfer' ? '📲 โอน/QR' : null);
+    const paymentBadge = isGhost
+      ? `<span style="font-size:11px;color:var(--sub);">—</span>`
+      : pmResolved === 'cod'
+        ? `<span onclick="quickSetPayment('${escapeAttr(o.order_id)}')" title="คลิกเพื่อเปลี่ยน" style="display:inline-block;background:#fff5f5;color:#c0392b;border:1px solid #f5c6c6;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;">${escapeHtml(pl)}</span>`
+        : pmResolved === 'transfer'
+          ? `<span onclick="quickSetPayment('${escapeAttr(o.order_id)}')" title="คลิกเพื่อเปลี่ยน" style="display:inline-block;background:#eaf4fd;color:#2980b9;border:1px solid #b3d4f0;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;">${escapeHtml(pl)}</span>`
+          : `<span onclick="quickSetPayment('${escapeAttr(o.order_id)}')" title="คลิกเพื่อตั้งค่า" style="display:inline-block;background:#f5f5f5;color:#999;border:1px dashed #ccc;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;">+ ตั้งค่า</span>`;
+
     return `
       <tr class="${isNew ? 'row-new' : ''}">
         <td>${orderIdDisplay}</td>
@@ -1907,6 +1979,7 @@ function renderOrders(orders) {
           <div class="items-list">${shortItems || '<em>—</em>'}</div>
         </td>
         <td>${totalDisplay}</td>
+        <td>${paymentBadge}</td>
         <td>${statusCell}</td>
         <td style="font-size:12px;color:var(--sub);white-space:nowrap;">${date}</td>
         <td>
@@ -2980,6 +3053,8 @@ function openEditModal(orderId) {
   // โหลดค่าส่วนลด/คูปองเดิม
   document.getElementById('emCouponCode').value    = o.coupon_code || '';
   document.getElementById('emDiscountAmount').value = (o.discount_amount > 0) ? o.discount_amount : '';
+  // โหลดวิธีชำระเงินเดิม
+  selectEditPayment(o.payment_method || '');
   renderEditItems(o.items || []);
   document.getElementById('editModal').classList.add('show');
   updateEmDiscountPreview();
@@ -3047,9 +3122,85 @@ function updateEmDiscountPreview() {
   }
 }
 
+// ── Quick-set payment method (คลิกตรงคอลัมน์ชำระได้เลย) ──────
+async function quickSetPayment(orderId) {
+  const o = allOrders.find(x => x.order_id === orderId);
+  if (!o) return;
+
+  // สร้าง popup เล็กๆ
+  const existing = document.getElementById('qpay-popup');
+  if (existing) existing.remove();
+
+  const current = o.payment_method || '';
+  const popup = document.createElement('div');
+  popup.id = 'qpay-popup';
+  popup.innerHTML = `
+    <div style="position:fixed;inset:0;z-index:9000;" onclick="document.getElementById('qpay-popup').remove()"></div>
+    <div style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:9001;background:#fff;border-radius:16px;box-shadow:0 8px 32px rgba(0,0,0,0.18);padding:20px 22px;min-width:260px;">
+      <div style="font-size:13px;font-weight:700;color:#333;margin-bottom:4px;">💳 วิธีชำระเงิน</div>
+      <div style="font-size:11px;color:#999;margin-bottom:14px;">ออเดอร์ #${escapeHtml(orderId)}</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <button onclick="applyQuickPayment('${escapeAttr(orderId)}','cod')" style="padding:10px 14px;border-radius:10px;border:2px solid ${current==='cod'?'#c0392b':'#eee'};background:${current==='cod'?'#fff5f5':'#fafafa'};color:${current==='cod'?'#c0392b':'#555'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;">🏍️ เก็บปลายทาง (COD)</button>
+        <button onclick="applyQuickPayment('${escapeAttr(orderId)}','transfer')" style="padding:10px 14px;border-radius:10px;border:2px solid ${current==='transfer'?'#2980b9':'#eee'};background:${current==='transfer'?'#eaf4fd':'#fafafa'};color:${current==='transfer'?'#2980b9':'#555'};font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;text-align:left;">📲 โอน/สแกน QR</button>
+        ${current ? `<button onclick="applyQuickPayment('${escapeAttr(orderId)}','')" style="padding:8px 14px;border-radius:10px;border:1.5px dashed #ddd;background:#fafafa;color:#aaa;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;text-align:left;">✕ ล้างค่า</button>` : ''}
+      </div>
+    </div>`;
+  document.body.appendChild(popup);
+}
+
+async function applyQuickPayment(orderId, method) {
+  document.getElementById('qpay-popup')?.remove();
+  if (!sb) return;
+  const label = method === 'cod' ? '🏍️ ปลายทาง' : method === 'transfer' ? '📲 โอน/QR' : null;
+  try {
+    const { error } = await sb.from('orders').update({
+      payment_method: method || null,
+      payment_label:  label,
+    }).eq('order_id', orderId);
+    if (error) throw error;
+    const o = allOrders.find(x => x.order_id === orderId);
+    if (o) { o.payment_method = method || null; o.payment_label = label; }
+    renderOrders(allOrders);
+    toast(method ? `✅ บันทึกวิธีชำระ: ${label}` : '✅ ล้างวิธีชำระแล้ว', 'success');
+  } catch(e) {
+    toast('บันทึกไม่สำเร็จ: ' + e.message, 'error');
+  }
+}
+
+let _emPaymentMethod = '';
+function selectEditPayment(method) {
+  _emPaymentMethod = method;
+  const none = document.getElementById('em-pay-none');
+  const cod  = document.getElementById('em-pay-cod');
+  const trf  = document.getElementById('em-pay-transfer');
+  if (!none || !cod || !trf) return;
+  // reset all
+  [none, cod, trf].forEach(el => {
+    el.style.borderColor = '#ccc';
+    el.style.background  = '#fff';
+    el.style.color       = '#555';
+  });
+  none.style.background = '#f5f5f5';
+  none.style.color      = '#888';
+  if (!method) {
+    none.style.borderColor = '#aaa';
+    none.style.background  = '#e8e8e8';
+    none.style.color       = '#555';
+  } else if (method === 'cod') {
+    cod.style.borderColor = '#c0392b';
+    cod.style.background  = '#fff5f5';
+    cod.style.color       = '#c0392b';
+  } else if (method === 'transfer') {
+    trf.style.borderColor = '#2980b9';
+    trf.style.background  = '#eaf4fd';
+    trf.style.color       = '#2980b9';
+  }
+}
+
 function closeEditModal() {
   document.getElementById('editModal').classList.remove('show');
   editingOrderId = null;
+  selectEditPayment('');
   // ล้าง discount fields
   const dc = document.getElementById('emDiscountAmount');
   const cc = document.getElementById('emCouponCode');
@@ -3079,6 +3230,8 @@ async function saveOrderEdit() {
     total,
     discount_amount: discountAmount,
     coupon_code    : couponCode,
+    payment_method : _emPaymentMethod || null,
+    payment_label  : _emPaymentMethod === 'cod' ? '🏍️ ปลายทาง' : _emPaymentMethod === 'transfer' ? '📲 โอน/QR' : null,
   };
   try {
     const { error } = await sb.from('orders').update(update).eq('order_id', editingOrderId);
@@ -3715,9 +3868,24 @@ async function openChatModal(orderId) {
   currentChatOrderId = orderId;
   document.getElementById('cmOrderId').textContent = '#' + orderId;
   const cid = o.customer_id || '';
-  document.getElementById('cmCustomerInfo').innerHTML = cid
+  const pm  = o.payment_method || null;
+  const pl  = o.payment_label || (pm === 'cod' ? '🏍️ เก็บปลายทาง' : pm === 'transfer' ? '📲 โอน/สแกน QR' : null);
+  const typeTag = o.order_type === 'delivery'
+    ? `<span style="background:#fff3e0;color:#e65100;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;">🚚 จัดส่ง</span>`
+    : `<span style="background:#e8f5e9;color:#2e7d32;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;">📦 จอง/รับเอง</span>`;
+  const payTag = pl
+    ? (pm === 'cod'
+        ? `<span style="background:#fff5f5;color:#c0392b;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;">${escapeHtml(pl)}</span>`
+        : `<span style="background:#eaf4fd;color:#2980b9;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:700;">${escapeHtml(pl)}</span>`)
+    : '';
+  document.getElementById('cmCustomerInfo').innerHTML = (cid
     ? `${escapeHtml(o.customer_name||'-')} • <span style="color:var(--line);">🆔 ${escapeHtml(cid)}</span>`
-    : `${escapeHtml(o.customer_name||'-')} • <span style="color:#e65100;">⚠️ ไม่มี customer_id</span>`;
+    : `${escapeHtml(o.customer_name||'-')} • <span style="color:#e65100;">⚠️ ไม่มี customer_id</span>`)
+    + `<br>${typeTag}${payTag ? ' ' + payTag : ''}`;
+
+  // ── Payment status bar (เฉพาะออเดอร์โอนเงิน) ──
+  _updateChatPaymentBar(o);
+
   document.getElementById('cmInput').value = '';
   const qt = document.getElementById('cmQuickTpls');
   const tpls = getTemplates();
@@ -3734,10 +3902,100 @@ async function openChatModal(orderId) {
   setupChatRealtime(orderId);
 }
 
+// อัปเดต payment status bar ใน chat modal
+function _updateChatPaymentBar(o) {
+  const ps   = o.payment_status || null;
+  const pm   = o.payment_method || null;
+  const wrap = document.getElementById('cmPaymentBar');
+  if (!wrap) return;
+
+  if (pm !== 'transfer') { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+
+  const statusEl = document.getElementById('cmPaymentStatus');
+  const slipEl   = document.getElementById('cmSlipInfo');
+  const confirmBtn = document.getElementById('cmConfirmPayBtn');
+  const viewBtn    = document.getElementById('cmViewSlipBtn');
+
+  // ── สีและข้อความตาม payment_status ──
+  const statusMap = {
+    'pending_slip'  : { text: '⏳ รอลูกค้าส่งสลิป',        color: '#e67e22', bg: '#fff8f0' },
+    'slip_mismatch' : { text: '⚠️ ยอดสลิปไม่ตรง',          color: '#c0392b', bg: '#fff5f5' },
+    'paid'          : { text: '📋 ได้รับสลิปแล้ว รอยืนยัน', color: '#2980b9', bg: '#eaf4fd' },
+    'confirmed'     : { text: '✅ ยืนยันชำระแล้ว',           color: '#27ae60', bg: '#e8f8f5' },
+  };
+  const s = statusMap[ps] || { text: '💳 โอนเงิน', color: '#555', bg: '#f5f5f5' };
+  wrap.style.background = s.bg;
+  if (statusEl) { statusEl.textContent = s.text; statusEl.style.color = s.color; }
+
+  // ── slip info ──
+  if (slipEl) {
+    const parts = [];
+    if (o.slip_amount) parts.push(`ยอดที่โอน: ฿${Number(o.slip_amount).toLocaleString()}`);
+    if (o.total)       parts.push(`ยอดออเดอร์: ฿${Number(o.total).toLocaleString()}`);
+    if (ps === 'slip_mismatch' && o.slip_amount && o.total) {
+      const diff = Number(o.total) - Number(o.slip_amount);
+      if (diff > 0) parts.push(`⚠️ ขาดอีก ฿${diff.toFixed(2)}`);
+      else          parts.push(`โอนเกิน ฿${Math.abs(diff).toFixed(2)}`);
+    }
+    slipEl.textContent = parts.join(' • ');
+  }
+
+  // ── ปุ่มยืนยัน: ซ่อนถ้ายืนยันแล้ว ──
+  if (confirmBtn) confirmBtn.style.display = (ps === 'confirmed') ? 'none' : 'inline-block';
+
+  // ── ปุ่มดูสลิป ──
+  if (viewBtn) viewBtn.style.display = o.slip_url ? 'inline-block' : 'none';
+
+  // เก็บ slip_url ไว้ใช้ตอนกดดูสลิป
+  window._currentSlipUrl = o.slip_url || null;
+}
+
 function closeChatModal() {
   document.getElementById('chatModal').classList.remove('show');
   currentChatOrderId = null;
   if (chatChannel && sb) { sb.removeChannel(chatChannel); chatChannel = null; }
+}
+
+// ── ยืนยันชำระแล้ว (manual) ──────────────────────────────
+async function adminConfirmPayment() {
+  if (!currentChatOrderId) return;
+  const bu = getBackendUrl();
+  if (!bu) { toast('กรุณาตั้ง Backend URL ก่อน'); return; }
+  const btn = document.getElementById('cmConfirmPayBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ กำลังยืนยัน...'; }
+  try {
+    const res = await fetch(`${bu}/confirm-payment`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_id: currentChatOrderId })
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || 'ยืนยันไม่ได้');
+    // อัปเดต allOrders ใน memory
+    const idx = allOrders.findIndex(x => x.order_id === currentChatOrderId);
+    if (idx >= 0) { allOrders[idx].payment_status = 'confirmed'; allOrders[idx].status = 'confirmed'; }
+    _updateChatPaymentBar(idx >= 0 ? allOrders[idx] : { payment_method:'transfer', payment_status:'confirmed' });
+    await loadChatHistory(currentChatOrderId);
+    renderOrders(allOrders);
+    toast('✅ ยืนยันชำระแล้ว!');
+  } catch(e) {
+    alert('ยืนยันไม่ได้: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '✅ ยืนยันชำระแล้ว'; }
+  }
+}
+
+// ── ดูสลิปในหน้าต่างใหม่ / modal ──────────────────────────
+function adminViewSlip() {
+  const url = window._currentSlipUrl;
+  if (!url) return;
+  const ov  = document.getElementById('slipViewModal');
+  const img = document.getElementById('slipViewImg');
+  const dl  = document.getElementById('slipViewDownload');
+  if (!ov || !img) return;
+  img.src = url;
+  if (dl) { dl.href = url; dl.style.display = url.startsWith('http') ? 'block' : 'none'; }
+  ov.style.display = 'flex';
 }
 
 async function loadChatHistory(orderId) {
@@ -3758,14 +4016,24 @@ function renderChatList(messages) {
   if (!messages.length) { list.innerHTML = '<div class="chat-empty">ยังไม่มีข้อความ</div>'; return; }
   list.innerHTML = messages.map(m => {
     const time = new Date(m.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' });
-    if (m.sender === 'system') return `<div class="chat-bubble system">🔔 ${escapeHtml(m.text)}<div class="chat-meta">${time}</div></div>`;
+    // system message — ตรวจว่ามีรูปสลิปแนบหรือไม่
+    if (m.sender === 'system') {
+      const slipImg = m.slip_url
+        ? `<div style="margin-top:8px;"><img src="${escapeHtml(m.slip_url)}" style="max-width:200px;border-radius:8px;cursor:pointer;" onclick="window.open('${escapeHtml(m.slip_url)}','_blank')"></div>`
+        : '';
+      return `<div class="chat-bubble system">🔔 ${escapeHtml(m.text)}${slipImg}<div class="chat-meta">${time}</div></div>`;
+    }
     // admin_note = Note ภายใน ไม่ส่งไป LINE
     if (m.sender === 'admin_note') return `<div class="chat-bubble from-admin" style="background:#fff9c4;border:1.5px dashed #f9a825;opacity:.85;">
       📝 <em style="color:#795548;">${escapeHtml(m.text)}</em>
       <div class="chat-meta" style="color:#a1887f;">Note ภายใน • ${time}</div></div>`;
     const cls = m.sender === 'admin' ? 'from-admin' : 'from-customer';
     const who = m.sender === 'admin' ? 'แอดมิน' : 'ลูกค้า';
-    return `<div class="chat-bubble ${cls}">${escapeHtml(m.text)}<div class="chat-meta">${who} • ${time}</div></div>`;
+    // แสดงรูปถ้า message มี image
+    const imgHtml = m.image_url
+      ? `<div style="margin-top:6px;"><img src="${escapeHtml(m.image_url)}" style="max-width:200px;border-radius:8px;cursor:pointer;" onclick="window.open('${escapeHtml(m.image_url)}','_blank')"></div>`
+      : '';
+    return `<div class="chat-bubble ${cls}">${escapeHtml(m.text)}${imgHtml}<div class="chat-meta">${who} • ${time}</div></div>`;
   }).join('');
   list.scrollTop = list.scrollHeight;
 }
@@ -3776,6 +4044,19 @@ function setupChatRealtime(orderId) {
   chatChannel = sb.channel('chat-' + orderId)
     .on('postgres_changes', { event:'INSERT', schema:'public', table:'messages', filter:`order_id=eq.${orderId}` },
       () => { if (currentChatOrderId === orderId) loadChatHistory(orderId); }
+    )
+    .on('postgres_changes', { event:'UPDATE', schema:'public', table:'orders', filter:`order_id=eq.${orderId}` },
+      (payload) => {
+        if (currentChatOrderId !== orderId) return;
+        // อัปเดต allOrders cache
+        const idx = allOrders.findIndex(x => x.order_id === orderId);
+        if (idx >= 0) {
+          const updated = { ...allOrders[idx], ...payload.new };
+          allOrders[idx] = updated;
+          _updateChatPaymentBar(updated);
+          window._currentSlipUrl = updated.slip_url || null;
+        }
+      }
     ).subscribe();
 }
 
