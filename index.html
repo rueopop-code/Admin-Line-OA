@@ -43,9 +43,9 @@
   --bg:#F6F2EC; --surface:#FFFFFF; --surface2:#FBF9F6;
   --text:#211D1A; --text-2:#4A443F; --text-3:#807A73; --text-4:#B0A9A1;
   --sub:#7B756E;
-  --border:rgba(78,13,13,0.08); --border2:rgba(78,13,13,0.15);
+  --border:rgba(78,13,13,0.13); --border2:rgba(78,13,13,0.22);
   --border-red:rgba(153,33,33,0.20); --border-red2:rgba(153,33,33,0.35);
-  --row-border:#EFE9E1;
+  --row-border:#E6DCCB;
 
   /* legacy compat */
   --red:var(--red-500); --primary:var(--red-500);
@@ -54,11 +54,11 @@
   --font:'IBM Plex Sans Thai','Sarabun',sans-serif;
   --font-display:'Prompt','IBM Plex Sans Thai',sans-serif;
 
-  --shadow-sm:0 1px 2px rgba(60,20,10,0.05),0 2px 8px rgba(60,20,10,0.04);
-  --shadow:0 2px 6px rgba(60,20,10,0.06),0 10px 28px rgba(60,20,10,0.08);
-  --shadow-lg:0 6px 18px rgba(60,20,10,0.10),0 20px 48px rgba(60,20,10,0.12);
+  --shadow-sm:0 1px 2px rgba(60,20,10,0.07);
+  --shadow:0 1px 3px rgba(60,20,10,0.08),0 6px 20px rgba(60,20,10,0.07);
+  --shadow-lg:0 4px 12px rgba(60,20,10,0.12),0 18px 44px rgba(60,20,10,0.14);
   --shadow-red:0 6px 18px rgba(100,20,20,0.28);
-  --r-sm:9px; --r-md:13px; --r-lg:18px; --r-xl:22px; --r-2xl:26px;
+  --r-sm:5px; --r-md:7px; --r-lg:9px; --r-xl:11px; --r-2xl:13px;
 }
 
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
@@ -247,8 +247,8 @@ input:checked+.slider:before{transform:translateX(18px)}
    ═══════════════════════════════════════ */
 .orders-card{
   background:var(--surface);border-radius:var(--r-lg);
-  border:1px solid var(--border2);box-shadow:var(--shadow);
-  overflow:hidden;
+  border:1px solid var(--border2);border-top:3px solid var(--red-700);
+  box-shadow:var(--shadow);overflow:hidden;
 }
 .orders-head{
   display:flex;align-items:center;justify-content:space-between;
@@ -269,32 +269,47 @@ input:checked+.slider:before{transform:translateX(18px)}
 .orders-head-right{display:flex;align-items:center;gap:8px}
 
 table{width:100%;border-collapse:collapse}
-thead tr{background:linear-gradient(180deg,#FBF8F2,#F6F1E7)}
+thead tr{background:#F7F1E4}
 th{
-  padding:12px 16px;text-align:left;font-size:10.5px;font-weight:700;color:#7A5A16;
-  text-transform:uppercase;letter-spacing:.9px;white-space:nowrap;
-  border-bottom:2px solid var(--gold-line-soft);border-right:1px solid rgba(201,162,39,.10);
+  padding:12px 16px;text-align:left;font-size:10px;font-weight:800;color:#6E1717;
+  text-transform:uppercase;letter-spacing:1.5px;white-space:nowrap;
+  border-top:1px solid var(--gold-line);
+  border-bottom:2px solid var(--red-700);
 }
-th:last-child{border-right:none}
-tbody tr{border-bottom:1px solid var(--row-border);transition:background .12s}
-tbody tr:hover td{background:#FBF4EC !important}
-td{padding:13px 16px;font-size:13px;vertical-align:middle;border-right:1px solid #F5F0E9}
-td:last-child{border-right:none}
+th:first-child{padding-left:22px}
+th:last-child{padding-right:22px}
+tbody tr{border-bottom:1px solid var(--row-border);transition:background .12s,box-shadow .12s}
+tbody tr:hover td{background:#FBF5EB !important}
+tbody tr:hover{box-shadow:inset 0 0 0 9999px rgba(201,162,39,.02)}
+td{padding:14.5px 16px;font-size:13px;vertical-align:middle}
+td:first-child{padding-left:22px}
+td:last-child{padding-right:22px}
 tr:last-child td{border-bottom:none}
 
+/* ── จัดเลขชิดขวาแบบรายงานการเงิน: หน้า 1 คอลัมน์ "ยอด", หน้า 2 คอลัมน์ "ออเดอร์/ยอดรวม" ── */
+#page-1 .orders-card th:nth-child(6),#page-1 .orders-card td:nth-child(6){text-align:right}
+#page-2 .customer-card th:nth-child(5),#page-2 .customer-card td:nth-child(5),
+#page-2 .customer-card th:nth-child(6),#page-2 .customer-card td:nth-child(6){text-align:right}
+#page-2 .customer-card td:nth-child(6){font-weight:700;color:var(--red-700);font-family:var(--font-display);font-variant-numeric:tabular-nums}
+#page-2 .customer-card td:nth-child(1){color:var(--text-4);font-size:12px;font-variant-numeric:tabular-nums}
+
 /* ── สีแถวตามสถานะออเดอร์ (CSS :has — ไม่แตะ JS) ── */
-tbody tr:has(.status-select option[value="pending"]:checked)   td:first-child{border-left:4px solid #F97316}
-tbody tr:has(.status-select option[value="sent"]:checked)      td:first-child{border-left:4px solid #3B82F6}
-tbody tr:has(.status-select option[value="confirmed"]:checked) td:first-child{border-left:4px solid #22C55E}
-tbody tr:has(.status-select option[value="shipped"]:checked)   td:first-child{border-left:4px solid #8B5CF6}
-tbody tr:has(.status-select option[value="done"]:checked)      td:first-child{border-left:4px solid #059669}
-tbody tr:has(.status-select option[value="cancelled"]:checked) td:first-child{border-left:4px solid #9CA3AF}
-tbody tr:has(.status-select option[value="pending"]:checked)   {background:#FFFBF6}
-tbody tr:has(.status-select option[value="sent"]:checked)      {background:#F8FBFF}
-tbody tr:has(.status-select option[value="confirmed"]:checked) {background:#F7FDF9}
-tbody tr:has(.status-select option[value="shipped"]:checked)   {background:#FBFAFF}
-tbody tr:has(.status-select option[value="done"]:checked)      {background:#F6FDFB}
-tbody tr:has(.status-select option[value="cancelled"]:checked) {background:#FAFAFA;opacity:.72}
+tbody tr:has(.status-select option[value="pending"]:checked)   td:first-child{border-left:5px solid #EA6A10}
+tbody tr:has(.status-select option[value="sent"]:checked)      td:first-child{border-left:5px solid #2563EB}
+tbody tr:has(.status-select option[value="confirmed"]:checked) td:first-child{border-left:5px solid #16A34A}
+tbody tr:has(.status-select option[value="shipped"]:checked)   td:first-child{border-left:5px solid #7C3AED}
+tbody tr:has(.status-select option[value="done"]:checked)      td:first-child{border-left:5px solid #047857}
+tbody tr:has(.status-select option[value="cancelled"]:checked) td:first-child{border-left:5px solid #9CA3AF}
+tbody tr:has(.status-select option[value="pending"]:checked)   {background:#FFF6EA}
+tbody tr:has(.status-select option[value="sent"]:checked)      {background:#F1F7FF}
+tbody tr:has(.status-select option[value="confirmed"]:checked) {background:#EFFBF3}
+tbody tr:has(.status-select option[value="shipped"]:checked)   {background:#F7F4FF}
+tbody tr:has(.status-select option[value="done"]:checked)      {background:#ECFAF5}
+tbody tr:has(.status-select option[value="cancelled"]:checked) {background:#F7F7F7;opacity:.68}
+
+/* ── แถวกดได้: เปิดหน้ารายละเอียด ── */
+tbody tr.row-clickable{cursor:pointer}
+tbody tr.row-clickable:hover td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
 
 /* ── cursor ชี้ได้ทุกจุดที่คลิกได้ ── */
 .items-cell-clickable{cursor:pointer}
@@ -313,19 +328,19 @@ tbody tr td[onclick]{cursor:pointer}
 .icon-btn.danger:hover{border-color:var(--danger);color:var(--danger);background:var(--danger-bg)}
 @media(max-width:768px){.orders-card{overflow-x:auto}table{min-width:600px}th,td{padding:9px 11px;font-size:12px}}
 
-.td-order-id{font-weight:700;color:var(--red-600);font-family:'Prompt',monospace;font-size:13px;white-space:nowrap;letter-spacing:.3px}
-.td-customer-name{font-weight:600;color:var(--text);font-size:13px}
+.td-order-id{font-weight:700;color:var(--red-600);font-family:'Prompt',monospace;font-size:12.5px;white-space:nowrap;letter-spacing:.4px}
+.td-customer-name{font-weight:600;color:var(--text);font-size:13.5px}
 .td-customer-sub{font-size:11px;color:var(--text-4);margin-top:2px;display:flex;align-items:center;gap:4px}
 .line-linked-dot{width:7px;height:7px;border-radius:50%;background:#06C755;flex-shrink:0}
 .line-linked-dot.unlinked{background:var(--gray-300)}
 .sales-tag{display:inline-block;background:var(--blue-bg);border:1px solid #C3D6FA;color:var(--blue-text);border-radius:7px;padding:2px 9px;font-size:11px;font-weight:700}
 .items-cell{color:var(--text-2);font-size:12px;line-height:1.55;max-width:150px}
-.price-cell{font-weight:700;color:var(--red-700);font-size:13.5px;white-space:nowrap;font-family:var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:.2px}
+.price-cell{font-weight:700;color:var(--red-700);font-size:14.5px;white-space:nowrap;font-family:var(--font-display);font-variant-numeric:tabular-nums;letter-spacing:.2px}
 .time-cell{color:var(--text-3);font-size:12px;white-space:nowrap}
-.empty-row td{text-align:center;color:var(--text-3);padding:40px;font-size:13px}
+.empty-row td{text-align:center;color:var(--text-4);padding:52px 40px;font-size:13px;font-style:italic;letter-spacing:.2px}
 
 /* ════════ STATUS CHIPS ════════ */
-.status-chip{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap;border:1px solid transparent;letter-spacing:.2px}
+.status-chip{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:5px;font-size:11px;font-weight:800;white-space:nowrap;border:1px solid transparent;border-left-width:3px;letter-spacing:.3px;text-transform:none}
 .status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .s-pending{background:#FFF6EC;color:#9A3412;border-color:#F8D9B4}.s-pending .status-dot{background:#F97316}
 .s-sent{background:var(--blue-bg);color:var(--blue-text);border-color:#C3D6FA}.s-sent .status-dot{background:var(--blue)}
@@ -389,7 +404,7 @@ tbody tr td[onclick]{cursor:pointer}
   margin-bottom:16px;display:flex;align-items:center;gap:9px;
   padding-bottom:10px;border-bottom:1px solid var(--gold-line-soft);
 }
-.customer-card{background:var(--surface);border-radius:var(--r-lg);border:1px solid var(--border2);box-shadow:var(--shadow);overflow:hidden}
+.customer-card{background:var(--surface);border-radius:var(--r-lg);border:1px solid var(--border2);border-top:3px solid var(--red-700);box-shadow:var(--shadow);overflow:hidden}
 
 /* ════════ CHART ════════ */
 .chart-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-bottom:18px}
@@ -1402,6 +1417,32 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 ════════════════════════════════════════ -->
 
 <!-- ITEMS POPUP -->
+<!-- CUSTOMER DETAIL MODAL (หน้ารายละเอียดลูกค้า) -->
+<div class="modal-bg" id="custDetailModal" onclick="if(event.target===this)closeCustomerProfile()">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-hdr" style="background:linear-gradient(160deg,#3E0A0A,#7E1A1A);border-bottom:2px solid var(--gold);">
+      <h3 style="color:#fff;" id="cd-name">ลูกค้า</h3>
+      <button class="modal-close" onclick="closeCustomerProfile()" style="background:rgba(255,255,255,.15);color:#fff;">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="cd-badges" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
+      <div id="cd-stats" style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px;"></div>
+      <div id="cd-contact" style="display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;background:var(--gray-50);border:1px solid var(--border);border-radius:8px;padding:12px 15px;font-size:13px;margin-bottom:16px;"></div>
+      <div style="font-size:10.5px;font-weight:800;color:var(--red-600);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:8px;">ประวัติออเดอร์</div>
+      <div style="border:1px solid var(--border2);border-radius:8px;overflow:hidden;max-height:300px;overflow-y:auto;">
+        <table class="items-popup-table" id="cd-orders-table">
+          <thead><tr><th>ออเดอร์</th><th>สินค้า</th><th style="text-align:right;">ยอด</th><th>สถานะ</th><th>วันที่</th></tr></thead>
+          <tbody id="cd-orders"></tbody>
+        </table>
+      </div>
+    </div>
+    <div class="modal-ftr">
+      <a id="cd-call-btn" href="" class="btn-secondary" style="text-decoration:none;display:none;">📞 โทรหาลูกค้า</a>
+      <button class="btn-primary" id="cd-orders-btn">📦 ดูในหน้าออเดอร์</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="itemsPopup" onclick="if(event.target===this)closeItemsPopup()">
   <div class="modal" id="itemsPopupInner">
     <div class="modal-hdr">
@@ -2247,7 +2288,7 @@ function renderOrders(orders) {
     const effectiveRefCode = (!isSalesRef && rawRefCode) ? rawRefCode : '';
 
     const salesBadge = effectiveSalesId
-      ? `<span style="display:inline-block;background:rgba(192,57,43,.1);color:#C0392B;border:1px solid rgba(192,57,43,.3);border-radius:12px;padding:2px 8px;font-size:11px;font-weight:700;">💼 ${escapeHtml(effectiveSalesId)}</span>`
+      ? `<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(192,57,43,.1);color:#C0392B;border:1px solid rgba(192,57,43,.3);border-radius:12px;padding:2px 4px 2px 8px;font-size:11px;font-weight:700;">💼 ${escapeHtml(effectiveSalesId)}<button onclick="event.stopPropagation();resetOrderSalesCode('${escapeAttr(o.order_id)}')" title="เอารหัสเซลออกจากออเดอร์นี้" style="border:none;background:rgba(192,57,43,.15);color:#C0392B;width:15px;height:15px;border-radius:50%;cursor:pointer;font-size:10px;line-height:1;display:inline-flex;align-items:center;justify-content:center;padding:0;">×</button></span>`
       : `<span style="font-size:11px;color:var(--sub);">—</span>`;
 
     const referralBadge = effectiveRefCode
@@ -2273,7 +2314,7 @@ function renderOrders(orders) {
           : `<span onclick="quickSetPayment('${escapeAttr(o.order_id)}')" title="คลิกเพื่อตั้งค่า" style="display:inline-block;background:#f5f5f5;color:#999;border:1px dashed #ccc;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;">+ ตั้งค่า</span>`;
 
     return `
-      <tr class="${isNew ? 'row-new' : ''}">
+      <tr class="${isNew ? 'row-new' : ''} ${isGhost ? '' : 'row-clickable'}" ${isGhost ? '' : `onclick="rowOpenOrderDetail(event,'${escapeAttr(o.order_id)}')"`}>
         <td>${orderIdDisplay}</td>
         <td><strong>${escapeHtml(o.customer_name || '-')}</strong><br>${lineNameDisplay}${cidDisplay}</td>
         <td>${salesBadge}</td>
@@ -2388,7 +2429,7 @@ function filterCustomers() {
     const lineDisplay = c.line_name ? `<small style="color:#06C755;font-size:11px;">📱 ${escapeHtml(c.line_name)}</small>` : '—';
     const repeatBadge = c.orderCount > 1 ? `<span style="font-size:10px;background:#e8f5e9;color:#2e7d32;padding:1px 6px;border-radius:10px;margin-left:4px;">ซื้อซ้ำ</span>` : '';
     return `
-      <tr>
+      <tr class="row-clickable" onclick="rowOpenCustomerDetail(event,'${escapeAttr(c.key)}')">
         <td style="color:var(--sub);font-size:12px;">${i+1}</td>
         <td><strong>${escapeHtml(c.name)}</strong>${repeatBadge}</td>
         <td>${escapeHtml(c.phone)}</td>
@@ -2411,6 +2452,77 @@ function filterToCustomer(name) {
     renderOrders(allOrders);
   }
 }
+
+// ═══ แถวกดได้ → เปิดหน้ารายละเอียด (กันชนกับปุ่ม/ดรอปดาวน์ในแถว) ═══
+function rowOpenOrderDetail(event, orderId) {
+  if (event.target.closest('button, select, a, input, .status-select, .items-cell-clickable, span[onclick]')) return;
+  openItemsPopup(orderId);
+}
+
+function rowOpenCustomerDetail(event, custKey) {
+  if (event.target.closest('button, select, a, input, span[onclick]')) return;
+  openCustomerProfile(custKey);
+}
+
+// ═══ CUSTOMER DETAIL MODAL ═══
+const CD_STATUS_TH = { pending:'รอดำเนินการ', sent:'ส่ง LINE แล้ว', confirmed:'ยืนยันแล้ว', shipped:'กำลังจัดส่ง', done:'เสร็จสิ้น', cancelled:'ยกเลิก', failed:'ล้มเหลว' };
+function openCustomerProfile(custKey) {
+  const c = allCustomers.find(x => x.key === custKey);
+  if (!c) return;
+
+  document.getElementById('cd-name').textContent = '👤 ' + c.name;
+
+  // Badges
+  const badges = [];
+  if (c.orderCount > 1) badges.push('<span style="background:#EFFBF3;color:#166534;border:1px solid #86EFAC;border-radius:5px;padding:3px 10px;font-size:11px;font-weight:800;">🔁 ลูกค้าซื้อซ้ำ</span>');
+  if (c.line_user_id) badges.push('<span style="background:#E7F6EC;color:#0A7A3C;border:1px solid #A8E3BE;border-radius:5px;padding:3px 10px;font-size:11px;font-weight:800;">📱 ผูก LINE แล้ว</span>');
+  const daysSince = c.lastOrder ? Math.floor((Date.now() - new Date(c.lastOrder)) / 86400000) : null;
+  if (daysSince !== null && daysSince <= 7) badges.push('<span style="background:var(--gold-pale);color:#7A5A16;border:1px solid var(--gold-line);border-radius:5px;padding:3px 10px;font-size:11px;font-weight:800;">⭐ ซื้อล่าสุดใน 7 วัน</span>');
+  document.getElementById('cd-badges').innerHTML = badges.join('');
+
+  // Mini stats
+  const avg = c.orderCount ? Math.round(c.totalSpent / c.orderCount) : 0;
+  const lastDate = c.lastOrder ? new Date(c.lastOrder).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' }) : '—';
+  const stat = (num, lbl) => `<div style="background:#fff;border:1px solid var(--border2);border-top:3px solid var(--red-600);border-radius:7px;padding:11px 12px;text-align:center;"><div style="font-family:var(--font-display);font-size:18px;font-weight:700;color:var(--red-700);">${num}</div><div style="font-size:9.5px;color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:.7px;margin-top:2px;">${lbl}</div></div>`;
+  document.getElementById('cd-stats').innerHTML =
+    stat(c.orderCount, 'ออเดอร์') +
+    stat('฿' + c.totalSpent.toLocaleString(), 'ยอดรวม') +
+    stat('฿' + avg.toLocaleString(), 'เฉลี่ย/ออเดอร์') +
+    stat(lastDate, 'ซื้อล่าสุด');
+
+  // Contact
+  const rows = [];
+  rows.push(`<div><span style="color:var(--sub);">เบอร์โทร:</span> <strong>${escapeHtml(c.phone || '—')}</strong></div>`);
+  rows.push(`<div><span style="color:var(--sub);">LINE:</span> <strong style="color:#06C755;">${escapeHtml(c.line_name || '—')}</strong></div>`);
+  const firstDate = c.firstOrder ? new Date(c.firstOrder).toLocaleDateString('th-TH', { dateStyle:'medium' }) : '—';
+  rows.push(`<div><span style="color:var(--sub);">ลูกค้าตั้งแต่:</span> ${firstDate}</div>`);
+  rows.push(`<div><span style="color:var(--sub);">ซื้อล่าสุด:</span> ${daysSince === null ? '—' : daysSince === 0 ? 'วันนี้' : daysSince + ' วันก่อน'}</div>`);
+  document.getElementById('cd-contact').innerHTML = rows.join('');
+
+  // Order history (ล่าสุดก่อน)
+  const hist = [...c.orders].sort((a,b) => (b.created_at||'').localeCompare(a.created_at||''));
+  document.getElementById('cd-orders').innerHTML = hist.map(o => {
+    const st = o.status || 'pending';
+    const items = (o.items||[]).map(i => `${escapeHtml(i.name)} ×${i.qty}`).join(', ') || '—';
+    const d = o.created_at ? new Date(o.created_at).toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'2-digit' }) : '—';
+    return `<tr>
+      <td style="font-weight:700;color:var(--red-600);white-space:nowrap;">#${escapeHtml(o.order_id||'')}</td>
+      <td style="font-size:12px;max-width:220px;">${items}</td>
+      <td style="text-align:right;font-weight:700;color:var(--red-700);white-space:nowrap;">฿${(o.total||0).toLocaleString()}</td>
+      <td><span class="status-chip s-${st}"><span class="status-dot"></span>${CD_STATUS_TH[st]||st}</span></td>
+      <td style="font-size:12px;color:var(--sub);white-space:nowrap;">${d}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--sub);padding:24px;">ไม่มีออเดอร์</td></tr>';
+
+  // Footer actions
+  const callBtn = document.getElementById('cd-call-btn');
+  const tel = String(c.phone||'').replace(/\D/g,'');
+  if (tel) { callBtn.href = 'tel:' + tel; callBtn.style.display = 'inline-flex'; } else { callBtn.style.display = 'none'; }
+  document.getElementById('cd-orders-btn').onclick = () => { closeCustomerProfile(); filterToCustomer(c.name); };
+
+  document.getElementById('custDetailModal').classList.add('show');
+}
+function closeCustomerProfile() { document.getElementById('custDetailModal').classList.remove('show'); }
 
 // ═══════════════════════════════════════════
 //  PAGE 3: ORDER EDIT WITH STOCK MANAGEMENT
@@ -5065,6 +5177,28 @@ function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, m => ({'&':'&a
 function escapeAttr(s) { return String(s??'').replace(/['"\\]/g,'\\$&'); }
 function clearSearch() { const inp = document.getElementById('searchInput'); if(inp) inp.value = ''; renderOrders(allOrders); if(inp) inp.focus(); }
 
+// เอารหัสเซล (เช่น S001) ออกจากออเดอร์ที่ระบุ — แก้ที่ฐานข้อมูลตรง ๆ
+// ใช้กรณีออเดอร์ทดสอบติดรหัสเซลมาจากลิงก์แนะนำที่เคยกดไว้
+async function resetOrderSalesCode(orderId) {
+  const o = allOrders.find(x => x.order_id === orderId);
+  if (!o) return;
+  const code = o.sales_id || o.ref_code || '';
+  if (!confirm(`เอารหัสเซล "${code}" ออกจากออเดอร์ ${orderId} ?`)) return;
+  try {
+    const updates = { sales_id: null };
+    // ref_code ที่เป็นรหัสเซล (S ตามด้วยตัวเลข) ล้างด้วย / ถ้าเป็น REF ชวนเพื่อน เก็บไว้
+    if (/^S\d+$/i.test(o.ref_code || '')) updates.ref_code = null;
+    const { error } = await sb.from('orders').update(updates).eq('order_id', orderId);
+    if (error) throw error;
+    o.sales_id = null;
+    if (updates.ref_code === null) o.ref_code = null;
+    renderOrders(allOrders);
+    toast(`เอารหัสเซลออกจากออเดอร์ ${orderId} แล้ว`, 'success');
+  } catch (e) {
+    toast('ล้างรหัสเซลไม่สำเร็จ: ' + (e.message || e), 'error');
+  }
+}
+
 let toastTimer = null;
 function toast(msg, type = '', duration = 3000) {
   const el = document.getElementById('toast');
@@ -5077,7 +5211,7 @@ function toast(msg, type = '', duration = 3000) {
 // Keyboard shortcuts
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
-    ['mapModal','editModal','chatModal','tplModal','couponModal','itemsPopup','linkModal','enhancedEditModal','mergeOrdersModal'].forEach(id => {
+    ['mapModal','editModal','chatModal','tplModal','couponModal','itemsPopup','linkModal','enhancedEditModal','mergeOrdersModal','custDetailModal'].forEach(id => {
       document.getElementById(id)?.classList.remove('show');
     });
     eeEditingOrderId = null;
