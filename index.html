@@ -1998,6 +1998,21 @@ function showPage(n) {
   if (n === 2) renderCustomerDB();
   if (n === 3) renderPage3Orders();
   if (n === 4) renderCharts();
+  if (n === 5) loadSalesPage();
+  if (n === 6) loadGpsPage();
+  // ออกจากหน้า GPS แล้วหยุด auto-refresh (ประหยัดทรัพยากร) — กลับเข้ามาจะเริ่มใหม่เอง
+  if (n !== 6 && typeof gpsInterval !== 'undefined' && gpsInterval) {
+    clearInterval(gpsInterval);
+    gpsInterval = null;
+  }
+  // แผนที่ที่ถูกสร้างตอนหน้าถูกซ่อน จะ render เพี้ยน — สั่งคำนวณขนาดใหม่หลังหน้าปรากฏ
+  setTimeout(() => {
+    try {
+      if (n === 5 && typeof adminSalesMap !== 'undefined' && adminSalesMap) adminSalesMap.invalidateSize();
+      if (n === 6 && typeof gpsAdminMap   !== 'undefined' && gpsAdminMap)   gpsAdminMap.invalidateSize();
+      if (n === 7 && typeof routeMainMap  !== 'undefined' && routeMainMap)  routeMainMap.invalidateSize();
+    } catch(_){}
+  }, 200);
 }
 
 // ═══════════════════════════════════════════
@@ -5413,12 +5428,50 @@ function loadLeafletThenMap() {
   } else { setTimeout(renderAdminSalesMap, 500); }
 }
 
+// ── ปุ่มสลับแผนที่ปกติ ↔ ภาพถ่ายดาวเทียม (เสมือนจริง) — ใช้ร่วมกันทุกแผนที่ (เหมือนแอปเซล) ──
+function addSatelliteToggle(map) {
+  if (!map || map._satToggleAdded) return;
+  map._satToggleAdded = true;
+  const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 });
+  let satOn = false;
+  const Ctl = L.Control.extend({
+    options: { position: 'topright' },
+    onAdd: function() {
+      const btn = L.DomUtil.create('button');
+      btn.innerHTML = '🛰️';
+      btn.title = 'สลับแผนที่ปกติ/ภาพถ่ายดาวเทียม';
+      btn.style.cssText = 'width:40px;height:40px;border-radius:10px;border:1px solid rgba(0,0,0,.15);' +
+        'background:#fff;cursor:pointer;font-size:18px;box-shadow:0 2px 8px rgba(0,0,0,.15);line-height:1;';
+      L.DomEvent.disableClickPropagation(btn);
+      btn.onclick = () => {
+        satOn = !satOn;
+        // หา street tile layer ปัจจุบัน
+        let streetLayer = null;
+        map.eachLayer(l => { if (l instanceof L.TileLayer && l !== satLayer) streetLayer = l; });
+        if (satOn) {
+          if (streetLayer) map._streetLayerRef = streetLayer;
+          if (map._streetLayerRef) map.removeLayer(map._streetLayerRef);
+          satLayer.addTo(map);
+          btn.innerHTML = '🗺️';
+        } else {
+          map.removeLayer(satLayer);
+          if (map._streetLayerRef) map._streetLayerRef.addTo(map);
+          btn.innerHTML = '🛰️';
+        }
+      };
+      return btn;
+    }
+  });
+  map.addControl(new Ctl());
+}
+
 function renderAdminSalesMap() {
   const el = document.getElementById('admin-sales-map');
   if (!el || !window.L) return;
   if (!adminSalesMap) {
     adminSalesMap = L.map('admin-sales-map', { attributionControl:false }).setView([18.145,100.14],11);
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(adminSalesMap);
+    addSatelliteToggle(adminSalesMap);
   }
   adminSalesMap.eachLayer(l => { if (l instanceof L.Marker || l instanceof L.Polyline) adminSalesMap.removeLayer(l); });
 
@@ -5483,6 +5536,7 @@ function openSalesDetail(salesId) {
     if (!sdMap) {
       sdMap = L.map('sd-map',{attributionControl:false}).setView([18.145,100.14],11);
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(sdMap);
+      addSatelliteToggle(sdMap);
     }
     sdMap.eachLayer(l=>{if(l instanceof L.Marker||l instanceof L.Polyline)sdMap.removeLayer(l);});
     const bounds=[];
@@ -5613,6 +5667,7 @@ function initGpsAdminMap() {
   gpsAdminMap = L.map('gps-admin-map', { attributionControl:false })
     .setView([18.145, 100.14], 12);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(gpsAdminMap);
+  addSatelliteToggle(gpsAdminMap);
 }
 
 async function refreshGpsData() {
@@ -5630,9 +5685,10 @@ async function refreshGpsData() {
     });
     const locations = await locRes.json();
 
-    // โหลดเส้นทางวันนี้
-    const today = new Date().toISOString().split('T')[0];
-    const routeRes = await fetch(`${SB_URL_SALES}/rest/v1/sales_routes?select=*&recorded_at=gte.${today}T00:00:00&order=sales_id,recorded_at.asc`, {
+    // โหลดเส้นทางวันนี้ (นับ "วันนี้" ตามเวลาท้องถิ่นไทย ไม่ใช่ UTC — เส้นทางจะรีเซ็ตตอนเที่ยงคืนจริง)
+    const dayStart = new Date();
+    dayStart.setHours(0,0,0,0);
+    const routeRes = await fetch(`${SB_URL_SALES}/rest/v1/sales_routes?select=*&recorded_at=gte.${encodeURIComponent(dayStart.toISOString())}&order=sales_id,recorded_at.asc`, {
       headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES }
     });
     const routes = await routeRes.json();
@@ -5665,10 +5721,11 @@ function renderGpsMap(locations, routes) {
       💼 ${s.name} ${isOnline?'🟢':'⚫'}
     </span>`;
 
-    // เส้นทางวันนี้
+    // เส้นทางวันนี้ — ลบเส้นเก่าออกก่อนเสมอ (กันเส้นของเมื่อวานค้างหลังรีเซ็ตวันใหม่)
+    if (gpsRoutes[sid]) { try { gpsAdminMap.removeLayer(gpsRoutes[sid]); } catch(_){} delete gpsRoutes[sid]; }
+    if (_adminRoadLayers['gps_' + sid]) { try { gpsAdminMap.removeLayer(_adminRoadLayers['gps_' + sid]); } catch(_){} delete _adminRoadLayers['gps_' + sid]; }
     if (myRoutes.length >= 2) {
       const pts = myRoutes.map(r => [parseFloat(r.lat), parseFloat(r.lng)]);
-      if (gpsRoutes[sid]) { try { gpsAdminMap.removeLayer(gpsRoutes[sid]); } catch(_){} }
       // วาด polyline เบื้องต้นก่อน แล้ว road route ทับ
       gpsRoutes[sid] = L.polyline(pts, { color, weight:3, opacity:.3, dashArray:'6,4' }).addTo(gpsAdminMap);
       adminDrawRoadRoute(gpsAdminMap, pts, color, 'gps_' + sid);
@@ -5830,6 +5887,7 @@ function initRouteMainMap() {
   routeMainMap = L.map('route-main-map', { attributionControl:false })
     .setView([18.145, 100.14], 11);
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(routeMainMap);
+  addSatelliteToggle(routeMainMap);
 }
 
 function renderRouteFilterBar() {
