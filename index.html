@@ -5452,6 +5452,7 @@ async function loadSalesPage() {
     // ล้าง cache ก่อนโหลดใหม่
     Object.keys(_pinsCache).forEach(k => delete _pinsCache[k]);
     await loadAllPins();
+    buildPhoneOwnerMap();
     renderSalesStats();
     renderSalesList();
     loadLeafletThenMap();
@@ -5461,7 +5462,7 @@ async function loadSalesPage() {
 }
 
 function renderSalesStats() {
-  const salesOrders = allSalesOrders.filter(o => (o.sales_id || o.ref_code) && !isGhostOrder(o));
+  const salesOrders = allSalesOrders.filter(isAttributedOrder);
   const revenue     = salesOrders.reduce((s,o) => s + (parseFloat(o.total)||0), 0);
   const pins        = getAllSalesPins().length;
   document.getElementById('ss-total').textContent    = allSalesStaff.length;
@@ -5491,7 +5492,8 @@ async function fetchSalesPins(salesId) {
       type: r.type||'shop', note: r.note||'',
       lat: parseFloat(r.lat), lng: parseFloat(r.lng),
       createdAt: r.created_at,
-      photo_url: r.photo_url || null
+      photo_url: r.photo_url || null,
+      salesId: salesId
     })).filter(p => p.lat) : [];
     _pinsCache[salesId] = pins;
     return pins;
@@ -5508,6 +5510,58 @@ async function loadAllPins() {
   await Promise.all(allSalesStaff.map(s => fetchSalesPins(s.salesId||s.id||'')));
 }
 
+// ═══════════════════════════════════════════
+//  จับคู่ "ฐานลูกค้าที่เซลเคยปักหมุดไว้" กับออเดอร์ที่ไม่มี sales_id/ref_code ติดมา
+//  โดยใช้เบอร์โทรเป็นตัวจับคู่ (แม่นกว่าชื่อ) — ถ้าเบอร์เดียวกันถูกปักหมุดโดยหลายเซล
+//  เซลคนแรกที่ปักหมุดไว้ (created_at เก่าสุด) จะเป็นเจ้าของเบอร์นั้น
+// ═══════════════════════════════════════════
+let _phoneOwnerMap = null;
+function buildPhoneOwnerMap() {
+  const map = new Map(); // normPhone -> { salesId, createdAt }
+  getAllSalesPins().forEach(p => {
+    const ph = String(p.phone || '').replace(/\D/g, '');
+    if (!ph) return;
+    const existing = map.get(ph);
+    if (!existing || new Date(p.createdAt || 0) < new Date(existing.createdAt || 0)) {
+      map.set(ph, { salesId: p.salesId, createdAt: p.createdAt });
+    }
+  });
+  _phoneOwnerMap = map;
+  return map;
+}
+
+// ออเดอร์ที่ "นับให้" เซลคนนี้ = ออเดอร์ที่ติด sales_id/ref_code ของเซลคนนี้โดยตรง (แชร์ลิงก์/สแกน QR)
+// รวมกับออเดอร์ที่ไม่มี sales_id/ref_code ติดมาเลย แต่เบอร์ลูกค้าตรงกับฐานลูกค้าที่เซลคนนี้เคยปักหมุดไว้ก่อน
+function getAttributedOrders(salesId) {
+  if (!_phoneOwnerMap) buildPhoneOwnerMap();
+  const normPhone = p => String(p || '').replace(/\D/g, '');
+  return allSalesOrders.filter(o => {
+    if (isGhostOrder(o)) return false;
+    if (o.sales_id === salesId || o.ref_code === salesId) return true;
+    if (o.sales_id || o.ref_code) return false; // มีเจ้าของโดยตรงอยู่แล้ว ไม่แย่งด้วยเบอร์
+    const ph = normPhone(o.phone);
+    if (!ph) return false;
+    const owner = _phoneOwnerMap.get(ph);
+    return owner && owner.salesId === salesId;
+  });
+}
+// true ถ้าออเดอร์นี้ถูกนับให้เซลผ่านการจับคู่เบอร์ (ไม่ได้มาจากลิงก์/QR โดยตรง) — ไว้ใช้ทำ badge บอกที่มา
+function isPhoneMatchedOrder(o, salesId) {
+  if (o.sales_id === salesId || o.ref_code === salesId) return false;
+  if (!_phoneOwnerMap) buildPhoneOwnerMap();
+  const ph = String(o.phone || '').replace(/\D/g, '');
+  const owner = ph ? _phoneOwnerMap.get(ph) : null;
+  return !!(owner && owner.salesId === salesId);
+}
+// ออเดอร์นี้ถูกนับให้เซลคนใดคนหนึ่งหรือไม่ (ไม่ว่าจะผ่านลิงก์/QR โดยตรง หรือจับคู่จากเบอร์)
+function isAttributedOrder(o) {
+  if (isGhostOrder(o)) return false;
+  if (o.sales_id || o.ref_code) return true;
+  if (!_phoneOwnerMap) buildPhoneOwnerMap();
+  const ph = String(o.phone || '').replace(/\D/g, '');
+  return !!(ph && _phoneOwnerMap.has(ph));
+}
+
 function renderSalesList() {
   const wrap = document.getElementById('sales-list-wrap');
   if (!allSalesStaff.length) {
@@ -5517,7 +5571,7 @@ function renderSalesList() {
   wrap.innerHTML = allSalesStaff.map((s, idx) => {
     const color    = SALES_COLORS[idx % SALES_COLORS.length];
     const sid      = s.salesId || s.id || '';
-    const myOrders = allSalesOrders.filter(o => (o.sales_id === sid || o.ref_code === sid) && !isGhostOrder(o));
+    const myOrders = getAttributedOrders(sid);
     const revenue  = myOrders.reduce((sum,o) => sum + (parseFloat(o.total)||0), 0);
     const pins     = getSalesPins(sid);
     const photo    = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
@@ -5666,7 +5720,7 @@ function openSalesDetail(salesId, focusSection, showOrders) {
   if (!s) return;
   const idx  = allSalesStaff.indexOf(s);
   const color= SALES_COLORS[idx%SALES_COLORS.length];
-  const myOrders = allSalesOrders.filter(o=>o.sales_id===salesId && !isGhostOrder(o));
+  const myOrders = getAttributedOrders(salesId);
   const revenue  = myOrders.reduce((sum,o)=>sum+(parseFloat(o.total)||0),0);
   const pins     = getSalesPins(salesId);
 
@@ -5688,7 +5742,10 @@ function openSalesDetail(salesId, focusSection, showOrders) {
     ordersBox.style.display = '';
     buyersBox.style.display = '';
     ordersBox.innerHTML = `<h4 id="sd-orders-hdr" style="font-size:14px;font-weight:700;margin-bottom:8px;">📋 ออเดอร์ล่าสุด</h4>` +
-      (myOrders.slice(0,10).map(o=>`<div style="display:flex;justify-content:space-between;padding:8px 10px;background:#f9f9f9;border-radius:8px;margin-bottom:6px;font-size:13px;"><span><code style="font-size:11px;">#${(o.order_id||'').slice(-8)}</code> ${o.customer_name||'—'}</span><span style="font-weight:700;color:${color};">฿${(o.total||0).toLocaleString()}</span></div>`).join('')||'<div style="color:var(--sub);font-size:13px;padding:8px 0;">ยังไม่มีออเดอร์</div>');
+      (myOrders.slice(0,10).map(o=>{
+        const matched = isPhoneMatchedOrder(o, salesId);
+        return `<div style="display:flex;justify-content:space-between;padding:8px 10px;background:#f9f9f9;border-radius:8px;margin-bottom:6px;font-size:13px;"><span><code style="font-size:11px;">#${(o.order_id||'').slice(-8)}</code> ${o.customer_name||'—'}${matched?' <span title="จับคู่จากฐานลูกค้าที่เซลเคยปักหมุดไว้ (ไม่ได้มาจากลิงก์/QR)" style="font-size:10px;color:#e67e22;background:#fff3e0;border-radius:6px;padding:1px 5px;margin-left:4px;">📌 จากฐานลูกค้า</span>':''}</span><span style="font-weight:700;color:${color};">฿${(o.total||0).toLocaleString()}</span></div>`;
+      }).join('')||'<div style="color:var(--sub);font-size:13px;padding:8px 0;">ยังไม่มีออเดอร์</div>');
   }
 
   // 👥 สรุปยอดขายแยกตามลูกค้า — กี่ออเดอร์ ซื้อไปเท่าไหร่ต่อคน
@@ -5890,6 +5947,7 @@ async function refreshGpsData() {
 
     // โหลดหมุดลูกค้าของทุกเซล (ใช้สำหรับนับ "จุดหมุดลูกค้าวันนี้" ใน popup)
     await loadAllPins();
+    buildPhoneOwnerMap();
 
     renderGpsMap(locations, routes);
     renderGpsSalesList(locations);
@@ -6170,10 +6228,12 @@ async function loadRoutePage() {
   const hasPins = Object.keys(_pinsCache).length > 0;
   if (!hasPins) {
     await loadAllPins();
+    buildPhoneOwnerMap();
   } else {
     // reload ใหม่เสมอเพื่อให้ข้อมูล fresh
     Object.keys(_pinsCache).forEach(k => delete _pinsCache[k]);
     await loadAllPins();
+    buildPhoneOwnerMap();
   }
 
   renderRouteMap('all');
@@ -6322,7 +6382,7 @@ function renderRouteLegend() {
     const color = SALES_COLORS[idx % SALES_COLORS.length];
     const sid   = s.salesId || s.id || '';
     const pins  = getSalesPins(sid);
-    const myOrders = allSalesOrders.filter(o => (o.sales_id === sid || o.ref_code === sid) && !isGhostOrder(o));
+    const myOrders = getAttributedOrders(sid);
     const revenue  = myOrders.reduce((sum,o) => sum + (parseFloat(o.total)||0), 0);
     const photo    = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
     const avatar   = photo
