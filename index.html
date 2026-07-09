@@ -593,6 +593,9 @@ tbody tr td[onclick]{cursor:pointer}
 .leaflet-marker-pane  { z-index: 6 !important; }
 .leaflet-tooltip-pane { z-index: 7 !important; }
 .leaflet-popup-pane   { z-index: 8 !important; }
+.leaflet-popup-content       { margin: 8px 10px !important; }
+.leaflet-popup-content-wrapper { border-radius: 10px !important; box-shadow: 0 3px 14px rgba(0,0,0,.22) !important; }
+.leaflet-popup-tip-container  { width:16px !important; height:8px !important; }
 .leaflet-control      { z-index: 9 !important; }
 .leaflet-top, .leaflet-bottom { z-index: 9 !important; }
 
@@ -1393,7 +1396,7 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
         <!-- รูปสถานที่ -->
         <div id="cdm-photo-wrap" style="display:none;margin-bottom:14px;">
           <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">📸 รูปสถานที่</div>
-          <img id="cdm-photo-img" src="" style="width:100%;border-radius:10px;object-fit:cover;max-height:180px;display:block;" onerror="document.getElementById('cdm-photo-wrap').style.display='none'">
+          <img id="cdm-photo-img" src="" onclick="openImageLightbox(this.src, event)" style="width:100%;border-radius:10px;object-fit:cover;max-height:180px;display:block;cursor:zoom-in;" onerror="document.getElementById('cdm-photo-wrap').style.display='none'">
         </div>
         <div id="cdm-note-wrap" style="display:none;margin-bottom:14px;">
           <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;">หมายเหตุ</div>
@@ -5283,6 +5286,8 @@ async function adminDrawRoadRouteFromPins(map, pins, color, key) {
 }
 // ─────────────────────────────────────────────────────────────────
 const SALES_COLORS  = ['#C0392B','#2980b9','#27ae60','#8e44ad','#e67e22','#16a085','#d35400','#1abc9c','#2c3e50','#7f8c8d'];
+// รูปแบบเลื่อนตำแหน่ง popup แบบวนซ้ำ เพื่อลดการซ้อนทับกันเมื่อเปิดหลายจุดพร้อมกัน
+const PIN_POPUP_OFFSETS = [[0,0],[34,-10],[-34,-10],[17,22],[-17,22],[0,-30],[46,12],[-46,12],[24,-26],[-24,-26]];
 
 let allSalesStaff = [], allSalesOrders = [], adminSalesMap = null, sdMap = null;
 
@@ -5479,6 +5484,7 @@ function renderAdminSalesMap() {
   legend.innerHTML = '';
   const allBounds = [];
 
+  let _pinN1 = 0;
   allSalesStaff.forEach((s, idx) => {
     const color = SALES_COLORS[idx % SALES_COLORS.length];
     const sid   = s.salesId || s.id || '';
@@ -5489,12 +5495,14 @@ function renderAdminSalesMap() {
 
     pins.forEach(p => {
       const icons = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
-      L.marker([p.lat,p.lng], {
+      const _mk1 = L.marker([p.lat,p.lng], {
         icon: L.divIcon({
           html: `<div style="width:22px;height:22px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;">${icons[p.type]||'📍'}</div>`,
           iconSize:[22,22], iconAnchor:[11,11], className:''
         })
-      }).addTo(adminSalesMap).bindPopup(`<div style="font-family:'Sarabun',sans-serif;min-width:140px;"><b>${p.name}</b><br><small style="color:${color};font-weight:700;">💼 ${s.name}</small>${p.photo_url?`<br><img src="${p.photo_url}" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-top:4px;display:block;" onerror="this.style.display='none'">`:''}</div>`);
+      }).addTo(adminSalesMap).bindPopup(`<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b><br><small style="color:${color};font-weight:700;font-size:10px;">💼 ${s.name}</small>${p.phone?`<br><span style="font-size:10px;color:#666;">📞 ${p.phone}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`, {autoClose:false, closeOnClick:false, closeButton:false, offset:PIN_POPUP_OFFSETS[_pinN1 % PIN_POPUP_OFFSETS.length]});
+      _pinN1++;
+      _mk1.openPopup();
       allBounds.push([p.lat,p.lng]);
     });
     if (pins.length >= 2) {
@@ -5540,9 +5548,12 @@ function openSalesDetail(salesId) {
     }
     sdMap.eachLayer(l=>{if(l instanceof L.Marker||l instanceof L.Polyline)sdMap.removeLayer(l);});
     const bounds=[];
+    let _pinN2 = 0;
     pins.forEach(p=>{
       const ic={shop:'🏪',home:'🏠',business:'🏢',other:'📍'};
-      L.marker([p.lat,p.lng],{icon:L.divIcon({html:`<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;">${ic[p.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''})}).addTo(sdMap).bindPopup(`<div style="font-family:'Sarabun',sans-serif;min-width:130px;"><b>${p.name}</b>${p.phone?'<br>📞 '+p.phone:''}${p.photo_url?`<br><img src="${p.photo_url}" style="width:100%;max-height:100px;object-fit:cover;border-radius:6px;margin-top:4px;display:block;" onerror="this.style.display='none'">`:''}</div>`);
+      const _mk2 = L.marker([p.lat,p.lng],{icon:L.divIcon({html:`<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;">${ic[p.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''})}).addTo(sdMap).bindPopup(`<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b>${p.phone?'<br><span style="font-size:10px;">📞 '+p.phone+'</span>':''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`, {autoClose:false, closeOnClick:false, closeButton:false, offset:PIN_POPUP_OFFSETS[_pinN2 % PIN_POPUP_OFFSETS.length]});
+      _pinN2++;
+      _mk2.openPopup();
       bounds.push([p.lat,p.lng]);
     });
     if(pins.length>=2){ L.polyline(pins.map(p=>[p.lat,p.lng]),{color,weight:2,opacity:.2,dashArray:'5,4'}).addTo(sdMap); adminDrawRoadRouteFromPins(sdMap, pins, color, 'sdmap_' + (s.salesId||s.id||'x')); }
@@ -5932,6 +5943,7 @@ function renderRouteMap(filter) {
 
   const allBounds = [];
   const typeIcons = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
+  let _pinN3 = 0;
 
   allSalesStaff.forEach((s, idx) => {
     const color = SALES_COLORS[idx % SALES_COLORS.length];
@@ -5973,14 +5985,15 @@ function renderRouteMap(filter) {
         })
       }).addTo(routeMainMap)
         .bindPopup(`
-          <div style="font-family:'Sarabun',sans-serif;min-width:150px;">
-            <div style="font-size:13px;font-weight:700;">${icon} ${p.name}</div>
-            <div style="font-size:12px;color:${color};font-weight:700;margin-top:2px;">💼 ${s.name}</div>
-            ${p.phone?`<div style="font-size:12px;color:#666;margin-top:2px;">📞 ${p.phone}</div>`:''}
-            ${p.note?`<div style="font-size:11px;color:#888;margin-top:2px;">${p.note}</div>`:''}
-            ${p.photo_url?`<img src="${p.photo_url}" style="width:100%;max-height:120px;object-fit:cover;border-radius:8px;margin-top:6px;display:block;" onerror="this.style.display='none'">` : ''}
-            <div style="font-size:10px;color:#aaa;margin-top:4px;">จุดที่ ${pidx+1} จาก ${pins.length}</div>
-          </div>`);
+          <div style="font-family:'Sarabun',sans-serif;min-width:110px;max-width:130px;line-height:1.25;">
+            <div style="font-size:12px;font-weight:700;">${icon} ${p.name}</div>
+            <div style="font-size:10px;color:${color};font-weight:700;">💼 ${s.name}</div>
+            ${p.phone?`<div style="font-size:10px;color:#666;">📞 ${p.phone}</div>`:''}
+            ${p.photo_url?`<img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:60px;object-fit:cover;border-radius:6px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">` : ''}
+            <div style="font-size:9px;color:#aaa;margin-top:2px;">จุดที่ ${pidx+1}/${pins.length}</div>
+          </div>`, {autoClose:false, closeOnClick:false, closeButton:false, offset:PIN_POPUP_OFFSETS[_pinN3 % PIN_POPUP_OFFSETS.length]});
+      _pinN3++;
+      marker.openPopup();
       routeLayersMap[sid].markers.push(marker);
       allBounds.push([p.lat, p.lng]);
     });
@@ -6172,7 +6185,27 @@ function closeCustDetail() {
     return pins.filter(pinMatchesRouteDate);
   };
 })();
+// เปิดรูปแบบเต็มจอ (lightbox) เมื่อกดที่รูปหมุด/รูปสถานที่
+window.openImageLightbox = function(url, ev) {
+  if (ev) { ev.stopPropagation(); ev.preventDefault(); }
+  if (!url) return;
+  const modal = document.getElementById('img-lightbox-modal');
+  const img   = document.getElementById('img-lightbox-img');
+  if (!modal || !img) return;
+  img.src = url;
+  modal.style.display = 'flex';
+};
+window.closeImageLightbox = function() {
+  const modal = document.getElementById('img-lightbox-modal');
+  if (modal) modal.style.display = 'none';
+};
 </script>
+
+<!-- IMAGE LIGHTBOX (ดูรูปเต็มจอ) -->
+<div id="img-lightbox-modal" onclick="closeImageLightbox()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:99999;align-items:center;justify-content:center;padding:24px;cursor:zoom-out;">
+  <img id="img-lightbox-img" src="" style="max-width:100%;max-height:100%;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.5);object-fit:contain;">
+  <button onclick="closeImageLightbox()" style="position:absolute;top:18px;right:22px;background:rgba(255,255,255,.15);border:none;color:#fff;width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
+</div>
 
 </body>
 </html>
