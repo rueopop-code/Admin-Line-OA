@@ -1245,9 +1245,15 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 
   <!-- Sales map (แผนที่รวมทุกเซล) -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:10px;">
       <h3 style="font-size:15px;font-weight:700;">🗺️ แผนที่ลูกค้าของเซลทุกคน</h3>
-      <div id="sales-map-legend" style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;"></div>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <div id="sales-map-legend" style="display:flex;gap:8px;flex-wrap:wrap;font-size:12px;"></div>
+        <button id="sales-addpin-btn" onclick="toggleGpsAddPinMode(adminSalesMap,'sales-addpin-btn','sales-addpin-hint',()=>loadSalesPage())" class="btn-primary" style="background:#27ae60;">➕ ปักหมุดลูกค้า</button>
+      </div>
+    </div>
+    <div id="sales-addpin-hint" style="display:none;margin-bottom:10px;padding:8px 14px;background:#eafaf1;border:1px solid #27ae6055;border-radius:10px;color:#1e8449;font-size:13px;font-weight:700;">
+      📍 แตะตำแหน่งบนแผนที่เพื่อปักหมุดลูกค้า (กด "➕ ปักหมุดลูกค้า" อีกครั้งเพื่อยกเลิก)
     </div>
     <div id="admin-sales-map" style="height:320px;border-radius:10px;overflow:hidden;"></div>
   </div>
@@ -1396,7 +1402,14 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
     <div class="page-title"><svg width="20" height="20"><use href="#ic-map"/></svg>เส้นทางเซล</div>
-    <button onclick="loadRoutePage()" class="btn-primary">🔄 โหลดใหม่</button>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button id="route-addpin-btn" onclick="toggleGpsAddPinMode(routeMainMap,'route-addpin-btn','route-addpin-hint',()=>loadRoutePage())" class="btn-primary" style="background:#27ae60;">➕ ปักหมุดลูกค้า</button>
+      <button onclick="loadRoutePage()" class="btn-primary">🔄 โหลดใหม่</button>
+    </div>
+  </div>
+
+  <div id="route-addpin-hint" style="display:none;margin-bottom:10px;padding:8px 14px;background:#eafaf1;border:1px solid #27ae6055;border-radius:10px;color:#1e8449;font-size:13px;font-weight:700;">
+    📍 แตะตำแหน่งบนแผนที่เพื่อปักหมุดลูกค้า (กด "➕ ปักหมุดลูกค้า" อีกครั้งเพื่อยกเลิก)
   </div>
 
   <!-- Filter วันที่ (รีเส้นทางวันต่อวัน) -->
@@ -5511,6 +5524,8 @@ function addSatelliteToggle(map) {
   if (!map || map._satToggleAdded) return;
   map._satToggleAdded = true;
   const satLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', { maxZoom:19 });
+  // เลเยอร์ชื่อสถานที่/ตำบล/อำเภอ/จังหวัด/ถนน วางทับภาพถ่ายดาวเทียม เพื่อให้ยังอ่านชื่อสถานที่ได้เหมือนแผนที่ปกติ
+  const satLabelsLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', { maxZoom:19, pane:'shadowPane' });
   let satOn = false;
   const Ctl = L.Control.extend({
     options: { position: 'topright' },
@@ -5525,14 +5540,16 @@ function addSatelliteToggle(map) {
         satOn = !satOn;
         // หา street tile layer ปัจจุบัน
         let streetLayer = null;
-        map.eachLayer(l => { if (l instanceof L.TileLayer && l !== satLayer) streetLayer = l; });
+        map.eachLayer(l => { if (l instanceof L.TileLayer && l !== satLayer && l !== satLabelsLayer) streetLayer = l; });
         if (satOn) {
           if (streetLayer) map._streetLayerRef = streetLayer;
           if (map._streetLayerRef) map.removeLayer(map._streetLayerRef);
           satLayer.addTo(map);
+          satLabelsLayer.addTo(map);
           btn.innerHTML = '🗺️';
         } else {
           map.removeLayer(satLayer);
+          map.removeLayer(satLabelsLayer);
           if (map._streetLayerRef) map._streetLayerRef.addTo(map);
           btn.innerHTML = '🛰️';
         }
@@ -5875,33 +5892,55 @@ function renderGpsMap(locations, routes) {
   setTimeout(() => gpsAdminMap.invalidateSize(), 200);
 }
 
-// ── แอดมินปักหมุดลูกค้าเองจากหน้า GPS เซล ──
+// ── แอดมินปักหมุดลูกค้าเอง — ใช้ร่วมกันได้ทั้งหน้า GPS เซล / จัดการเซล / เส้นทางเซล ──
 let _gpsAddPinMode = false;
 let _gpsAddPinLatLng = null;
 let _gpsAddPinClickHandler = null;
+let _addPinActiveMap    = null;
+let _addPinBtnId        = 'gps-addpin-btn';
+let _addPinHintId       = 'gps-addpin-hint';
+let _addPinRefreshFn    = () => refreshGpsData();
 
-function toggleGpsAddPinMode() {
+function toggleGpsAddPinMode(map, btnId, hintId, refreshFn) {
+  // เรียกแบบไม่มีพารามิเตอร์ = ใช้งานจากหน้า GPS เซล (ของเดิม); ระบุพารามิเตอร์ = ใช้จากแผนที่อื่น
+  const targetMap = map || gpsAdminMap;
+  _addPinBtnId     = btnId || 'gps-addpin-btn';
+  _addPinHintId    = hintId || 'gps-addpin-hint';
+  _addPinRefreshFn = refreshFn || (() => refreshGpsData());
+
+  // ถ้ากำลังเปิดโหมดปักหมุดของแผนที่อื่นอยู่ ให้ปิดของเก่าก่อนสลับ
+  if (_gpsAddPinMode && _addPinActiveMap && _addPinActiveMap !== targetMap) {
+    _deactivateAddPinMode();
+  }
+
   _gpsAddPinMode = !_gpsAddPinMode;
-  const btn  = document.getElementById('gps-addpin-btn');
-  const hint = document.getElementById('gps-addpin-hint');
+  const btn  = document.getElementById(_addPinBtnId);
+  const hint = document.getElementById(_addPinHintId);
   if (_gpsAddPinMode) {
-    btn.style.background = '#e74c3c';
-    btn.textContent = '✖ ยกเลิกปักหมุด';
-    hint.style.display = 'block';
-    if (gpsAdminMap) {
+    _addPinActiveMap = targetMap;
+    if (btn)  { btn.style.background = '#e74c3c'; btn.textContent = '✖ ยกเลิกปักหมุด'; }
+    if (hint) hint.style.display = 'block';
+    if (targetMap) {
       _gpsAddPinClickHandler = (e) => openGpsAddPinModal(e.latlng.lat, e.latlng.lng);
-      gpsAdminMap.on('click', _gpsAddPinClickHandler);
-      gpsAdminMap.getContainer().style.cursor = 'crosshair';
+      targetMap.on('click', _gpsAddPinClickHandler);
+      targetMap.getContainer().style.cursor = 'crosshair';
     }
   } else {
-    btn.style.background = '#27ae60';
-    btn.textContent = '➕ ปักหมุดลูกค้า';
-    hint.style.display = 'none';
-    if (gpsAdminMap && _gpsAddPinClickHandler) {
-      gpsAdminMap.off('click', _gpsAddPinClickHandler);
-      gpsAdminMap.getContainer().style.cursor = '';
-    }
+    _deactivateAddPinMode();
   }
+}
+
+function _deactivateAddPinMode() {
+  _gpsAddPinMode = false;
+  const btn  = document.getElementById(_addPinBtnId);
+  const hint = document.getElementById(_addPinHintId);
+  if (btn)  { btn.style.background = '#27ae60'; btn.textContent = '➕ ปักหมุดลูกค้า'; }
+  if (hint) hint.style.display = 'none';
+  if (_addPinActiveMap && _gpsAddPinClickHandler) {
+    _addPinActiveMap.off('click', _gpsAddPinClickHandler);
+    _addPinActiveMap.getContainer().style.cursor = '';
+  }
+  _addPinActiveMap = null;
 }
 
 function openGpsAddPinModal(lat, lng) {
@@ -5954,8 +5993,8 @@ async function submitGpsAddPin() {
     delete _pinsCache[sid]; // ล้าง cache เพื่อโหลดหมุดใหม่รอบถัดไป
     await fetchSalesPins(sid);
     closeGpsAddPinModal();
-    toggleGpsAddPinMode(); // ปิดโหมดปักหมุดหลังบันทึกสำเร็จ
-    await refreshGpsData();
+    _deactivateAddPinMode(); // ปิดโหมดปักหมุดหลังบันทึกสำเร็จ
+    await _addPinRefreshFn();
     toast('✅ ปักหมุดลูกค้าสำเร็จ', 'success');
   } catch (e) {
     errEl.textContent = 'บันทึกไม่สำเร็จ: ' + e.message;
