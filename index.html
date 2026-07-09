@@ -1328,8 +1328,13 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
         <div id="gps-admin-dot" style="width:10px;height:10px;border-radius:50%;background:#ccc;"></div>
         <span id="gps-admin-text" style="color:#888;">กำลังโหลด...</span>
       </div>
+      <button id="gps-addpin-btn" onclick="toggleGpsAddPinMode()" class="btn-primary" style="background:#27ae60;">➕ ปักหมุดลูกค้า</button>
       <button onclick="loadGpsPage()" class="btn-primary">🔄 รีเฟรช</button>
     </div>
+  </div>
+
+  <div id="gps-addpin-hint" style="display:none;margin-bottom:10px;padding:8px 14px;background:#eafaf1;border:1px solid #27ae6055;border-radius:10px;color:#1e8449;font-size:13px;font-weight:700;">
+    📍 แตะตำแหน่งบนแผนที่เพื่อปักหมุดลูกค้า (กด “➕ ปักหมุดลูกค้า” อีกครั้งเพื่อยกเลิก)
   </div>
 
   <!-- Legend -->
@@ -1344,6 +1349,47 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
   <div id="gps-sales-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;"></div>
 
 </div><!-- /page-6 -->
+
+<!-- Modal: แอดมินปักหมุดลูกค้า (จากหน้า GPS เซล) -->
+<div id="gps-addpin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:5500;align-items:center;justify-content:center;padding:16px;">
+  <div style="background:#fff;border-radius:18px;width:100%;max-width:380px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25);">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:16px;font-weight:700;">📍 ปักหมุดลูกค้าใหม่</div>
+      <button onclick="closeGpsAddPinModal()" style="background:var(--gray-100);border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;">×</button>
+    </div>
+    <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px;">
+      <div style="font-size:12px;color:#888;" id="gap-latlng"></div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text-3);">เซล (เจ้าของหมุด) *</label>
+        <select id="gap-sales" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;"></select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text-3);">ชื่อลูกค้า/ร้านค้า *</label>
+        <input id="gap-name" type="text" placeholder="เช่น ร้านค้าโชห่วย" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text-3);">เบอร์โทร</label>
+        <input id="gap-phone" type="text" placeholder="08xxxxxxxx" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;">
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text-3);">ประเภท</label>
+        <select id="gap-type" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;">
+          <option value="shop">🏪 ร้านค้า</option>
+          <option value="home">🏠 บ้าน</option>
+          <option value="business">🏢 บริษัท/สำนักงาน</option>
+          <option value="other">📍 อื่นๆ</option>
+        </select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text-3);">หมายเหตุ</label>
+        <textarea id="gap-note" rows="2" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;resize:vertical;"></textarea>
+      </div>
+      <div id="gap-err" style="display:none;color:#e74c3c;font-size:12px;font-weight:700;"></div>
+      <button id="gap-submit-btn" onclick="submitGpsAddPin()" class="btn-primary" style="width:100%;padding:11px;font-size:14px;">✔ บันทึกหมุด</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- PAGE 7: เส้นทางเซล -->
 <div id="page-7" class="admin-page" style="display:none;">
@@ -5287,7 +5333,34 @@ async function adminDrawRoadRouteFromPins(map, pins, color, key) {
 // ─────────────────────────────────────────────────────────────────
 const SALES_COLORS  = ['#C0392B','#2980b9','#27ae60','#8e44ad','#e67e22','#16a085','#d35400','#1abc9c','#2c3e50','#7f8c8d'];
 // รูปแบบเลื่อนตำแหน่ง popup แบบวนซ้ำ เพื่อลดการซ้อนทับกันเมื่อเปิดหลายจุดพร้อมกัน
-const PIN_POPUP_OFFSETS = [[0,0],[34,-10],[-34,-10],[17,22],[-17,22],[0,-30],[46,12],[-46,12],[24,-26],[-24,-26]];
+const PIN_POPUP_OFFSETS = [[0,-6],[52,-16],[-52,-16],[26,34],[-26,34],[0,-46],[70,18],[-70,18],[36,-40],[-36,-40],[80,-30],[-80,-30],[0,50],[52,50],[-52,50]];
+
+// ── หาชื่อจังหวัด/อำเภอจากพิกัด (reverse geocoding ผ่าน OpenStreetMap Nominatim) ──
+const _geoAddrCache = (() => { try { return JSON.parse(localStorage.getItem('geo_addr_cache')||'{}'); } catch(_) { return {}; } })();
+let _geoAddrQueue = Promise.resolve();
+function _geoAddrKey(lat,lng){ return lat.toFixed(3)+','+lng.toFixed(3); }
+function reverseGeocodeTH(lat, lng) {
+  const key = _geoAddrKey(lat,lng);
+  if (_geoAddrCache[key]) return Promise.resolve(_geoAddrCache[key]);
+  const run = _geoAddrQueue.then(async () => {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=12&addressdetails=1&accept-language=th`);
+      const d = await r.json();
+      const a = d.address || {};
+      const province = a.province || a.state || '';
+      const district  = a.county || a.district || a.city_district || a.town || a.suburb || '';
+      const text = [district, province].filter(Boolean).join(', ') || '';
+      _geoAddrCache[key] = text;
+      try { localStorage.setItem('geo_addr_cache', JSON.stringify(_geoAddrCache)); } catch(_){}
+      return text;
+    } catch(_) { return ''; }
+    finally {
+      await new Promise(res => setTimeout(res, 1100)); // เว้นจังหวะเรียก API ตามนโยบายของ Nominatim
+    }
+  });
+  _geoAddrQueue = run.catch(()=>{});
+  return run;
+}
 
 let allSalesStaff = [], allSalesOrders = [], adminSalesMap = null, sdMap = null;
 
@@ -5495,14 +5568,16 @@ function renderAdminSalesMap() {
 
     pins.forEach(p => {
       const icons = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
+      const buildPopup1 = (addr) => `<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b><br><small style="color:${color};font-weight:700;font-size:10px;">💼 ${s.name}</small>${p.phone?`<br><span style="font-size:10px;color:#666;">📞 ${p.phone}</span>`:''}${addr?`<br><span style="font-size:9px;color:#999;">📍 ${addr}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`;
       const _mk1 = L.marker([p.lat,p.lng], {
         icon: L.divIcon({
           html: `<div style="width:22px;height:22px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;">${icons[p.type]||'📍'}</div>`,
           iconSize:[22,22], iconAnchor:[11,11], className:''
         })
-      }).addTo(adminSalesMap).bindPopup(`<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b><br><small style="color:${color};font-weight:700;font-size:10px;">💼 ${s.name}</small>${p.phone?`<br><span style="font-size:10px;color:#666;">📞 ${p.phone}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`, {autoClose:false, closeOnClick:false, closeButton:false, offset:PIN_POPUP_OFFSETS[_pinN1 % PIN_POPUP_OFFSETS.length]});
+      }).addTo(adminSalesMap).bindPopup(buildPopup1(''), {autoClose:false, closeOnClick:false, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN1 % PIN_POPUP_OFFSETS.length]});
       _pinN1++;
       _mk1.openPopup();
+      reverseGeocodeTH(p.lat, p.lng).then(addr => { if (addr) _mk1.setPopupContent(buildPopup1(addr)); });
       allBounds.push([p.lat,p.lng]);
     });
     if (pins.length >= 2) {
@@ -5551,9 +5626,11 @@ function openSalesDetail(salesId) {
     let _pinN2 = 0;
     pins.forEach(p=>{
       const ic={shop:'🏪',home:'🏠',business:'🏢',other:'📍'};
-      const _mk2 = L.marker([p.lat,p.lng],{icon:L.divIcon({html:`<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;">${ic[p.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''})}).addTo(sdMap).bindPopup(`<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b>${p.phone?'<br><span style="font-size:10px;">📞 '+p.phone+'</span>':''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`, {autoClose:false, closeOnClick:false, closeButton:false, offset:PIN_POPUP_OFFSETS[_pinN2 % PIN_POPUP_OFFSETS.length]});
+      const buildPopup2 = (addr) => `<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b>${p.phone?'<br><span style="font-size:10px;">📞 '+p.phone+'</span>':''}${addr?`<br><span style="font-size:9px;color:#999;">📍 ${addr}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`;
+      const _mk2 = L.marker([p.lat,p.lng],{icon:L.divIcon({html:`<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;">${ic[p.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''})}).addTo(sdMap).bindPopup(buildPopup2(''), {autoClose:false, closeOnClick:false, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN2 % PIN_POPUP_OFFSETS.length]});
       _pinN2++;
       _mk2.openPopup();
+      reverseGeocodeTH(p.lat, p.lng).then(addr => { if (addr) _mk2.setPopupContent(buildPopup2(addr)); });
       bounds.push([p.lat,p.lng]);
     });
     if(pins.length>=2){ L.polyline(pins.map(p=>[p.lat,p.lng]),{color,weight:2,opacity:.2,dashArray:'5,4'}).addTo(sdMap); adminDrawRoadRouteFromPins(sdMap, pins, color, 'sdmap_' + (s.salesId||s.id||'x')); }
@@ -5704,6 +5781,9 @@ async function refreshGpsData() {
     });
     const routes = await routeRes.json();
 
+    // โหลดหมุดลูกค้าของทุกเซล (ใช้สำหรับนับ "จุดหมุดลูกค้าวันนี้" ใน popup)
+    await loadAllPins();
+
     renderGpsMap(locations, routes);
     renderGpsSalesList(locations);
     setGpsAdminStatus('ok', 'อัปเดต ' + new Date().toLocaleTimeString('th-TH'));
@@ -5747,16 +5827,22 @@ function renderGpsMap(locations, routes) {
     if (loc && loc.lat) {
       const lat = parseFloat(loc.lat), lng = parseFloat(loc.lng);
       const timeAgo = getTimeAgo(loc.updated_at);
-      const popupHtml = `<div style="font-family:'Sarabun',sans-serif;min-width:140px;">
+      const _todayStr = new Date().toLocaleDateString('en-CA');
+      const pinsToday = getSalesPins(sid).filter(p => p.createdAt && new Date(p.createdAt).toLocaleDateString('en-CA') === _todayStr).length;
+      const buildGpsPopup = (addr) => `<div style="font-family:'Sarabun',sans-serif;min-width:140px;">
         <div style="font-size:14px;font-weight:700;color:${color};">💼 ${s.name}</div>
         <div style="font-size:12px;color:#666;margin-top:3px;">รหัส: ${sid}</div>
         <div style="font-size:11px;color:${isOnline?'#27ae60':'#e74c3c'};margin-top:3px;">${isOnline?'🟢 ออนไลน์':'⚫ ออฟไลน์'} · ${timeAgo}</div>
-        <div style="font-size:11px;color:#888;margin-top:2px;">จุดวันนี้: ${myRoutes.length} จุด</div>
+        ${addr?`<div style="font-size:10px;color:#999;margin-top:2px;">📍 ${addr}</div>`:''}
+        <div style="font-size:11px;color:#888;margin-top:2px;">จุด GPS วันนี้: ${myRoutes.length} จุด</div>
+        <div style="font-size:11px;color:#888;margin-top:1px;">🚩 ปักหมุดลูกค้าวันนี้: ${pinsToday} จุด</div>
       </div>`;
+      const popupHtml = buildGpsPopup('');
 
       if (gpsMarkers[sid]) {
         gpsMarkers[sid].setLatLng([lat, lng]);
         gpsMarkers[sid].setPopupContent(popupHtml);
+        reverseGeocodeTH(lat, lng).then(addr => { if (addr) gpsMarkers[sid].setPopupContent(buildGpsPopup(addr)); });
       } else {
         const _sPhoto = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
         const _sAvatarHtml = _sPhoto
@@ -5777,6 +5863,7 @@ function renderGpsMap(locations, routes) {
           }),
           zIndexOffset: 1000 + idx
         }).addTo(gpsAdminMap).bindPopup(popupHtml);
+        reverseGeocodeTH(lat, lng).then(addr => { if (addr) gpsMarkers[sid].setPopupContent(buildGpsPopup(addr)); });
       }
       allBounds.push([lat, lng]);
     }
@@ -5786,6 +5873,96 @@ function renderGpsMap(locations, routes) {
     gpsAdminMap.fitBounds(allBounds, { padding:[40,40] });
   }
   setTimeout(() => gpsAdminMap.invalidateSize(), 200);
+}
+
+// ── แอดมินปักหมุดลูกค้าเองจากหน้า GPS เซล ──
+let _gpsAddPinMode = false;
+let _gpsAddPinLatLng = null;
+let _gpsAddPinClickHandler = null;
+
+function toggleGpsAddPinMode() {
+  _gpsAddPinMode = !_gpsAddPinMode;
+  const btn  = document.getElementById('gps-addpin-btn');
+  const hint = document.getElementById('gps-addpin-hint');
+  if (_gpsAddPinMode) {
+    btn.style.background = '#e74c3c';
+    btn.textContent = '✖ ยกเลิกปักหมุด';
+    hint.style.display = 'block';
+    if (gpsAdminMap) {
+      _gpsAddPinClickHandler = (e) => openGpsAddPinModal(e.latlng.lat, e.latlng.lng);
+      gpsAdminMap.on('click', _gpsAddPinClickHandler);
+      gpsAdminMap.getContainer().style.cursor = 'crosshair';
+    }
+  } else {
+    btn.style.background = '#27ae60';
+    btn.textContent = '➕ ปักหมุดลูกค้า';
+    hint.style.display = 'none';
+    if (gpsAdminMap && _gpsAddPinClickHandler) {
+      gpsAdminMap.off('click', _gpsAddPinClickHandler);
+      gpsAdminMap.getContainer().style.cursor = '';
+    }
+  }
+}
+
+function openGpsAddPinModal(lat, lng) {
+  _gpsAddPinLatLng = { lat, lng };
+  document.getElementById('gap-latlng').textContent = `📌 พิกัด: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+  document.getElementById('gap-name').value  = '';
+  document.getElementById('gap-phone').value = '';
+  document.getElementById('gap-note').value  = '';
+  document.getElementById('gap-type').value  = 'shop';
+  document.getElementById('gap-err').style.display = 'none';
+  const sel = document.getElementById('gap-sales');
+  sel.innerHTML = allSalesStaff.map(s => `<option value="${s.salesId||s.id||''}">${s.name}</option>`).join('');
+  document.getElementById('gps-addpin-modal').style.display = 'flex';
+  reverseGeocodeTH(lat, lng).then(addr => {
+    if (addr) document.getElementById('gap-latlng').textContent = `📌 ${addr} (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+  });
+}
+
+function closeGpsAddPinModal() {
+  document.getElementById('gps-addpin-modal').style.display = 'none';
+}
+
+async function submitGpsAddPin() {
+  const errEl = document.getElementById('gap-err');
+  errEl.style.display = 'none';
+  const sid   = document.getElementById('gap-sales').value;
+  const name  = document.getElementById('gap-name').value.trim();
+  const phone = document.getElementById('gap-phone').value.trim();
+  const type  = document.getElementById('gap-type').value;
+  const note  = document.getElementById('gap-note').value.trim();
+  if (!sid)  { errEl.textContent = 'กรุณาเลือกเซล'; errEl.style.display = 'block'; return; }
+  if (!name) { errEl.textContent = 'กรุณากรอกชื่อลูกค้า/ร้านค้า'; errEl.style.display = 'block'; return; }
+  if (!_gpsAddPinLatLng) { errEl.textContent = 'ไม่พบพิกัดที่เลือก'; errEl.style.display = 'block'; return; }
+
+  const btn = document.getElementById('gap-submit-btn');
+  btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+  try {
+    const res = await fetch(`${SB_URL_SALES}/rest/v1/sales_pins`, {
+      method: 'POST',
+      headers: {
+        'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES,
+        'Content-Type': 'application/json', 'Prefer': 'return=representation'
+      },
+      body: JSON.stringify({
+        sales_id: sid, name, phone, type, note,
+        lat: _gpsAddPinLatLng.lat, lng: _gpsAddPinLatLng.lng
+      })
+    });
+    if (!res.ok) throw new Error('บันทึกไม่สำเร็จ');
+    delete _pinsCache[sid]; // ล้าง cache เพื่อโหลดหมุดใหม่รอบถัดไป
+    await fetchSalesPins(sid);
+    closeGpsAddPinModal();
+    toggleGpsAddPinMode(); // ปิดโหมดปักหมุดหลังบันทึกสำเร็จ
+    await refreshGpsData();
+    toast('✅ ปักหมุดลูกค้าสำเร็จ', 'success');
+  } catch (e) {
+    errEl.textContent = 'บันทึกไม่สำเร็จ: ' + e.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false; btn.textContent = '✔ บันทึกหมุด';
+  }
 }
 
 function renderGpsSalesList(locations) {
@@ -5983,17 +6160,20 @@ function renderRouteMap(filter) {
           </div>`,
           iconSize:[28,28], iconAnchor:[14,14], className:''
         })
-      }).addTo(routeMainMap)
-        .bindPopup(`
+      }).addTo(routeMainMap);
+      const buildPopup3 = (addr) => `
           <div style="font-family:'Sarabun',sans-serif;min-width:110px;max-width:130px;line-height:1.25;">
             <div style="font-size:12px;font-weight:700;">${icon} ${p.name}</div>
             <div style="font-size:10px;color:${color};font-weight:700;">💼 ${s.name}</div>
             ${p.phone?`<div style="font-size:10px;color:#666;">📞 ${p.phone}</div>`:''}
+            ${addr?`<div style="font-size:9px;color:#999;">📍 ${addr}</div>`:''}
             ${p.photo_url?`<img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:60px;object-fit:cover;border-radius:6px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">` : ''}
             <div style="font-size:9px;color:#aaa;margin-top:2px;">จุดที่ ${pidx+1}/${pins.length}</div>
-          </div>`, {autoClose:false, closeOnClick:false, closeButton:false, offset:PIN_POPUP_OFFSETS[_pinN3 % PIN_POPUP_OFFSETS.length]});
+          </div>`;
+      marker.bindPopup(buildPopup3(''), {autoClose:false, closeOnClick:false, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN3 % PIN_POPUP_OFFSETS.length]});
       _pinN3++;
       marker.openPopup();
+      reverseGeocodeTH(p.lat, p.lng).then(addr => { if (addr) marker.setPopupContent(buildPopup3(addr)); });
       routeLayersMap[sid].markers.push(marker);
       allBounds.push([p.lat, p.lng]);
     });
