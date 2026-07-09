@@ -2201,14 +2201,24 @@ function handleRealtimeChange(payload) {
   if (eventType === 'INSERT') {
     if (!allOrders.find(o => o.order_id === newRow.order_id)) {
       allOrders.unshift(newRow);
+      if (!isGhostOrder(newRow)) {
+        recentlyAddedIds.add(newRow.order_id);
+        setTimeout(() => recentlyAddedIds.delete(newRow.order_id), 5000);
+        toast(`🔔 ออเดอร์ใหม่: ${newRow.customer_name || '#' + newRow.order_id}`, 'success');
+        try { playBeep(); } catch(e) {}
+      }
+    }
+  } else if (eventType === 'UPDATE') {
+    const idx = allOrders.findIndex(o => o.order_id === newRow.order_id);
+    const wasGhost = idx >= 0 && isGhostOrder(allOrders[idx]);
+    if (idx >= 0) allOrders[idx] = newRow;
+    // แถวที่เคยเป็นแค่ "เปิดลิงก์ดูสินค้า" (ghost) แต่ตอนนี้มีสินค้า/ยอดรวมแล้ว = เพิ่งกดยืนยันสั่งซื้อจริง
+    if (wasGhost && !isGhostOrder(newRow)) {
       recentlyAddedIds.add(newRow.order_id);
       setTimeout(() => recentlyAddedIds.delete(newRow.order_id), 5000);
       toast(`🔔 ออเดอร์ใหม่: ${newRow.customer_name || '#' + newRow.order_id}`, 'success');
       try { playBeep(); } catch(e) {}
     }
-  } else if (eventType === 'UPDATE') {
-    const idx = allOrders.findIndex(o => o.order_id === newRow.order_id);
-    if (idx >= 0) allOrders[idx] = newRow;
   } else if (eventType === 'DELETE') {
     allOrders = allOrders.filter(o => o.order_id !== oldRow.order_id);
   }
@@ -2231,6 +2241,21 @@ function playBeep() {
 // ═══════════════════════════════════════════
 //  RENDER ORDERS (Page 1)
 // ═══════════════════════════════════════════
+// ออเดอร์ "ผี" (ghost) = ยังไม่ใช่ออเดอร์จริง ไม่ควรนับ/แจ้งเตือน:
+//  - LINE-     : แชกจาก LINE OA เฉยๆ ยังไม่ได้สั่งซื้อ
+//  - LINK-CUST-/LINK- ที่ยังไม่มีสินค้า/ยอดรวม = แค่เปิดลิงก์ดูสินค้า (เซล/ลูกค้ายังไม่กดยืนยันสั่งซื้อ)
+//    ถ้าแถวเดิมถูกอัปเดตจนมีสินค้า/ยอดรวมแล้ว จะไม่ถือเป็น ghost อีกต่อไป (กลายเป็นออเดอร์จริงอัตโนมัติ)
+function isGhostOrder(o) {
+  const id = String(o.order_id || '');
+  if (id.startsWith('LINE-')) return true;
+  if (/^(LINK-CUST-|LINK-)/.test(id)) {
+    const hasTotal = Number(o.total || 0) > 0;
+    const hasItems = Array.isArray(o.items) && o.items.length > 0;
+    return !hasTotal && !hasItems;
+  }
+  return false;
+}
+
 function renderOrders(orders) {
   const tbody = document.getElementById('orders-tbody');
   const normPhone = (p) => String(p || '').replace(/\D/g, '');
@@ -2242,13 +2267,13 @@ function renderOrders(orders) {
     return arr.filter(Boolean);
   };
 
-  const realOrders = orders.filter(o => !String(o.order_id || '').startsWith('LINE-'));
+  const realOrders = orders.filter(o => !isGhostOrder(o));
   const realLineUids = new Set(realOrders.map(o => o.line_user_id).filter(Boolean));
   const realPhones   = new Set(realOrders.map(o => normPhone(o.phone)).filter(Boolean));
   const realNames    = new Set(realOrders.flatMap(o => orderNames(o)));
 
   const merged = orders.filter(o => {
-    const isGhost = String(o.order_id || '').startsWith('LINE-');
+    const isGhost = isGhostOrder(o);
     if (!isGhost) return true;
     if (o.line_user_id && realLineUids.has(o.line_user_id)) return false;
     if (o.phone && realPhones.has(normPhone(o.phone))) return false;
@@ -2260,7 +2285,7 @@ function renderOrders(orders) {
   if (currentFilter === 'line_chat') {
     list = merged.filter(o => String(o.order_id || '').startsWith('LINE-'));
   } else if (currentFilter !== 'all') {
-    list = merged.filter(o => (o.status || 'pending') === currentFilter && !String(o.order_id || '').startsWith('LINE-'));
+    list = merged.filter(o => (o.status || 'pending') === currentFilter && !isGhostOrder(o));
   }
 
   const searchInput = document.getElementById('searchInput');
@@ -2303,7 +2328,7 @@ function renderOrders(orders) {
   }
 
   tbody.innerHTML = list.map(o => {
-    const isGhost = String(o.order_id || '').startsWith('LINE-');
+    const isGhost = isGhostOrder(o);
     const myPhone = normPhone(o.phone);
     const myNames = orderNames(o);
     const hasLineChat = !isGhost && orders.some(g => {
@@ -2420,7 +2445,7 @@ function renderOrders(orders) {
 }
 
 function renderStats(orders) {
-  const real = orders.filter(o => !String(o.order_id || '').startsWith('LINE-'));
+  const real = orders.filter(o => !isGhostOrder(o));
   const total     = real.length;
   const pending   = real.filter(o => (o.status||'pending') === 'pending').length;
   const confirmed = real.filter(o => ['confirmed','shipped','done'].includes(o.status)).length;
@@ -5408,7 +5433,7 @@ async function loadSalesPage() {
 }
 
 function renderSalesStats() {
-  const salesOrders = allSalesOrders.filter(o => o.sales_id || o.ref_code);
+  const salesOrders = allSalesOrders.filter(o => (o.sales_id || o.ref_code) && !isGhostOrder(o));
   const revenue     = salesOrders.reduce((s,o) => s + (parseFloat(o.total)||0), 0);
   const pins        = getAllSalesPins().length;
   document.getElementById('ss-total').textContent    = allSalesStaff.length;
@@ -5464,7 +5489,7 @@ function renderSalesList() {
   wrap.innerHTML = allSalesStaff.map((s, idx) => {
     const color    = SALES_COLORS[idx % SALES_COLORS.length];
     const sid      = s.salesId || s.id || '';
-    const myOrders = allSalesOrders.filter(o => o.sales_id === sid || o.ref_code === sid);
+    const myOrders = allSalesOrders.filter(o => (o.sales_id === sid || o.ref_code === sid) && !isGhostOrder(o));
     const revenue  = myOrders.reduce((sum,o) => sum + (parseFloat(o.total)||0), 0);
     const pins     = getSalesPins(sid);
     const photo    = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
@@ -5612,7 +5637,7 @@ function openSalesDetail(salesId) {
   if (!s) return;
   const idx  = allSalesStaff.indexOf(s);
   const color= SALES_COLORS[idx%SALES_COLORS.length];
-  const myOrders = allSalesOrders.filter(o=>o.sales_id===salesId);
+  const myOrders = allSalesOrders.filter(o=>o.sales_id===salesId && !isGhostOrder(o));
   const revenue  = myOrders.reduce((sum,o)=>sum+(parseFloat(o.total)||0),0);
   const pins     = getSalesPins(salesId);
 
@@ -6232,7 +6257,7 @@ function renderRouteLegend() {
     const color = SALES_COLORS[idx % SALES_COLORS.length];
     const sid   = s.salesId || s.id || '';
     const pins  = getSalesPins(sid);
-    const myOrders = allSalesOrders.filter(o => o.sales_id === sid || o.ref_code === sid);
+    const myOrders = allSalesOrders.filter(o => (o.sales_id === sid || o.ref_code === sid) && !isGhostOrder(o));
     const revenue  = myOrders.reduce((sum,o) => sum + (parseFloat(o.total)||0), 0);
     const photo    = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
     const avatar   = photo
