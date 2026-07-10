@@ -2705,7 +2705,7 @@ function normName(s) {
 }
 function findProduct(name) {
   if (!name) return null;
-  const n = normName(name);
+  const n = normName(emStripPromoTag(name)); // ตัดหางโปร 🎁 ก่อนค้นหา
   // 1. Exact
   let p = allProducts.find(p => normName(p.name) === n);
   if (p) return p;
@@ -2902,7 +2902,8 @@ function openEnhancedEdit(orderId) {
 
   const _eeItems = eeOriginalItems.map(i => {
     // จำขนาด/ราคาที่ลูกค้าเคยเลือกไว้ จากชื่อสินค้ารูปแบบ "ชื่อ (ขนาด)" ไม่ต้องกดเลือกซ้ำ
-    const m = (i.name || '').match(/\(([^)]+)\)\s*$/);
+    // (ตัดหางโปร 🎁 ออกก่อน ไม่งั้นจับขนาดไม่เจอ)
+    const m = emStripPromoTag(i.name).match(/\(([^)]+)\)\s*$/);
     return { ...i, _variant: m ? m[1] : '' };
   });
   renderEnhancedItems(_eeItems);
@@ -2931,10 +2932,18 @@ function closeEnhancedEdit() {
 function renderEnhancedItems(items) {
   const list = document.getElementById('eeItemsList');
   list.innerHTML = items.map((it, idx) => {
-    const baseName = (it.name||'').replace(/\s*\([^)]*\)\s*$/, '').trim();
+    // ถ้า _variant หาย (เช่นหลังเพิ่ม/ลบแถว) ให้จับกลับจากชื่อรูปแบบ "ชื่อ (ขนาด)" — กันราคา/ปุ่มขนาดถูกรีเซ็ต
+    if (it._variant === undefined) {
+      const _vm = emStripPromoTag(it.name || '').match(/\(([^)]+)\)\s*$/);
+      it._variant = _vm ? _vm[1] : '';
+    }
+    const baseName = emStripPromoTag(it.name||'').replace(/\s*\([^)]*\)\s*$/, '').trim();
     const prod = findProduct(baseName) || findProduct(it.name||'');
-    // อัปราคาจาก catalog เฉพาะตอนที่ยังไม่ได้เลือกขนาด
-    if (prod && prod.price && !it._variant) it.price = prod.price;
+    // อัปราคาจาก catalog เฉพาะตอนที่ยังไม่ได้เลือกขนาด (ยกเว้นสินค้าที่มีโปรชุด — ห้ามทับราคาโปร)
+    if (prod && prod.price && !it._variant && !emGetBundleFor(it.name||'', '')) it.price = prod.price;
+    // ราคาโปรชุด: ครบจำนวน → ราคาโปร, ไม่ครบ → ราคาปกติ
+    const _eeBu = emBundleUnitPrice(it.name||'', it._variant||'', it.qty||1, it.price||0);
+    if (_eeBu !== null) it.price = _eeBu;
     const stockNum = prod ? (prod.stock ?? prod.quantity ?? null) : null;
     const stockBadge = stockNum !== null
       ? `<div class="stock-badge-inline" style="font-size:10px;color:${stockNum < 5 ? '#e53935' : '#2e7d32'};margin-top:2px;padding-left:2px;">📦 สต็อก: ${stockNum}</div>`
@@ -2976,7 +2985,7 @@ function renderEnhancedItems(items) {
           ${variantHtml}
           ${stockBadge}
         </div>
-        <input type="number" min="1" value="${it.qty||1}" data-field="qty" oninput="recalcEETotal();updateStockPreview();" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;width:100%;outline:none;">
+        <input type="number" min="1" value="${it.qty||1}" data-field="qty" oninput="emQtyBundleSync(this);recalcEETotal();updateStockPreview();" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;width:100%;outline:none;">
         <input type="number" min="0" step="0.01" value="${it.price||0}" data-field="price" oninput="recalcEETotal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;width:100%;outline:none;">
         <button onclick="removeEnhancedItem(${idx})" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;color:var(--sub);font-size:14px;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)';" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--sub)';">×</button>
       </div>`;
@@ -3000,7 +3009,7 @@ function eeSelectVariant(idx, label, price) {
     };
   });
   if (!items[idx]) return;
-  const baseName = items[idx].name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  const baseName = emStripPromoTag(items[idx].name).replace(/\s*\([^)]*\)\s*$/, '').trim();
   if (items[idx]._variant === label) {
     // deselect
     items[idx]._variant = '';
@@ -3012,6 +3021,9 @@ function eeSelectVariant(idx, label, price) {
     items[idx]._variant = label;
     items[idx].name = baseName + ' (' + label + ')';
     if (price) items[idx].price = price;
+    // โปรชุด: ถ้าจำนวนครบตามโปร ใช้ราคาโปรแทน
+    const _bu = emBundleUnitPrice(items[idx].name, label, items[idx].qty||1, items[idx].price);
+    if (_bu !== null) items[idx].price = _bu;
   }
   renderEnhancedItems(items);
 }
@@ -3127,6 +3139,9 @@ function selectProduct(idx, name, price) {
   items[idx].name = name;
   items[idx].price = price;
   items[idx]._variant = '';
+  // โปรชุด: ถ้าจำนวนครบตามโปร ใช้ราคาโปรแทน
+  const _bu = emBundleUnitPrice(name, '', items[idx].qty||1, price);
+  if (_bu !== null) items[idx].price = _bu;
   renderEnhancedItems(items);
   // focus qty
   const newRows = document.querySelectorAll('#eeItemsList .enhanced-item-row');
@@ -3212,11 +3227,11 @@ function updateStockPreview() {
 }
 
 function calcStockDiff(originalItems, newItems) {
-  // Build qty maps
+  // Build qty maps (ตัดหางโปร 🎁 ออกก่อนเทียบ — ชื่อมี/ไม่มีหางโปรคือสินค้าเดียวกัน)
   const origMap = {};
-  originalItems.forEach(i => { origMap[i.name] = (origMap[i.name]||0) + (i.qty||1); });
+  originalItems.forEach(i => { const k = emStripPromoTag(i.name); origMap[k] = (origMap[k]||0) + (i.qty||1); });
   const newMap = {};
-  newItems.forEach(i => { newMap[i.name] = (newMap[i.name]||0) + (i.qty||1); });
+  newItems.forEach(i => { const k = emStripPromoTag(i.name); newMap[k] = (newMap[k]||0) + (i.qty||1); });
 
   const allNames = new Set([...Object.keys(origMap), ...Object.keys(newMap)]);
   const diffs = [];
@@ -3748,14 +3763,15 @@ function openEditModal(orderId) {
   selectEditPayment(o.payment_method || '');
   _emOpenItems = (o.items || []).map(it => {
     // จำขนาด/ราคาที่ลูกค้าเคยเลือกไว้ จากชื่อสินค้ารูปแบบ "ชื่อ (ขนาด)" ไม่ต้องกดเลือกซ้ำ
-    const m = (it.name || '').match(/\(([^)]+)\)\s*$/);
+    // (ตัดหางโปร 🎁 ออกก่อน ไม่งั้นจับขนาดไม่เจอ)
+    const m = emStripPromoTag(it.name).match(/\(([^)]+)\)\s*$/);
     return { ...it, _variant: m ? m[1] : '', _sizes: [] };
   });
 
   function _enrichAndRender() {
     _emOpenItems.forEach(it => {
       if (it._sizes && it._sizes.length) return;
-      const baseName = (it.name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+      const baseName = emStripPromoTag(it.name || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
       const key = _emSizesCache[baseName] ? baseName : (_emSizesCache[it.name] ? it.name : null);
       if (key) {
         try {
@@ -3805,6 +3821,73 @@ function emParseSizes(s) {
   return [];
 }
 
+// ── โปรชุด (Bundle) helpers: อ่าน bundle:{q,price} จาก sizes หน้าร้าน ──
+function emStripPromoTag(name) {
+  // ตัดหางโปรที่ระบบหน้าร้านต่อท้ายชื่อ เช่น " 🎁 โปรชุด 2 ชิ้น"
+  return (name || '').replace(/\s*🎁.*$/, '').trim();
+}
+function emGetBundleFor(name, variantLabel) {
+  // คืน { q, price, normal } ถ้าสินค้า/ขนาดนั้นมีโปรชุด, ไม่มี → null
+  const clean = emStripPromoTag(name);
+  const baseName = clean.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  let sizesVal = null;
+  for (const k of [baseName, clean]) {
+    if (k && _emSizesCache[k]) { sizesVal = _emSizesCache[k]; break; }
+  }
+  let prod = null;
+  if (allProducts.length) prod = findProduct(baseName) || findProduct(clean);
+  if (!sizesVal && prod) {
+    sizesVal = prod.sizes ?? prod.variants ?? prod.size_options ?? prod.options ?? prod.product_sizes ?? null;
+  }
+  // 1) bundle ระดับขนาด (sizes)
+  if (sizesVal) {
+    try {
+      const s = typeof sizesVal === 'string' ? JSON.parse(sizesVal) : sizesVal;
+      const arr = Array.isArray(s)
+        ? s
+        : Object.entries(s).map(([k, v]) => (typeof v === 'object' && v !== null) ? { ...v, n: k } : { n: k, p: parseFloat(v) || 0 });
+      let hit = null;
+      if (variantLabel) {
+        hit = arr.find(v => typeof v === 'object' && v &&
+          String(v.label ?? v.name ?? v.n ?? v.size ?? v.ขนาด ?? '') === String(variantLabel));
+      }
+      if (!hit && arr.length === 1) hit = arr[0];
+      if (hit && typeof hit === 'object' && hit.bundle) {
+        const bq = parseInt(hit.bundle.q ?? hit.bundle.qty ?? 0);
+        const bp = parseFloat(hit.bundle.price ?? hit.bundle.p ?? 0);
+        if (bq >= 2 && bp > 0) {
+          const normal = parseFloat(hit.price ?? hit.p ?? hit.ราคา ?? 0) || (prod ? prod.price : 0) || 0;
+          return { q: bq, price: bp, normal };
+        }
+      }
+    } catch (e) {}
+  }
+  // 2) bundle ระดับสินค้า
+  if (prod && prod.bundle) {
+    const bq = parseInt(prod.bundle.q ?? prod.bundle.qty ?? 0);
+    const bp = parseFloat(prod.bundle.price ?? prod.bundle.p ?? 0);
+    if (bq >= 2 && bp > 0) return { q: bq, price: bp, normal: prod.price || 0 };
+  }
+  return null;
+}
+function emBundleUnitPrice(name, variantLabel, qty, basePrice) {
+  // คืนราคา/ชิ้นตามโปรชุด: ครบจำนวน → ราคาโปร, ไม่ครบ → ราคาปกติ | null = ไม่มีโปร (ไม่แตะราคา)
+  const b = emGetBundleFor(name, variantLabel);
+  if (!b) return null;
+  return (qty >= b.q) ? b.price : (b.normal || basePrice);
+}
+function emQtyBundleSync(inputEl) {
+  // เรียกตอนแก้จำนวน: ถ้าสินค้ามีโปรชุด ปรับราคา/ชิ้นในช่องให้อัตโนมัติ
+  const row = inputEl.closest('.enhanced-item-row, .em-item-row');
+  if (!row) return;
+  const nameInput = row.querySelector('[data-field="name"]');
+  const priceInput = row.querySelector('[data-field="price"]');
+  if (!nameInput || !priceInput) return;
+  const qty = parseInt(inputEl.value) || 1;
+  const bu = emBundleUnitPrice(nameInput.value.trim(), nameInput.dataset.variant || '', qty, parseFloat(priceInput.value) || 0);
+  if (bu !== null) priceInput.value = bu;
+}
+
 function emGetSizesFromProd(prod) {
   if (!prod) return [];
   // Try every possible location for sizes data
@@ -3831,7 +3914,10 @@ function renderEditItems(items) {
     // หา sizes: cache → allProducts → _sizes
     let sizes = [];
     const _itName = it.name || '';
-    const _baseName = _itName.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    const _baseName = emStripPromoTag(_itName).replace(/\s*\([^)]*\)\s*$/, '').trim();
+    // ราคาโปรชุด: ครบจำนวน → ราคาโปร, ไม่ครบ → ราคาปกติ
+    const _emBu = emBundleUnitPrice(_itName, it._variant||'', it.qty||1, it.price||0);
+    if (_emBu !== null) it.price = _emBu;
     // 1. cache
     for (const _k of [_baseName, _itName]) {
       if (_emSizesCache[_k]) {
@@ -3881,7 +3967,7 @@ function renderEditItems(items) {
         </div>
         ${variantHtml}
       </div>
-      <input type="number" min="1" value="${it.qty||1}" data-field="qty" oninput="recalcTotal()">
+      <input type="number" min="1" value="${it.qty||1}" data-field="qty" oninput="emQtyBundleSync(this);recalcTotal()">
       <input type="number" min="0" step="0.01" value="${it.price||0}" data-field="price" oninput="recalcTotal()">
       <button class="item-del" onclick="removeOrderItem(${idx})">×</button>
     </div>`;
@@ -4006,6 +4092,9 @@ function emSelectProduct(idx, name, price) {
   items[idx].price    = price;
   items[idx]._variant = '';
   items[idx]._sizes   = _directSizes; // ส่ง sizes โดยตรง ไม่ต้องรอ allProducts
+  // โปรชุด: ถ้าจำนวนครบตามโปร ใช้ราคาโปรแทน
+  const _bu = emBundleUnitPrice(name, '', items[idx].qty||1, price);
+  if (_bu !== null) items[idx].price = _bu;
   renderEditItems(items);
   const newRows = document.querySelectorAll('#emItemsList .em-item-row');
   if (newRows[idx]) newRows[idx].querySelector('[data-field="qty"]').focus();
@@ -4014,8 +4103,8 @@ function emSelectProduct(idx, name, price) {
 function emSelectVariant(idx, label, price) {
   const items = getCurrentItems();
   if (!items[idx]) return;
-  // always strip trailing (size) to get base name
-  const baseName = items[idx].name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+  // always strip trailing (size) to get base name (ตัดหางโปร 🎁 ด้วย)
+  const baseName = emStripPromoTag(items[idx].name).replace(/\s*\([^)]*\)\s*$/, '').trim();
   // toggle: if same label → deselect
   if (items[idx]._variant === label) {
     items[idx]._variant = '';
@@ -4027,6 +4116,9 @@ function emSelectVariant(idx, label, price) {
     items[idx]._variant = label;
     items[idx].name = `${baseName} (${label})`;
     if (price) items[idx].price = price;
+    // โปรชุด: ถ้าจำนวนครบตามโปร ใช้ราคาโปรแทน
+    const _bu = emBundleUnitPrice(items[idx].name, label, items[idx].qty||1, items[idx].price);
+    if (_bu !== null) items[idx].price = _bu;
   }
   renderEditItems(items);
 }
