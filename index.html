@@ -199,12 +199,14 @@ header::after{
 .stat-card.blue::before{background:linear-gradient(90deg,#1D4ED8,#60A5FA)}
 .stat-card.green::before{background:linear-gradient(90deg,#15803D,#4ADE80)}
 .stat-card.teal::before{background:linear-gradient(90deg,#0F766E,#2DD4BF)}
+.stat-card.purple::before{background:linear-gradient(90deg,#6D28D9,#A78BFA)}
 .stat-num{font-family:var(--font-display);font-size:28px;font-weight:700;line-height:1.1;margin-bottom:5px;letter-spacing:.2px;font-variant-numeric:tabular-nums}
 .stat-card.red .stat-num{color:var(--red-600)}
 .stat-card.orange .stat-num{color:var(--amber)}
 .stat-card.blue .stat-num{color:var(--blue)}
 .stat-card.green .stat-num{color:var(--green)}
 .stat-card.teal .stat-num{color:#0F766E}
+.stat-card.purple .stat-num{color:#6D28D9}
 .stat-label{font-size:10.5px;color:var(--text-3);font-weight:700;text-transform:uppercase;letter-spacing:.8px}
 
 /* ════════ FILTER BAR ════════ */
@@ -978,6 +980,7 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
     <div class="stat-card red clickable" onclick="statCardClick('all')" title="ดูออเดอร์ทั้งหมด"><div class="stat-num" id="stat-total">—</div><div class="stat-label">ออเดอร์ทั้งหมด</div></div>
     <div class="stat-card orange clickable" onclick="statCardClick('pending')" title="ดูออเดอร์ที่รอดำเนินการ"><div class="stat-num" id="stat-pending">—</div><div class="stat-label">รอดำเนินการ</div></div>
     <div class="stat-card blue clickable" onclick="statCardClick('confirmed')" title="ดูออเดอร์ที่ยืนยันแล้ว"><div class="stat-num" id="stat-confirmed">—</div><div class="stat-label">ยืนยันแล้ว</div></div>
+    <div class="stat-card purple clickable" onclick="statCardClick('shipped')" title="ดูออเดอร์ที่กำลังจัดส่ง"><div class="stat-num" id="stat-shipped">—</div><div class="stat-label">🚚 กำลังจัดส่ง</div></div>
     <div class="stat-card teal clickable" onclick="statCardClick('done')" title="ดูออเดอร์ที่เสร็จสิ้น"><div class="stat-num" id="stat-done">—</div><div class="stat-label">เสร็จสิ้น</div></div>
     <div class="stat-card green clickable" onclick="statCardClick('all')" title="ดูออเดอร์ทั้งหมด"><div class="stat-num" id="stat-revenue">—</div><div class="stat-label">รายได้รวม (฿)</div></div>
   </div>
@@ -1314,6 +1317,9 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
     <div id="admin-sales-map" style="height:320px;border-radius:10px;overflow:hidden;"></div>
   </div>
 
+  <!-- ไทม์ไลน์การวิ่งของเซล (วันนี้) -->
+  <div id="sales-timeline-wrap" style="margin-bottom:16px;"></div>
+
   <!-- Sales list -->
   <div id="sales-list-wrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">
     <div style="text-align:center;padding:40px;color:var(--sub);grid-column:1/-1;">กด "โหลดใหม่" เพื่อดูข้อมูลเซล</div>
@@ -1394,6 +1400,9 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
   <!-- Sales online list -->
   <div id="gps-sales-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;"></div>
 
+  <!-- ไทม์ไลน์การวิ่งของเซล (วันนี้) -->
+  <div id="gps-timeline-wrap" style="margin-top:16px;"></div>
+
 </div><!-- /page-6 -->
 
 <!-- Modal: แอดมินปักหมุดลูกค้า (จากหน้า GPS เซล) -->
@@ -1471,6 +1480,9 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
   <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;">
     <div id="route-main-map" style="height:460px;"></div>
   </div>
+
+  <!-- ไทม์ไลน์การวิ่งของเซล (ตามวันที่เลือกด้านบน) -->
+  <div id="route-timeline-wrap" style="margin-bottom:16px;"></div>
 
   <!-- Legend + Stats -->
   <div id="route-legend-wrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;"></div>
@@ -2466,13 +2478,16 @@ function renderStats(orders) {
   const real = orders.filter(o => !isGhostOrder(o));
   const total     = real.length;
   const pending   = real.filter(o => normalizeStatus(o.status) === 'pending').length;
-  const confirmed = real.filter(o => ['confirmed','shipped'].includes(normalizeStatus(o.status))).length;
+  const confirmed = real.filter(o => normalizeStatus(o.status) === 'confirmed').length;
+  const shipped   = real.filter(o => normalizeStatus(o.status) === 'shipped').length;
   const done      = real.filter(o => normalizeStatus(o.status) === 'done').length;
   const revenue   = real.filter(o => normalizeStatus(o.status) !== 'cancelled')
                         .reduce((s, o) => s + (o.total || 0), 0);
   document.getElementById('stat-total').textContent     = total;
   document.getElementById('stat-pending').textContent   = pending;
   document.getElementById('stat-confirmed').textContent = confirmed;
+  const _shipEl = document.getElementById('stat-shipped');
+  if (_shipEl) _shipEl.textContent = shipped;
   document.getElementById('stat-done').textContent      = done;
   document.getElementById('stat-revenue').textContent   = revenue.toLocaleString();
 }
@@ -5458,10 +5473,15 @@ async function adminDrawRoadRoute(map, points, color, key) {
     const data = await res.json();
     if (!data.routes || !data.routes[0]) return;
     if (_adminRoadLayers[key]) { try { map.removeLayer(_adminRoadLayers[key]); } catch(_){} }
-    _adminRoadLayers[key] = L.geoJSON(data.routes[0].geometry, {
-      style: { color, weight: 4, opacity: .85 }
-    }).addTo(map);
+    _adminRoadLayers[key] = _makeSharpRouteLayer(data.routes[0].geometry, color).addTo(map);
   } catch(_) {}
+}
+
+// ── เส้นทางแบบ "คม": เส้นขอบขาวด้านล่าง + เส้นสีทึบด้านบน มุมโค้งมน อ่านง่ายทุกพื้นหลัง (ปกติ/ดาวเทียม) ──
+function _makeSharpRouteLayer(geometry, color) {
+  const casing = L.geoJSON(geometry, { style: { color:'#ffffff', weight:8, opacity:.95, lineJoin:'round', lineCap:'round' } });
+  const line   = L.geoJSON(geometry, { style: { color, weight:4.5, opacity:1, lineJoin:'round', lineCap:'round' } });
+  return L.layerGroup([casing, line]);
 }
 
 async function adminDrawRoadRouteFromPins(map, pins, color, key) {
@@ -5474,13 +5494,70 @@ async function adminDrawRoadRouteFromPins(map, pins, color, key) {
     const data = await res.json();
     if (!data.routes || !data.routes[0]) return;
     if (_adminRoadLayers[key]) { try { map.removeLayer(_adminRoadLayers[key]); } catch(_){} }
-    _adminRoadLayers[key] = L.geoJSON(data.routes[0].geometry, {
-      style: { color, weight: 4, opacity: .85 }
-    }).addTo(map);
+    _adminRoadLayers[key] = _makeSharpRouteLayer(data.routes[0].geometry, color).addTo(map);
   } catch(_) {}
+}
+
+// ── ตัวกรองสัญญาณ GPS กระตุก/ลอย (jitter filter) ──────────────────
+// ปัญหา: มือถือวางนิ่ง ๆ แต่พิกัด GPS แกว่งไปมา ทำให้เส้น/หมุดเดินทั่วแผนที่
+// วิธีแก้ฝั่งแอดมิน: ตัดจุดที่ขยับ < 18 ม. จากจุดล่าสุดทิ้ง (ถือว่าอยู่กับที่)
+// และตัดจุดหลุด (ความเร็วที่คำนวณได้ > 45 ม./วิ ≈ 160 กม./ชม. = สัญญาณเพี้ยน)
+// รวมถึงตัดจุดที่ค่าความแม่นยำ (accuracy) แย่กว่า 35 ม. ทิ้ง ถ้าฐานข้อมูลมีคอลัมน์นี้
+function _gpsAccuracyOk(row, maxM) {
+  const a = parseFloat(row && (row.accuracy ?? row.acc));
+  return !isFinite(a) || a <= (maxM || 35);
+}
+function _distMeters(lat1, lng1, lat2, lng2) {
+  const R = 6371000, toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+// ── อ่านเวลาให้ถูกโซน: ถ้าเวลาจากฐานข้อมูลไม่มี timezone ติดมา (เช่น "2026-07-11 02:03:00")
+//    ให้ถือว่าเป็น UTC แล้วแปลงเป็นเวลาไทยอัตโนมัติ — แก้ปัญหาเวลาเพี้ยน ±7 ชม. ──
+function _parseDbTime(iso) {
+  if (!iso) return new Date(NaN);
+  if (iso instanceof Date) return iso;
+  const s = String(iso).trim();
+  if (!/([zZ]|[+\-]\d{2}:?\d{2})$/.test(s)) {
+    return new Date(s.replace(' ', 'T') + 'Z');
+  }
+  return new Date(s);
+}
+function filterGpsJitter(rows) {
+  if (!Array.isArray(rows) || rows.length < 2) return rows || [];
+  const out = [rows[0]];
+  for (let i = 1; i < rows.length; i++) {
+    const prev = out[out.length - 1], cur = rows[i];
+    const pLat = parseFloat(prev.lat), pLng = parseFloat(prev.lng);
+    const cLat = parseFloat(cur.lat),  cLng = parseFloat(cur.lng);
+    if (!isFinite(cLat) || !isFinite(cLng)) continue;
+    if (!_gpsAccuracyOk(cur)) continue; // สัญญาณแม่นยำต่ำ ตัดทิ้ง
+    const d  = _distMeters(pLat, pLng, cLat, cLng);
+    if (d < 18) continue; // อยู่กับที่ — จุดแกว่งจาก GPS jitter ตัดทิ้ง
+    const dt = (_parseDbTime(cur.recorded_at || cur.updated_at || 0) - _parseDbTime(prev.recorded_at || prev.updated_at || 0)) / 1000;
+    if (dt > 0 && d / dt > 45) continue; // จุดหลุด/วาป ตัดทิ้ง
+    out.push(cur);
+  }
+  return out;
 }
 // ─────────────────────────────────────────────────────────────────
 const SALES_COLORS  = ['#C0392B','#2980b9','#27ae60','#8e44ad','#e67e22','#16a085','#d35400','#1abc9c','#2c3e50','#7f8c8d'];
+
+// ── รูปแบบวันที่/เวลาแบบไทย (พ.ศ.) เช่น "11/07/2569 14:09" ──
+function fmtThaiDT(iso) {
+  if (!iso) return '';
+  const d = _parseDbTime(iso);
+  if (isNaN(d)) return '';
+  return d.toLocaleDateString('th-TH', { day:'2-digit', month:'2-digit', year:'numeric' })
+    + ' ' + d.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' }) + ' น.';
+}
+function fmtThaiTime(iso) {
+  if (!iso) return '';
+  const d = _parseDbTime(iso);
+  if (isNaN(d)) return '';
+  return d.toLocaleTimeString('th-TH', { hour:'2-digit', minute:'2-digit' });
+}
 // รูปแบบเลื่อนตำแหน่ง popup แบบวนซ้ำ เพื่อลดการซ้อนทับกันเมื่อเปิดหลายจุดพร้อมกัน
 const PIN_POPUP_OFFSETS = [[0,-6],[52,-16],[-52,-16],[26,34],[-26,34],[0,-46],[70,18],[-70,18],[36,-40],[-36,-40],[80,-30],[-80,-30],[0,50],[52,50],[-52,50]];
 
@@ -5784,7 +5861,7 @@ function renderAdminSalesMap() {
 
     pins.forEach(p => {
       const icons = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
-      const buildPopup1 = (addr) => `<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b><br><small style="color:${color};font-weight:700;font-size:10px;">💼 ${s.name}</small>${p.phone?`<br><span style="font-size:10px;color:#666;">📞 ${p.phone}</span>`:''}${addr?`<br><span style="font-size:9px;color:#999;">📍 ${addr}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`;
+      const buildPopup1 = (addr) => `<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b><br><small style="color:${color};font-weight:700;font-size:10px;">💼 ${s.name}</small>${p.phone?`<br><span style="font-size:10px;color:#666;">📞 ${p.phone}</span>`:''}${p.createdAt?`<br><span style="font-size:9px;color:#888;">🕒 ปักเมื่อ ${fmtThaiDT(p.createdAt)}</span>`:''}${addr?`<br><span style="font-size:9px;color:#999;">📍 ${addr}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`;
       const _mk1 = L.marker([p.lat,p.lng], {
         icon: L.divIcon({
           html: `<div style="width:22px;height:22px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;">${icons[p.type]||'📍'}</div>`,
@@ -5854,8 +5931,8 @@ function openSalesDetail(salesId, focusSection, showOrders) {
       (buyers.map(b => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f9f9f9;border-radius:8px;margin-bottom:6px;font-size:13px;"><span style="font-weight:600;">${escapeHtml(b.name)}</span><span style="text-align:right;"><span style="font-weight:700;color:${color};">฿${b.total.toLocaleString()}</span><span style="color:var(--sub);font-size:11px;margin-left:6px;">(${b.count} ออเดอร์)</span></span></div>`).join('')||'<div style="color:var(--sub);font-size:13px;padding:8px 0;">ยังไม่มีลูกค้าซื้อ</div>');
   }
 
-  document.getElementById('sd-customers').innerHTML = `<h4 id="sd-customers-hdr" style="font-size:14px;font-weight:700;margin-bottom:8px;">📍 ลูกค้าที่ปักหมุด (${pins.length} คน)</h4>` +
-    (pins.slice(0,15).map((p,i)=>{const ic={shop:'🏪',home:'🏠',business:'🏢',other:'📍'};return `<div onclick="openCustDetail('${salesId}',${i})" style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:#f9f9f9;border-radius:8px;margin-bottom:6px;font-size:13px;cursor:pointer;"><span>${ic[p.type]||'📍'}</span><span style="flex:1;font-weight:600;">${p.name}</span>${p.phone?`<span style="color:${color};font-size:12px;">📞 ${p.phone}</span>`:''}<span style="color:#ccc;font-size:14px;">›</span></div>`;}).join('')||'<div style="color:var(--sub);font-size:13px;padding:8px 0;">ยังไม่มีหมุด</div>');
+  _sdPinState = { salesId, color, mode:'all', date:'', month:'' };
+  renderSdPinList();
 
   document.getElementById('sales-detail-modal').style.display = 'block';
 
@@ -5882,7 +5959,7 @@ function openSalesDetail(salesId, focusSection, showOrders) {
     let _pinN2 = 0;
     pins.forEach(p=>{
       const ic={shop:'🏪',home:'🏠',business:'🏢',other:'📍'};
-      const buildPopup2 = (addr) => `<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b>${p.phone?'<br><span style="font-size:10px;">📞 '+p.phone+'</span>':''}${addr?`<br><span style="font-size:9px;color:#999;">📍 ${addr}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`;
+      const buildPopup2 = (addr) => `<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b>${p.phone?'<br><span style="font-size:10px;">📞 '+p.phone+'</span>':''}${p.createdAt?`<br><span style="font-size:9px;color:#888;">🕒 ปักเมื่อ ${fmtThaiDT(p.createdAt)}</span>`:''}${addr?`<br><span style="font-size:9px;color:#999;">📍 ${addr}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`;
       const _mk2 = L.marker([p.lat,p.lng],{icon:L.divIcon({html:`<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;">${ic[p.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''})}).addTo(sdMap).bindPopup(buildPopup2(''), {autoClose:false, closeOnClick:false, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN2 % PIN_POPUP_OFFSETS.length]});
       _pinN2++;
       _mk2.openPopup();
@@ -5896,6 +5973,91 @@ function openSalesDetail(salesId, focusSection, showOrders) {
 }
 
 function closeSalesDetail() { document.getElementById('sales-detail-modal').style.display='none'; }
+
+// ── รายชื่อหมุดใน modal รายละเอียดเซล + ตัวกรองแบบปฏิทิน + เวลาที่ปัก ──
+let _sdPinState = { salesId:'', color:'#C0392B', mode:'all', date:'', month:'' };
+
+function setSdPinMode(mode, val) {
+  _sdPinState.mode = mode;
+  if (mode === 'date')  { _sdPinState.date = val || ''; _sdPinState.month = ''; if (!val) _sdPinState.mode = 'all'; }
+  else if (mode === 'month') { _sdPinState.month = val || ''; _sdPinState.date = ''; if (!val) _sdPinState.mode = 'all'; }
+  else { _sdPinState.date = ''; _sdPinState.month = ''; }
+  renderSdPinList();
+}
+
+function _sdPinMatches(p) {
+  const { mode, date, month } = _sdPinState;
+  if (mode === 'all') return true;
+  if (!p.createdAt) return false;
+  const dt = _parseDbTime(p.createdAt);
+  if (isNaN(dt)) return false;
+  const dayKey = dt.toLocaleDateString('en-CA'); // YYYY-MM-DD ตามเวลาท้องถิ่น
+  if (mode === 'today')     return dayKey === new Date().toLocaleDateString('en-CA');
+  if (mode === 'yesterday') return dayKey === new Date(Date.now() - 86400000).toLocaleDateString('en-CA');
+  if (mode === '7d')        return dt.getTime() >= (new Date(new Date().toLocaleDateString('en-CA') + 'T00:00:00').getTime() - 6*86400000);
+  if (mode === 'date')      return dayKey === date;
+  if (mode === 'month')     return dayKey.slice(0,7) === month;
+  return true;
+}
+
+function _sdPinFilterLabel() {
+  const { mode, date, month } = _sdPinState;
+  if (mode === 'today') return 'วันนี้';
+  if (mode === 'yesterday') return 'เมื่อวาน';
+  if (mode === '7d') return '7 วันล่าสุด';
+  if (mode === 'date' && date) {
+    const d = new Date(date + 'T00:00:00');
+    return d.toLocaleDateString('th-TH', { day:'numeric', month:'short', year:'numeric' });
+  }
+  if (mode === 'month' && month) {
+    const d = new Date(month + '-01T00:00:00');
+    return d.toLocaleDateString('th-TH', { month:'long', year:'numeric' });
+  }
+  return '';
+}
+
+function renderSdPinList() {
+  const box = document.getElementById('sd-customers');
+  if (!box) return;
+  const { salesId, color, mode, date, month } = _sdPinState;
+  // ใช้ cache ตรง ๆ เพื่อให้เห็นหมุดทั้งหมด (ไม่โดน filter วันของหน้าเส้นทางเซล)
+  const allPins = (_pinsCache[salesId] || []);
+  const pins = allPins.filter(_sdPinMatches);
+
+  const chip = (key, label) => {
+    const active = mode === key;
+    return `<button onclick="setSdPinMode('${key}')" style="padding:5px 12px;border-radius:20px;border:1.5px solid ${color};background:${active?color:'#fff'};color:${active?'#fff':color};font-family:'Sarabun',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">${label}</button>`;
+  };
+  const pickStyle = `padding:5px 8px;border:1.5px solid ${color}55;border-radius:10px;font-size:12px;font-family:'Sarabun',sans-serif;background:#fff;color:#333;outline:none;cursor:pointer;`;
+  const filterLbl = _sdPinFilterLabel();
+
+  const ic = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
+  const listHtml = pins.map(p => {
+    const i = allPins.indexOf(p); // index จริงใน cache
+    return `<div onclick="openCustDetailFromCache('${salesId}',${i})" style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:#f9f9f9;border-radius:8px;margin-bottom:6px;font-size:13px;cursor:pointer;">
+      <span>${ic[p.type]||'📍'}</span>
+      <span style="flex:1;min-width:0;">
+        <span style="font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</span>
+        ${p.createdAt?`<span style="font-size:10px;color:#888;">🕒 ปักเมื่อ ${fmtThaiDT(p.createdAt)}</span>`:''}
+      </span>
+      ${p.phone?`<span style="color:${color};font-size:12px;flex-shrink:0;">📞 ${p.phone}</span>`:''}
+      <span style="color:#ccc;font-size:14px;">›</span>
+    </div>`;
+  }).join('');
+
+  box.innerHTML = `
+    <h4 id="sd-customers-hdr" style="font-size:14px;font-weight:700;margin-bottom:8px;">📍 ลูกค้าที่ปักหมุด (${pins.length}${mode!=='all'?`/${allPins.length}`:''} คน)${filterLbl?` <span style="font-size:11px;color:${color};font-weight:700;">· ${filterLbl}</span>`:''}</h4>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+      <span style="font-size:11px;font-weight:700;color:var(--sub);">📅 กรองวันที่ปัก:</span>
+      ${chip('all','ทั้งหมด')}
+      ${chip('today','วันนี้')}
+      ${chip('yesterday','เมื่อวาน')}
+      ${chip('7d','7 วันล่าสุด')}
+      <input type="date" value="${mode==='date'?date:''}" onchange="setSdPinMode('date',this.value)" title="เลือกวันจากปฏิทิน" style="${pickStyle}${mode==='date'?`box-shadow:0 0 0 2px ${color}44;`:''}">
+      <input type="month" value="${mode==='month'?month:''}" onchange="setSdPinMode('month',this.value)" title="เลือกทั้งเดือน" style="${pickStyle}${mode==='month'?`box-shadow:0 0 0 2px ${color}44;`:''}">
+    </div>
+    ${listHtml || '<div style="color:var(--sub);font-size:13px;padding:8px 0;">'+(mode!=='all'?'ไม่มีหมุดในช่วงที่เลือก':'ยังไม่มีหมุด')+'</div>'}`;
+}
 
 function openEditSalesById(salesId) {
   const s = allSalesStaff.find(x => (x.salesId||x.id) === salesId);
@@ -6059,7 +6221,8 @@ function renderGpsMap(locations, routes) {
     const color = SALES_COLORS[idx % SALES_COLORS.length];
     const sid   = s.salesId || s.id || '';
     const loc   = Array.isArray(locations) ? locations.find(l => l.sales_id === sid) : null;
-    const myRoutes = Array.isArray(routes) ? routes.filter(r => r.sales_id === sid) : [];
+    const myRoutesRaw = Array.isArray(routes) ? routes.filter(r => r.sales_id === sid) : [];
+    const myRoutes = filterGpsJitter(myRoutesRaw); // กรองจุดแกว่ง/จุดวาปออกก่อนวาดเส้น
 
     const isOnline = loc && (Date.now() - new Date(loc.updated_at).getTime()) < 3 * 60 * 1000; // online ถ้าอัปเดตใน 3 นาที
 
@@ -6083,6 +6246,7 @@ function renderGpsMap(locations, routes) {
     // marker ตำแหน่งปัจจุบัน
     if (loc && loc.lat) {
       const lat = parseFloat(loc.lat), lng = parseFloat(loc.lng);
+      const locAcc = parseFloat(loc.accuracy);
       const timeAgo = getTimeAgo(loc.updated_at);
       const _todayStr = new Date().toLocaleDateString('en-CA');
       const pinsToday = getSalesPins(sid).filter(p => p.createdAt && new Date(p.createdAt).toLocaleDateString('en-CA') === _todayStr).length;
@@ -6090,6 +6254,7 @@ function renderGpsMap(locations, routes) {
         <div style="font-size:14px;font-weight:700;color:${color};">💼 ${s.name}</div>
         <div style="font-size:12px;color:#666;margin-top:3px;">รหัส: ${sid}</div>
         <div style="font-size:11px;color:${isOnline?'#27ae60':'#e74c3c'};margin-top:3px;">${isOnline?'🟢 ออนไลน์':'⚫ ออฟไลน์'} · ${timeAgo}</div>
+        ${isFinite(locAcc)&&locAcc>0?`<div style="font-size:11px;color:${locAcc<=25?'#27ae60':locAcc<=60?'#e67e22':'#e74c3c'};margin-top:2px;">🎯 ความแม่นยำ ~${Math.round(locAcc)} ม.</div>`:''}
         ${addr?`<div style="font-size:10px;color:#999;margin-top:2px;">📍 ${addr}</div>`:''}
         <div style="font-size:11px;color:#888;margin-top:2px;">จุด GPS วันนี้: ${myRoutes.length} จุด</div>
         <div style="font-size:11px;color:#888;margin-top:1px;">🚩 ปักหมุดลูกค้าวันนี้: ${pinsToday} จุด</div>
@@ -6097,7 +6262,11 @@ function renderGpsMap(locations, routes) {
       const popupHtml = buildGpsPopup('');
 
       if (gpsMarkers[sid]) {
-        gpsMarkers[sid].setLatLng([lat, lng]);
+        // กันหมุด "วาปไปวาปมา" ตอนมือถือวางนิ่ง: ขยับหมุดเฉพาะเมื่อเคลื่อนที่จริง > 20 ม.
+        const _prevLL = gpsMarkers[sid].getLatLng();
+        if (_distMeters(_prevLL.lat, _prevLL.lng, lat, lng) > 20) {
+          gpsMarkers[sid].setLatLng([lat, lng]);
+        }
         gpsMarkers[sid].setPopupContent(popupHtml);
         reverseGeocodeTH(lat, lng).then(addr => { if (addr) gpsMarkers[sid].setPopupContent(buildGpsPopup(addr)); });
       } else {
@@ -6123,6 +6292,23 @@ function renderGpsMap(locations, routes) {
         reverseGeocodeTH(lat, lng).then(addr => { if (addr) gpsMarkers[sid].setPopupContent(buildGpsPopup(addr)); });
       }
       allBounds.push([lat, lng]);
+
+      // วงกลมรัศมีความแม่นยำรอบหมุด (ยิ่งเล็ก = ยิ่งแม่น) — อัปเดตตำแหน่ง/ขนาดตามข้อมูลล่าสุด
+      window._gpsAccCircles = window._gpsAccCircles || {};
+      if (isFinite(locAcc) && locAcc > 0 && locAcc <= 150) {
+        if (window._gpsAccCircles[sid]) {
+          window._gpsAccCircles[sid].setLatLng([lat, lng]);
+          window._gpsAccCircles[sid].setRadius(locAcc);
+        } else {
+          window._gpsAccCircles[sid] = L.circle([lat, lng], {
+            radius: locAcc, color, weight: 1, opacity: .5,
+            fillColor: color, fillOpacity: .07, interactive: false
+          }).addTo(gpsAdminMap);
+        }
+      } else if (window._gpsAccCircles && window._gpsAccCircles[sid]) {
+        try { gpsAdminMap.removeLayer(window._gpsAccCircles[sid]); } catch(_){}
+        delete window._gpsAccCircles[sid];
+      }
     }
   });
 
@@ -6398,6 +6584,13 @@ function renderRouteMap(filter) {
     obj.markers.forEach(m => routeMainMap.removeLayer(m));
   });
   routeLayersMap = {};
+  // ลบเส้นถนน (OSRM) เดิมของทุกเซลด้วย — กันเส้นของเซลอื่นค้างบนแผนที่ตอนกดกรองดูทีละคน
+  Object.keys(_adminRoadLayers).forEach(k => {
+    if (k.startsWith('route_')) {
+      try { routeMainMap.removeLayer(_adminRoadLayers[k]); } catch(_){}
+      delete _adminRoadLayers[k];
+    }
+  });
 
   const allBounds = [];
   const typeIcons = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
@@ -6447,6 +6640,7 @@ function renderRouteMap(filter) {
             <div style="font-size:12px;font-weight:700;">${icon} ${p.name}</div>
             <div style="font-size:10px;color:${color};font-weight:700;">💼 ${s.name}</div>
             ${p.phone?`<div style="font-size:10px;color:#666;">📞 ${p.phone}</div>`:''}
+            ${p.createdAt?`<div style="font-size:9px;color:#888;">🕒 ปักเมื่อ ${fmtThaiDT(p.createdAt)}</div>`:''}
             ${addr?`<div style="font-size:9px;color:#999;">📍 ${addr}</div>`:''}
             ${p.photo_url?`<img src="${p.photo_url}" onclick="event.stopPropagation();openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:60px;object-fit:cover;border-radius:6px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">` : ''}
             <div style="font-size:9px;color:${color};font-weight:700;margin-top:3px;">จุดที่ ${pidx+1}/${pins.length} · แตะดูรายละเอียด ›</div>
@@ -6522,12 +6716,18 @@ function renderRouteLegend() {
 // ─── Customer Detail Modal ────────────────────────────
 let _cdmMap = null;
 
+// เปิด modal ลูกค้าโดยใช้ index จาก cache เต็ม (เรียกจากลิสต์หมุดใน modal รายละเอียดเซล)
+function openCustDetailFromCache(salesId, pinIdx) {
+  window._custDetailUseCache = true;
+  try { openCustDetail(salesId, pinIdx); } finally { window._custDetailUseCache = false; }
+}
+
 function openCustDetail(salesId, pinIdx) {
   const s   = allSalesStaff.find(x => (x.salesId||x.id) === salesId);
   if (!s) return;
   const idx  = allSalesStaff.indexOf(s);
   const color = SALES_COLORS[idx % SALES_COLORS.length];
-  const pins  = getSalesPins(salesId);
+  const pins  = window._custDetailUseCache ? (_pinsCache[salesId] || []) : getSalesPins(salesId);
   const p     = pins[pinIdx];
   if (!p) return;
 
@@ -6540,7 +6740,7 @@ function openCustDetail(salesId, pinIdx) {
   document.getElementById('cdm-sales').textContent = '💼 เซล: ' + s.name + ' (' + salesId + ')';
 
   // ข้อมูล
-  const addedDate = p.createdAt ? new Date(p.createdAt).toLocaleDateString('th-TH', {day:'numeric',month:'short',year:'numeric'}) : '—';
+  const addedDate = p.createdAt ? fmtThaiDT(p.createdAt) : '—';
   document.getElementById('cdm-info').innerHTML = [
     { icon:'📋', label:'ประเภท',    val: typeLabels[p.type]||'—' },
     { icon:'📞', label:'เบอร์โทร',  val: p.phone||'—' },
@@ -6648,6 +6848,477 @@ window.closeImageLightbox = function() {
   const modal = document.getElementById('img-lightbox-modal');
   if (modal) modal.style.display = 'none';
 };
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  🚗 ไทม์ไลน์การวิ่งของเซล (ออกเดินทางกี่โมง / จอดจุดไหน กี่โมง–กี่โมง)
+//  — โมดูลใหม่ additive ใช้ร่วมกัน 3 หน้า: จัดการเซล / GPS เซล / เส้นทางเซล
+// ═══════════════════════════════════════════════════════════════
+
+// ช่วงเวลาของวันตาม key: 'today' | 'yesterday' | 'YYYY-MM-DD'
+function _tlDateRange(key) {
+  const d = new Date();
+  if (key === 'yesterday') d.setDate(d.getDate() - 1);
+  else if (key && key !== 'today' && key !== 'all') {
+    const p = new Date(key + 'T00:00:00');
+    if (!isNaN(p)) d.setTime(p.getTime());
+  }
+  d.setHours(0,0,0,0);
+  return [d, new Date(d.getTime() + 86400000)];
+}
+function _tlDateLabel(key) {
+  const [s] = _tlDateRange(key);
+  const lbl = s.toLocaleDateString('th-TH', { day:'2-digit', month:'2-digit', year:'numeric' });
+  if (key === 'today' || key === 'all' || !key) return 'วันนี้ ' + lbl;
+  if (key === 'yesterday') return 'เมื่อวาน ' + lbl;
+  return lbl;
+}
+
+// ดึงจุด GPS (sales_routes) ของวันที่เลือก ทุกเซล
+async function fetchRoutesRowsForDay(key) {
+  try {
+    const [s, e] = _tlDateRange(key);
+    const url = `${SB_URL_SALES}/rest/v1/sales_routes?select=*` +
+      `&recorded_at=gte.${encodeURIComponent(s.toISOString())}` +
+      `&recorded_at=lt.${encodeURIComponent(e.toISOString())}` +
+      `&order=sales_id,recorded_at.asc`;
+    const res = await fetch(url, { headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES } });
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch(_) { return []; }
+}
+
+// วิเคราะห์การวิ่ง 1 คน: ออกเดินทาง / จุดจอด (อยู่ในรัศมี 60 ม. นาน ≥ 5 นาที) / ระยะทางรวม
+function analyzeSalesRun(rowsRaw) {
+  const rows = (rowsRaw || [])
+    .filter(r => isFinite(parseFloat(r.lat)) && isFinite(parseFloat(r.lng)) && r.recorded_at)
+    .slice().sort((a,b) => _parseDbTime(a.recorded_at) - _parseDbTime(b.recorded_at));
+  if (!rows.length) return null;
+
+  const stops = [];
+  let i = 0;
+  while (i < rows.length) {
+    let j = i;
+    const aLat = parseFloat(rows[i].lat), aLng = parseFloat(rows[i].lng);
+    while (j + 1 < rows.length &&
+      _distMeters(aLat, aLng, parseFloat(rows[j+1].lat), parseFloat(rows[j+1].lng)) < 60) j++;
+    const mins = (_parseDbTime(rows[j].recorded_at) - _parseDbTime(rows[i].recorded_at)) / 60000;
+    if (j > i && mins >= 5) {
+      stops.push({ lat:aLat, lng:aLng, from:rows[i].recorded_at, to:rows[j].recorded_at, mins:Math.round(mins) });
+    }
+    i = j + 1;
+  }
+
+  // ถ้ากลุ่มจอดแรกคือ "จุดออกตัว" (เริ่มพร้อมจุด GPS แรกและอยู่ที่เดิม)
+  // → ไม่นับเป็นจุดแวะ และเวลาออกเดินทาง = ตอนที่ออกจากจุดนั้นจริง ๆ (ไม่ใช่ตอนเปิด GPS)
+  let origin = null;
+  if (stops.length) {
+    const s0 = stops[0];
+    const nearStart  = _distMeters(parseFloat(rows[0].lat), parseFloat(rows[0].lng), s0.lat, s0.lng) < 60;
+    const startsEarly = Math.abs(_parseDbTime(s0.from) - _parseDbTime(rows[0].recorded_at)) < 120000;
+    if (nearStart && startsEarly) origin = stops.shift();
+  }
+  const departAt  = origin ? origin.to : rows[0].recorded_at;
+  const departLat = origin ? origin.lat : parseFloat(rows[0].lat);
+  const departLng = origin ? origin.lng : parseFloat(rows[0].lng);
+
+  // ระยะทางรวมจากจุดที่ผ่านตัวกรอง jitter แล้ว (ไม่นับสัญญาณแกว่ง)
+  const f = filterGpsJitter(rows);
+  let distM = 0;
+  for (let k = 1; k < f.length; k++) {
+    distM += _distMeters(parseFloat(f[k-1].lat), parseFloat(f[k-1].lng), parseFloat(f[k].lat), parseFloat(f[k].lng));
+  }
+
+  return { start: rows[0], end: rows[rows.length-1], stops, origin, departAt, departLat, departLng, distM, nPts: rows.length };
+}
+
+let _tlAddrSeq = 0;
+function _tlAddrSlot(lat, lng) {
+  const id = 'tl-addr-' + (++_tlAddrSeq);
+  reverseGeocodeTH(lat, lng).then(addr => {
+    const el = document.getElementById(id);
+    if (el && addr) el.textContent = '📍 ' + addr;
+  });
+  return `<span id="${id}" style="font-size:10px;color:#999;"></span>`;
+}
+
+// วาดไทม์ไลน์ลง container ที่กำหนด
+function renderRunTimeline(containerId, rows, dateKey) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  const bySid = {};
+  (rows || []).forEach(r => { (bySid[r.sales_id] = bySid[r.sales_id] || []).push(r); });
+
+  const cards = (allSalesStaff || []).map((s, idx) => {
+    const sid   = s.salesId || s.id || '';
+    const color = SALES_COLORS[idx % SALES_COLORS.length];
+    const a = analyzeSalesRun(bySid[sid]);
+    if (!a) return '';
+
+    const gmap = (lat,lng) => `window.open('https://maps.google.com/?q=${lat},${lng}','_blank')`;
+    const dot  = (bg) => `<span style="width:12px;height:12px;border-radius:50%;background:${bg};border:2.5px solid #fff;box-shadow:0 0 0 2px ${bg}44;flex-shrink:0;margin-top:2px;"></span>`;
+    const items = [];
+
+    // 🚀 ออกเดินทาง (เวลาที่ล้อหมุนจริง — ไม่นับช่วงรอที่จุดออกตัว)
+    items.push(`<div style="display:flex;gap:10px;align-items:flex-start;">
+      ${dot('#27ae60')}
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;">🚀 ออกเดินทาง <span style="color:#27ae60;">${fmtThaiTime(a.departAt)} น.</span>
+          ${a.origin?`<span style="font-size:10px;color:#999;font-weight:600;">(อยู่จุดออกตัวตั้งแต่ ${fmtThaiTime(a.origin.from)} น.)</span>`:''}
+        </div>
+        ${_tlAddrSlot(a.departLat, a.departLng)}
+      </div>
+    </div>`);
+
+    // 🅿️ จุดจอด/แวะ
+    a.stops.forEach((st, n) => {
+      items.push(`<div onclick="${gmap(st.lat, st.lng)}" style="display:flex;gap:10px;align-items:flex-start;cursor:pointer;" title="เปิดใน Google Maps">
+        ${dot(color)}
+        <div style="flex:1;">
+          <div style="font-size:13px;font-weight:700;">🅿️ จอด/แวะจุดที่ ${n+1}
+            <span style="color:${color};">${fmtThaiTime(st.from)}–${fmtThaiTime(st.to)} น.</span>
+            <span style="font-size:11px;color:#888;font-weight:600;">(${st.mins} นาที)</span>
+          </div>
+          ${_tlAddrSlot(st.lat, st.lng)}
+        </div>
+      </div>`);
+    });
+
+    // 📍 จุดล่าสุด
+    items.push(`<div style="display:flex;gap:10px;align-items:flex-start;">
+      ${dot('#e67e22')}
+      <div style="flex:1;">
+        <div style="font-size:13px;font-weight:700;">📍 อัปเดตล่าสุด <span style="color:#e67e22;">${fmtThaiTime(a.end.recorded_at)} น.</span></div>
+        ${_tlAddrSlot(parseFloat(a.end.lat), parseFloat(a.end.lng))}
+      </div>
+    </div>`);
+
+    const km = (a.distM / 1000).toFixed(1);
+    const photo  = s.photo || localStorage.getItem('sales_photo_' + sid) || '';
+    const avatar = photo
+      ? `<img src="${photo}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:2.5px solid ${color};">`
+      : `<div style="width:34px;height:34px;border-radius:50%;background:${color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;">${(s.name||'?')[0]}</div>`;
+
+    return `<div style="background:#fff;border:1.5px solid ${color}33;border-radius:14px;padding:14px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        ${avatar}
+        <div style="flex:1;">
+          <div style="font-size:14px;font-weight:700;">${s.name}</div>
+          <div style="font-size:11px;color:${color};font-weight:700;">${sid}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;font-weight:700;color:${color};">~${km} กม.</div>
+          <div style="font-size:10px;color:#999;">${a.nPts} จุด GPS · จอด ${a.stops.length} จุด</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;position:relative;padding-left:2px;">
+        <div style="position:absolute;left:7px;top:8px;bottom:8px;width:2px;background:${color}33;border-radius:2px;"></div>
+        ${items.join('')}
+      </div>
+    </div>`;
+  }).filter(Boolean).join('');
+
+  if (!cards) {
+    el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;">
+      <h3 style="font-size:15px;font-weight:700;margin-bottom:6px;">🚗 ไทม์ไลน์การวิ่งของเซล <span style="font-size:12px;color:var(--sub);font-weight:600;">(${_tlDateLabel(dateKey)})</span></h3>
+      <div style="font-size:13px;color:var(--sub);">ยังไม่มีข้อมูล GPS ในวันนี้/วันที่เลือก</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;">
+    <h3 style="font-size:15px;font-weight:700;margin-bottom:12px;">🚗 ไทม์ไลน์การวิ่งของเซล <span style="font-size:12px;color:var(--sub);font-weight:600;">(${_tlDateLabel(dateKey)})</span></h3>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;">${cards}</div>
+  </div>`;
+}
+
+// ── ปักจุดเวลาลงบนแผนที่ตรงเส้นเดินทาง (🚀 ออกเดินทาง / 🅿️ จุดจอด / 📍 ล่าสุด) ──
+const _runMarkerLayers = {}; // mapKey → L.layerGroup
+
+function drawRunMarkersOnMap(map, mapKey, rows, onlySid) {
+  if (!map || !window.L) return;
+  if (_runMarkerLayers[mapKey]) { try { map.removeLayer(_runMarkerLayers[mapKey]); } catch(_){} }
+  const group = L.layerGroup();
+
+  const bySid = {};
+  (rows || []).forEach(r => { (bySid[r.sales_id] = bySid[r.sales_id] || []).push(r); });
+
+  const mkIcon = (bg, emoji, label) => L.divIcon({
+    html: `<div style="display:flex;flex-direction:column;align-items:center;">
+      <div style="background:${bg};color:#fff;border-radius:10px;padding:2px 7px;font-family:'Sarabun',sans-serif;font-size:10px;font-weight:700;white-space:nowrap;box-shadow:0 2px 6px rgba(0,0,0,.35);border:1.5px solid #fff;">${emoji} ${label}</div>
+      <div style="width:9px;height:9px;border-radius:50%;background:${bg};border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.4);margin-top:2px;"></div>
+    </div>`,
+    iconSize:[0,0], iconAnchor:[0,28], className:''
+  });
+
+  (allSalesStaff || []).forEach((s, idx) => {
+    const sid = s.salesId || s.id || '';
+    if (onlySid && onlySid !== 'all' && onlySid !== sid) return;
+    const color = SALES_COLORS[idx % SALES_COLORS.length];
+    const a = analyzeSalesRun(bySid[sid]);
+    if (!a) return;
+
+    const pop = (title, body, lat, lng) => `<div style="font-family:'Sarabun',sans-serif;min-width:130px;">
+      <div style="font-size:13px;font-weight:700;">${title}</div>
+      <div style="font-size:11px;color:#666;margin-top:2px;">${body}</div>
+      <div style="font-size:10px;color:${color};font-weight:700;margin-top:2px;">💼 ${s.name}</div>
+      <a href="https://maps.google.com/?q=${lat},${lng}" target="_blank" style="font-size:10px;color:#1565c0;">🗺️ เปิดใน Google Maps</a>
+    </div>`;
+
+    // 🚀 ออกเดินทาง (เวลาที่ออกจากจุดออกตัวจริง)
+    const sLat = a.departLat, sLng = a.departLng;
+    group.addLayer(L.marker([sLat, sLng], { icon: mkIcon('#27ae60','🚀', fmtThaiTime(a.departAt)), zIndexOffset:600 })
+      .bindPopup(pop('🚀 ออกเดินทาง', fmtThaiDT(a.departAt), sLat, sLng)));
+
+    // 🅿️ จุดจอด/แวะ
+    a.stops.forEach((st, n) => {
+      group.addLayer(L.marker([st.lat, st.lng], { icon: mkIcon(color,'🅿️'+(n+1), `${fmtThaiTime(st.from)}–${fmtThaiTime(st.to)}`), zIndexOffset:650 })
+        .bindPopup(pop(`🅿️ จอด/แวะจุดที่ ${n+1} (${st.mins} นาที)`, `${fmtThaiDT(st.from)} ถึง ${fmtThaiTime(st.to)} น.`, st.lat, st.lng)));
+    });
+
+    // 📍 จุดล่าสุด (ถ้าไม่ทับจุดเริ่ม)
+    const eLat = parseFloat(a.end.lat), eLng = parseFloat(a.end.lng);
+    if (_distMeters(sLat, sLng, eLat, eLng) > 30) {
+      group.addLayer(L.marker([eLat, eLng], { icon: mkIcon('#e67e22','📍', fmtThaiTime(a.end.recorded_at)), zIndexOffset:640 })
+        .bindPopup(pop('📍 อัปเดตล่าสุด', fmtThaiDT(a.end.recorded_at), eLat, eLng)));
+    }
+  });
+
+  group.addTo(map);
+  _runMarkerLayers[mapKey] = group;
+}
+
+// ── ผูกกับ 3 หน้า (wrap แบบ additive ไม่แก้ function เดิม) ──
+let _lastRouteTimelineRows = [];
+async function refreshRouteTimeline() {
+  const key = (typeof activeRouteDate !== 'undefined' && activeRouteDate !== 'all') ? activeRouteDate : 'today';
+  const rows = await fetchRoutesRowsForDay(key);
+  _lastRouteTimelineRows = rows;
+  renderRunTimeline('route-timeline-wrap', rows, key);
+  if (typeof routeMainMap !== 'undefined' && routeMainMap) {
+    drawRunMarkersOnMap(routeMainMap, 'routepage', rows, (typeof activeRouteFilter !== 'undefined') ? activeRouteFilter : 'all');
+  }
+}
+let _lastSalesTimelineRows = [];
+async function refreshSalesTimeline() {
+  const rows = await fetchRoutesRowsForDay('today');
+  _lastSalesTimelineRows = rows;
+  renderRunTimeline('sales-timeline-wrap', rows, 'today');
+  if (typeof adminSalesMap !== 'undefined' && adminSalesMap) {
+    drawRunMarkersOnMap(adminSalesMap, 'salespage', rows, 'all');
+  }
+}
+
+(function() {
+  // หน้า GPS เซล — ใช้ routes ที่ refreshGpsData โหลดไว้แล้ว (วันนี้) ไม่ต้องยิงซ้ำ
+  if (typeof renderGpsMap === 'function') {
+    const _oGps = renderGpsMap;
+    window.renderGpsMap = function(locations, routes) {
+      _oGps(locations, routes);
+      try {
+        renderRunTimeline('gps-timeline-wrap', routes, 'today');
+        if (typeof gpsAdminMap !== 'undefined' && gpsAdminMap) drawRunMarkersOnMap(gpsAdminMap, 'gpspage', routes, 'all');
+      } catch(_){}
+    };
+  }
+  // เปลี่ยน filter เซลหน้าเส้นทางเซล → วาดจุดเวลาใหม่ตามเซลที่เลือก
+  if (typeof filterRouteMap === 'function') {
+    const _oFilter = filterRouteMap;
+    window.filterRouteMap = function(f) {
+      _oFilter(f);
+      try {
+        if (typeof routeMainMap !== 'undefined' && routeMainMap) drawRunMarkersOnMap(routeMainMap, 'routepage', _lastRouteTimelineRows, f);
+      } catch(_){}
+    };
+  }
+  // หน้าเส้นทางเซล — อัปเดตตามวันที่เลือก
+  if (typeof loadRoutePage === 'function') {
+    const _oRoute = loadRoutePage;
+    window.loadRoutePage = async function() {
+      await _oRoute();
+      try { refreshRouteTimeline(); } catch(_){}
+    };
+  }
+  if (typeof setRouteDate === 'function') {
+    const _oSetDate = setRouteDate;
+    window.setRouteDate = function(d) {
+      _oSetDate(d);
+      try { refreshRouteTimeline(); } catch(_){}
+    };
+  }
+  // หน้าจัดการเซล — วันนี้
+  if (typeof loadSalesPage === 'function') {
+    const _oSales = loadSalesPage;
+    window.loadSalesPage = async function() {
+      await _oSales();
+      try { refreshSalesTimeline(); } catch(_){}
+    };
+  }
+  // renderAdminSalesMap ล้างหมุดทั้งหมดตอนวาดใหม่ → วาดป้ายเวลา 🚀🅿️ กลับคืนหลังวาดเสร็จ
+  if (typeof renderAdminSalesMap === 'function') {
+    const _oASM = renderAdminSalesMap;
+    window.renderAdminSalesMap = function() {
+      _oASM();
+      try {
+        if (adminSalesMap && _lastSalesTimelineRows.length) {
+          drawRunMarkersOnMap(adminSalesMap, 'salespage', _lastSalesTimelineRows, 'all');
+        }
+      } catch(_){}
+    };
+  }
+})();
+</script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  🔴 LIVE — ติดตามเซลแบบเรียลไทม์ (หน้า GPS เซล)
+//  · เช็คตำแหน่งถี่ทุก 5 วิ (เบา: ดึงเฉพาะตาราง sales_locations)
+//  · สมัคร Supabase Realtime ด้วย — ถ้าเปิดไว้ที่ฐานข้อมูล จะเด้งทันทีไม่ต้องรอ
+//  · หมุดเลื่อนแบบนุ่ม (animate) + เขียนเส้นต่อท้ายสด ๆ บนแผนที่
+//  · กรองความแม่นยำ: ข้ามจุด accuracy แย่ / ขยับ < 12 ม. / จุดวาป
+// ═══════════════════════════════════════════════════════════════
+const GPS_LIVE_POLL_MS = 5000;
+let _gpsLiveInterval = null;
+let _sbSalesRT = null, _rtChannel = null;
+const _liveTrails = {};   // sid → { pts:[[lat,lng]...], casing:L.polyline, line:L.polyline, lastT:0 }
+const _liveLastAccepted = {}; // sid → {lat,lng,t}
+
+// เลื่อนหมุดแบบนุ่ม ๆ แทนการวาป
+function animateMarkerTo(marker, toLat, toLng, ms) {
+  if (!marker) return;
+  const from = marker.getLatLng();
+  const dur = ms || 900, t0 = performance.now();
+  if (marker._liveAnimFrame) cancelAnimationFrame(marker._liveAnimFrame);
+  const step = (now) => {
+    const k = Math.min(1, (now - t0) / dur);
+    const e = k < .5 ? 2*k*k : 1 - Math.pow(-2*k + 2, 2) / 2; // easeInOut
+    marker.setLatLng([from.lat + (toLat - from.lat) * e, from.lng + (toLng - from.lng) * e]);
+    if (k < 1) marker._liveAnimFrame = requestAnimationFrame(step);
+  };
+  marker._liveAnimFrame = requestAnimationFrame(step);
+}
+
+// เขียนเส้นต่อท้ายแบบสด (สไตล์คมเหมือนเส้นหลัก: ขอบขาว + สีทึบ)
+function _liveTrailExtend(sid, color, lat, lng) {
+  if (!gpsAdminMap) return;
+  let tr = _liveTrails[sid];
+  if (!tr) {
+    tr = _liveTrails[sid] = { pts: [[lat, lng]], casing: null, line: null };
+    return; // จุดแรกยังไม่มีเส้น รอจุดถัดไป
+  }
+  tr.pts.push([lat, lng]);
+  if (!tr.line) {
+    tr.casing = L.polyline(tr.pts, { color:'#ffffff', weight:8, opacity:.95, lineJoin:'round', lineCap:'round' }).addTo(gpsAdminMap);
+    tr.line   = L.polyline(tr.pts, { color, weight:4.5, opacity:1, lineJoin:'round', lineCap:'round' }).addTo(gpsAdminMap);
+  } else {
+    tr.casing.addLatLng([lat, lng]);
+    tr.line.addLatLng([lat, lng]);
+  }
+}
+
+function _liveTrailsClear() {
+  Object.values(_liveTrails).forEach(tr => {
+    try { if (tr.casing) gpsAdminMap.removeLayer(tr.casing); } catch(_){}
+    try { if (tr.line)   gpsAdminMap.removeLayer(tr.line); } catch(_){}
+  });
+  Object.keys(_liveTrails).forEach(k => delete _liveTrails[k]);
+}
+
+// รับตำแหน่งใหม่ 1 จุด → กรองความแม่นยำ → ขยับหมุด + ต่อเส้น
+function onLiveLocation(row) {
+  if (!row || !gpsAdminMap) return;
+  const sid = row.sales_id;
+  const lat = parseFloat(row.lat), lng = parseFloat(row.lng);
+  if (!isFinite(lat) || !isFinite(lng)) return;
+  if (!_gpsAccuracyOk(row, 40)) return; // สัญญาณหยาบ ไม่เอา
+
+  const idx = (allSalesStaff || []).findIndex(s => (s.salesId || s.id) === sid);
+  if (idx < 0) return;
+  const color = SALES_COLORS[idx % SALES_COLORS.length];
+
+  const last = _liveLastAccepted[sid];
+  const now = Date.now();
+  if (last) {
+    const d = _distMeters(last.lat, last.lng, lat, lng);
+    if (d < 12) return; // อยู่กับที่/สัญญาณแกว่ง — ไม่ขยับ
+    const dt = (now - last.t) / 1000;
+    if (dt > 0 && d / dt > 45) return; // จุดวาป — ทิ้ง
+  }
+  _liveLastAccepted[sid] = { lat, lng, t: now };
+
+  if (gpsMarkers[sid]) animateMarkerTo(gpsMarkers[sid], lat, lng);
+  // เลื่อนวงความแม่นยำตามหมุดด้วย
+  if (window._gpsAccCircles && window._gpsAccCircles[sid]) {
+    window._gpsAccCircles[sid].setLatLng([lat, lng]);
+    const _a = parseFloat(row.accuracy);
+    if (isFinite(_a) && _a > 0 && _a <= 150) window._gpsAccCircles[sid].setRadius(_a);
+  }
+  _liveTrailExtend(sid, color, lat, lng);
+
+  const txt = document.getElementById('gps-admin-text');
+  if (txt) txt.textContent = '🔴 LIVE ' + new Date().toLocaleTimeString('th-TH');
+}
+
+// โพลตำแหน่งอย่างเดียว (เบา) ทุก 5 วิ — ใช้ได้แม้ Realtime ที่ฐานข้อมูลไม่ได้เปิด
+async function _gpsLivePoll() {
+  const p6 = document.getElementById('page-6');
+  if (!p6 || p6.style.display === 'none' || !gpsAdminMap) return;
+  try {
+    const res = await fetch(`${SB_URL_SALES}/rest/v1/sales_locations?select=*`, {
+      headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES }
+    });
+    const rows = await res.json();
+    if (Array.isArray(rows)) rows.forEach(onLiveLocation);
+  } catch(_){}
+}
+
+function startGpsLive() {
+  clearInterval(_gpsLiveInterval);
+  _gpsLiveInterval = setInterval(_gpsLivePoll, GPS_LIVE_POLL_MS);
+  // Supabase Realtime (โบนัส: เด้งทันทีถ้าเปิด replication ไว้ที่ตาราง)
+  if (!_rtChannel && window.supabase) {
+    try {
+      _sbSalesRT = _sbSalesRT || supabase.createClient(SB_URL_SALES, SB_KEY_SALES);
+      _rtChannel = _sbSalesRT.channel('gps-live-admin')
+        .on('postgres_changes', { event:'*', schema:'public', table:'sales_locations' }, p => onLiveLocation(p.new))
+        .on('postgres_changes', { event:'INSERT', schema:'public', table:'sales_routes' }, p => onLiveLocation(p.new))
+        .subscribe();
+    } catch(_){}
+  }
+}
+function stopGpsLive() {
+  clearInterval(_gpsLiveInterval);
+  _gpsLiveInterval = null;
+}
+
+// ── hooks ──
+(function() {
+  // เริ่ม LIVE เมื่อเข้า/โหลดหน้า GPS เซล, หยุดเมื่อออกจากหน้า
+  if (typeof loadGpsPage === 'function') {
+    const _oLoad = loadGpsPage;
+    window.loadGpsPage = async function() {
+      await _oLoad();
+      startGpsLive();
+    };
+  }
+  if (typeof showPage === 'function') {
+    const _oShow = window.showPage;
+    window.showPage = function(n) {
+      _oShow(n);
+      if (n === 6) startGpsLive(); else stopGpsLive();
+    };
+  }
+  // ทุกครั้งที่รอบรีเฟรชใหญ่ (15 วิ) วาดเส้น OSRM ทับประวัติแล้ว → ล้างเส้นสดกันซ้อน
+  if (typeof renderGpsMap === 'function') {
+    const _oRender = window.renderGpsMap;
+    window.renderGpsMap = function(locations, routes) {
+      try { _liveTrailsClear(); } catch(_){}
+      _oRender(locations, routes);
+    };
+  }
+})();
 </script>
 
 <!-- IMAGE LIGHTBOX (ดูรูปเต็มจอ) -->
