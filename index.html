@@ -944,7 +944,79 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
   <button class="nav-tab" data-page="5" onclick="showPage(5)">💼 จัดการเซล</button>
   <button class="nav-tab" data-page="6" onclick="showPage(6)">📡 GPS เซล</button>
   <button class="nav-tab" data-page="7" onclick="showPage(7)">🗺️ เส้นทางเซล</button>
+  <span style="flex:1"></span>
+  <span id="auth-user-chip" style="display:none;align-items:center;gap:8px;padding:4px 10px;background:rgba(255,255,255,.12);border-radius:20px;font-size:12px;color:#fff;">
+    <span id="auth-user-name" style="font-weight:700;"></span>
+    <button onclick="openUsersModal()" id="auth-users-btn" title="จัดการผู้ใช้และสิทธิ์" style="display:none;background:none;border:none;color:#ffd76e;cursor:pointer;font-size:14px;padding:0;">👤+</button>
+    <button onclick="authLogout()" title="ออกจากระบบ" style="background:none;border:none;color:#ffb3b3;cursor:pointer;font-size:12px;padding:0;font-family:'Sarabun',sans-serif;font-weight:700;">ออก ⎋</button>
+  </span>
 </nav>
+
+<!-- 🔐 LOGIN OVERLAY -->
+<div id="loginOv" style="display:none;position:fixed;inset:0;background:linear-gradient(135deg,#7E1610,#C0392B);z-index:99999;align-items:center;justify-content:center;font-family:'Sarabun',sans-serif;">
+  <div style="background:#fff;border-radius:18px;padding:28px 26px;width:min(92vw,360px);box-shadow:0 20px 60px rgba(0,0,0,.4);">
+    <div style="text-align:center;margin-bottom:18px;">
+      <div style="font-size:34px;">🔐</div>
+      <div style="font-family:'Prompt',sans-serif;font-size:18px;font-weight:800;color:#7E1610;">Admin — มนชิน ซัพพลาย</div>
+      <div id="login-sub" style="font-size:12px;color:#888;margin-top:2px;">เข้าสู่ระบบเพื่อใช้งาน</div>
+    </div>
+    <div id="login-form">
+      <input id="lg-user" placeholder="ชื่อผู้ใช้" autocomplete="username" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;font-family:'Sarabun',sans-serif;margin-bottom:8px;outline:none;">
+      <input id="lg-pass" type="password" placeholder="รหัสผ่าน" autocomplete="current-password" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;font-family:'Sarabun',sans-serif;margin-bottom:8px;outline:none;" onkeyup="if(event.key==='Enter')authLogin()">
+      <div id="lg-err" style="font-size:12px;color:#c0392b;min-height:16px;margin-bottom:6px;"></div>
+      <button onclick="authLogin()" id="lg-btn" style="width:100%;padding:12px;background:linear-gradient(120deg,#C0392B,#7E1610);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;font-family:'Sarabun',sans-serif;cursor:pointer;">เข้าสู่ระบบ</button>
+      <div style="text-align:center;margin-top:10px;" id="setup-link-wrap" hidden>
+        <button onclick="showSetupForm()" style="background:none;border:none;color:#2980b9;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;">ครั้งแรก? สร้างบัญชีเจ้าของร้าน →</button>
+      </div>
+    </div>
+    <div id="setup-form" style="display:none;">
+      <div style="font-size:12px;color:#555;background:#fff8e6;border:1px solid #f0dfa8;border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.6;">สร้างบัญชี<b>เจ้าของร้าน</b>คนแรก — ต้องใช้ Master Key (env <code>ADMIN_API_KEY</code> บน Render) ยืนยันว่าเป็นเจ้าของจริง</div>
+      <input id="su-key" type="password" placeholder="Master Key (ADMIN_API_KEY)" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:13px;font-family:'Sarabun',sans-serif;margin-bottom:8px;outline:none;">
+      <input id="su-user" placeholder="ตั้งชื่อผู้ใช้" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;font-family:'Sarabun',sans-serif;margin-bottom:8px;outline:none;">
+      <input id="su-name" placeholder="ชื่อที่แสดง เช่น เจ้าของร้าน" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;font-family:'Sarabun',sans-serif;margin-bottom:8px;outline:none;">
+      <input id="su-pass" type="password" placeholder="ตั้งรหัสผ่าน (อย่างน้อย 6 ตัว)" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;font-family:'Sarabun',sans-serif;margin-bottom:8px;outline:none;">
+      <div id="su-err" style="font-size:12px;color:#c0392b;min-height:16px;margin-bottom:6px;"></div>
+      <button onclick="authSetup()" style="width:100%;padding:12px;background:#1a6b3c;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;font-family:'Sarabun',sans-serif;cursor:pointer;">✨ สร้างบัญชีเจ้าของร้าน</button>
+      <div style="text-align:center;margin-top:10px;">
+        <button onclick="showLoginForm()" style="background:none;border:none;color:#888;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;">← กลับไปเข้าสู่ระบบ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 👤 USERS MANAGEMENT MODAL -->
+<div id="usersModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9999;align-items:flex-start;justify-content:center;overflow-y:auto;padding:30px 12px;font-family:'Sarabun',sans-serif;">
+  <div style="background:#fff;border-radius:16px;width:min(96vw,560px);box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;">
+    <div style="background:linear-gradient(120deg,#C0392B,#7E1610);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-family:'Prompt',sans-serif;font-weight:800;font-size:15px;">👤 จัดการผู้ใช้และสิทธิ์</div>
+      <button onclick="closeUsersModal()" style="background:rgba(255,255,255,.2);border:none;color:#fff;width:26px;height:26px;border-radius:50%;cursor:pointer;font-size:13px;">✕</button>
+    </div>
+    <div style="padding:16px 18px;">
+      <div id="users-list" style="margin-bottom:16px;"><div style="color:#888;font-size:13px;">กำลังโหลด...</div></div>
+      <div style="border-top:2px dashed #eee;padding-top:14px;">
+        <div style="font-weight:800;font-size:14px;margin-bottom:8px;" id="uform-title">➕ เพิ่มผู้ใช้ใหม่</div>
+        <input type="hidden" id="uf-id">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+          <input id="uf-user" placeholder="ชื่อผู้ใช้" style="padding:9px 11px;border:1.5px solid #ddd;border-radius:9px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          <input id="uf-name" placeholder="ชื่อที่แสดง" style="padding:9px 11px;border:1.5px solid #ddd;border-radius:9px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          <input id="uf-pass" type="password" placeholder="รหัสผ่าน (≥6 ตัว)" style="padding:9px 11px;border:1.5px solid #ddd;border-radius:9px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;">
+          <select id="uf-role" onchange="ufRoleChanged()" style="padding:9px 11px;border:1.5px solid #ddd;border-radius:9px;font-size:13px;font-family:'Sarabun',sans-serif;outline:none;background:#fff;">
+            <option value="staff">แอดมิน (staff)</option>
+            <option value="manager">ผู้จัดการ (manager)</option>
+            <option value="owner">เจ้าของร้าน (owner)</option>
+          </select>
+        </div>
+        <div style="font-size:12px;font-weight:700;color:#555;margin-bottom:6px;">สิทธิ์การเข้าถึง:</div>
+        <div id="uf-perms" style="display:grid;grid-template-columns:1fr 1fr;gap:4px 10px;margin-bottom:10px;"></div>
+        <div id="uf-err" style="font-size:12px;color:#c0392b;min-height:16px;"></div>
+        <div style="display:flex;gap:8px;">
+          <button onclick="saveUserForm()" id="uf-save" style="flex:1;padding:11px;background:linear-gradient(120deg,#C0392B,#7E1610);color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:800;font-family:'Sarabun',sans-serif;cursor:pointer;">💾 บันทึกผู้ใช้</button>
+          <button onclick="resetUserForm()" style="padding:11px 14px;background:#eee;color:#555;border:none;border-radius:10px;font-size:13px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">ล้าง</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 
 <!-- PAGE 1: หน้าหลัก -->
@@ -970,8 +1042,15 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
       <label>Backend URL (option)</label>
       <input type="text" id="backend-url" placeholder="https://..." style="min-width:180px;">
     </div>
+    <div class="config-field">
+      <label>Admin API Key (option)</label>
+      <input type="password" id="admin-api-key" placeholder="ตรงกับ env ADMIN_API_KEY" style="min-width:160px;">
+    </div>
     <button class="load-btn" onclick="connectAndLoad()">
       <svg width="14" height="14"><use href="#ic-refresh"/></svg>เชื่อมต่อ
+    </button>
+    <button class="load-btn" onclick="exportOrdersBackup()" title="ดาวน์โหลดออเดอร์ทั้งหมดเป็น CSV เก็บสำรองไว้" style="background:#1a6b3c;">
+      📥 สำรองข้อมูล
     </button>
   </div>
 
@@ -1722,7 +1801,7 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
             <div id="cmSlipInfo" style="font-size:11px;color:#888;margin-top:2px;"></div>
           </div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;">
-            <button id="cmConfirmPayBtn" onclick="adminConfirmPayment()"
+            <button id="cmConfirmPayBtn" class="perm-payments" onclick="adminConfirmPayment()"
               style="padding:7px 14px;background:#27ae60;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">
               ✅ ยืนยันชำระแล้ว
             </button>
@@ -2103,6 +2182,8 @@ window.addEventListener('DOMContentLoaded', () => {
   if (savedUrl) document.getElementById('sb-url').value = savedUrl;
   if (savedKey) document.getElementById('sb-key').value = savedKey;
   if (savedBackend) document.getElementById('backend-url').value = savedBackend;
+  const savedAdminKey = localStorage.getItem('admin_api_key');
+  if (savedAdminKey) { const el = document.getElementById('admin-api-key'); if (el) el.value = savedAdminKey; }
 
   document.querySelectorAll('.fchip').forEach(c => {
     c.addEventListener('click', () => {
@@ -2146,6 +2227,8 @@ async function connectAndLoad() {
   localStorage.setItem('admin_sb_url', url);
   localStorage.setItem('admin_sb_key', key);
   if (backend) localStorage.setItem('admin_backend_url', backend);
+  const adminKeyEl = document.getElementById('admin-api-key');
+  if (adminKeyEl) localStorage.setItem('admin_api_key', adminKeyEl.value.trim());
 
   try {
     sb = supabase.createClient(url, key);
@@ -5018,7 +5101,7 @@ function _updateChatPaymentBar(o) {
   }
 
   // ── ปุ่มยืนยัน: ซ่อนถ้ายืนยันแล้ว ──
-  if (confirmBtn) confirmBtn.style.display = (ps === 'confirmed') ? 'none' : 'inline-block';
+  if (confirmBtn) confirmBtn.style.display = (ps === 'confirmed' || (typeof hasPerm === 'function' && !hasPerm('payments'))) ? 'none' : 'inline-block';
 
   // ── ปุ่มดูสลิป ──
   if (viewBtn) viewBtn.style.display = o.slip_url ? 'inline-block' : 'none';
@@ -5198,6 +5281,34 @@ document.addEventListener('keydown', e => {
 let _editingCouponId = null;
 
 function getBackendUrl() { return (document.getElementById('backend-url')?.value||'').replace(/\/+$/,''); }
+function getAdminApiKey() { return (document.getElementById('admin-api-key')?.value || localStorage.getItem('admin_api_key') || '').trim(); }
+
+// 🔐 แนบ x-admin-key อัตโนมัติทุก request ที่ยิงไป backend (คูปอง/ยืนยันจ่าย/แจ้งสถานะ ฯลฯ)
+(function installAdminKeyInjector() {
+  const _origFetch = window.fetch.bind(window);
+  window.fetch = function(url, opts) {
+    opts = opts || {};
+    try {
+      const u = typeof url === 'string' ? url : (url && url.url) || '';
+      const bu = getBackendUrl();
+      if (bu && u.indexOf(bu) === 0) {
+        const k = getAdminApiKey();
+        if (k) opts.headers = Object.assign({}, opts.headers, { 'x-admin-key': k });
+      }
+    } catch(_) {}
+    return _origFetch(url, opts);
+  };
+})();
+
+// 📥 ดาวน์โหลดออเดอร์ทั้งหมดเป็น CSV (สำรองข้อมูล — แนะนำทำสัปดาห์ละครั้ง)
+function exportOrdersBackup() {
+  const bu = getBackendUrl();
+  if (!bu) { alert('กรุณากรอก Backend URL แล้วกดเชื่อมต่อก่อน'); return; }
+  const k = getAdminApiKey();
+  const url = bu + '/admin/export-orders' + (k ? ('?admin_key=' + encodeURIComponent(k)) : '');
+  window.open(url, '_blank');
+  toast('กำลังดาวน์โหลดไฟล์สำรองออเดอร์ (CSV)...');
+}
 
 function openCouponModal() {
   const bu = getBackendUrl();
@@ -7327,5 +7438,317 @@ function stopGpsLive() {
   <button onclick="closeImageLightbox()" style="position:absolute;top:18px;right:22px;background:rgba(255,255,255,.15);border:none;color:#fff;width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;">×</button>
 </div>
 
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  🔐 ระบบเข้าสู่ระบบ + สิทธิ์การเข้าถึง (ฝั่งหน้าแอดมิน)
+//  · owner เห็น/ทำได้ทุกอย่าง · manager/staff เห็นเฉพาะที่ได้รับสิทธิ์
+//  · เมนู/ปุ่มที่ไม่มีสิทธิ์ = ซ่อนหายไปเลย
+//  · ใส่ Master Key ในแถบตั้งค่า = เทียบเท่า owner (ทางลัดของเจ้าของ)
+// ═══════════════════════════════════════════════════════════════
+const AUTH_PERMS = [
+  ['orders',        '📦 ออเดอร์ (ดู/แก้สถานะ/แจ้งลูกค้า)'],
+  ['customers',     '👥 ฐานข้อมูลลูกค้า'],
+  ['reports',       '📊 สรุปยอดขาย'],
+  ['sales',         '💼 เซล (จัดการ/GPS/เส้นทาง)'],
+  ['coupons',       '🎟️ คูปอง'],
+  ['payments',      '💳 ยืนยันการชำระเงิน'],
+  ['products',      '🛍️ สินค้า (หน้าร้าน)'],
+  ['shop_settings', '🏪 ตั้งค่าร้าน (เวลา/QR/แบนเนอร์)'],
+  ['backup',        '📥 สำรองข้อมูล'],
+  ['users',         '👤 จัดการผู้ใช้/สิทธิ์'],
+  ['settings',      '⚙️ ตั้งค่าการเชื่อมต่อ (แถบบน)'],
+];
+const PAGE_PERM = { 1:'orders', 2:'customers', 3:'orders', 4:'reports', 5:'sales', 6:'sales', 7:'sales' };
+
+let authUser = null; // { username, display_name, role, perms }
+
+function authToken()   { return localStorage.getItem('admin_auth_token') || ''; }
+function isMasterMode(){ return !!getAdminApiKey(); }
+function hasPerm(p) {
+  if (isMasterMode()) return true;
+  if (!authUser) return false;
+  if (authUser.role === 'owner') return true;
+  return (authUser.perms || []).includes(p);
+}
+
+// แนบ Authorization: Bearer อัตโนมัติทุก request ไป backend
+(function installBearerInjector() {
+  const _f = window.fetch.bind(window);
+  window.fetch = function(url, opts) {
+    opts = opts || {};
+    try {
+      const u = typeof url === 'string' ? url : (url && url.url) || '';
+      const bu = getBackendUrl();
+      if (bu && u.indexOf(bu) === 0 && authToken()) {
+        opts.headers = Object.assign({}, opts.headers, { 'Authorization': 'Bearer ' + authToken() });
+      }
+    } catch(_) {}
+    return _f(url, opts);
+  };
+})();
+
+// ── จอ Login ──
+function showLoginOverlay() {
+  const el = document.getElementById('loginOv');
+  if (el) el.style.display = 'flex';
+  // ปุ่ม "สร้างบัญชีเจ้าของร้าน" แสดงเฉพาะตอนระบบยังไม่มี owner เท่านั้น
+  // (แอดมิน/คนทั่วไปจะไม่เห็นปุ่มนี้เลยหลังตั้งระบบเสร็จ)
+  const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
+  if (bu) {
+    fetch(bu + '/auth/status').then(r => r.json()).then(d => {
+      const w = document.getElementById('setup-link-wrap');
+      if (w) w.hidden = !!d.has_owner;
+    }).catch(() => {});
+  }
+}
+function hideLoginOverlay() { const el = document.getElementById('loginOv'); if (el) el.style.display = 'none'; }
+function showSetupForm() { document.getElementById('login-form').style.display='none'; document.getElementById('setup-form').style.display='block'; }
+function showLoginForm() { document.getElementById('setup-form').style.display='none'; document.getElementById('login-form').style.display='block'; }
+
+async function authLogin() {
+  const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
+  const err = document.getElementById('lg-err');
+  if (!bu) { err.textContent = 'ยังไม่ได้ตั้ง Backend URL — เชื่อมต่อครั้งแรกด้วย Master Key ก่อน'; return; }
+  const btn = document.getElementById('lg-btn');
+  btn.disabled = true; btn.textContent = '⏳ กำลังตรวจสอบ...';
+  try {
+    const r = await fetch(bu + '/auth/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ username: document.getElementById('lg-user').value, password: document.getElementById('lg-pass').value })
+    });
+    const d = await r.json().catch(()=>({}));
+    if (r.status === 404 && d.error === 'no_users') { showSetupForm(); return; }
+    if (!r.ok) throw new Error(d.error || 'เข้าสู่ระบบไม่สำเร็จ');
+    localStorage.setItem('admin_auth_token', d.token);
+    localStorage.setItem('admin_auth_user', JSON.stringify(d.user));
+    authUser = d.user;
+    hideLoginOverlay();
+    applyPerms();
+    toast('👋 สวัสดี ' + (d.user.display_name || d.user.username));
+  } catch(e) {
+    err.textContent = '❌ ' + e.message;
+  } finally { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
+}
+
+async function authSetup() {
+  const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
+  const err = document.getElementById('su-err');
+  if (!bu) { err.textContent = 'กรอก Backend URL ในแถบตั้งค่าก่อน'; return; }
+  try {
+    const r = await fetch(bu + '/auth/setup', {
+      method:'POST',
+      headers:{ 'Content-Type':'application/json', 'x-admin-key': document.getElementById('su-key').value.trim() },
+      body: JSON.stringify({
+        username: document.getElementById('su-user').value,
+        password: document.getElementById('su-pass').value,
+        display_name: document.getElementById('su-name').value
+      })
+    });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(d.error || 'สร้างไม่สำเร็จ');
+    localStorage.setItem('admin_auth_token', d.token);
+    localStorage.setItem('admin_auth_user', JSON.stringify(d.user));
+    authUser = d.user;
+    hideLoginOverlay();
+    applyPerms();
+    toast('✨ สร้างบัญชีเจ้าของร้านแล้ว ยินดีต้อนรับ!');
+  } catch(e) { err.textContent = '❌ ' + e.message; }
+}
+
+function authLogout() {
+  if (!confirm('ออกจากระบบ?')) return;
+  localStorage.removeItem('admin_auth_token');
+  localStorage.removeItem('admin_auth_user');
+  authUser = null;
+  location.reload();
+}
+
+// ── ซ่อนเมนู/ปุ่มตามสิทธิ์ ──
+function applyPerms() {
+  const chip = document.getElementById('auth-user-chip');
+  const nameEl = document.getElementById('auth-user-name');
+  const roleTh = { owner:'เจ้าของร้าน', manager:'ผู้จัดการ', staff:'แอดมิน' };
+  if (isMasterMode()) {
+    if (chip && nameEl) { chip.style.display = 'inline-flex'; nameEl.textContent = '🔑 Master Key (เจ้าของร้าน)'; }
+    const ub = document.getElementById('auth-users-btn'); if (ub) ub.style.display = 'inline';
+  } else if (authUser) {
+    if (chip && nameEl) {
+      chip.style.display = 'inline-flex';
+      nameEl.textContent = '👤 ' + (authUser.display_name || authUser.username) + ' · ' + (roleTh[authUser.role] || authUser.role);
+    }
+    const ub = document.getElementById('auth-users-btn'); if (ub) ub.style.display = hasPerm('users') ? 'inline' : 'none';
+  }
+
+  // เมนูหน้า: ไม่มีสิทธิ์ = ซ่อน
+  let firstAllowed = null;
+  document.querySelectorAll('.nav-tab').forEach(tab => {
+    const pg = parseInt(tab.dataset.page);
+    const ok = hasPerm(PAGE_PERM[pg]);
+    tab.style.display = ok ? '' : 'none';
+    if (ok && firstAllowed === null) firstAllowed = pg;
+  });
+  // ถ้าหน้าปัจจุบันโดนซ่อน → เด้งไปหน้าแรกที่เข้าได้
+  const curTab = document.querySelector('.nav-tab.active');
+  if (curTab && curTab.style.display === 'none' && firstAllowed) showPage(firstAllowed);
+
+  // แถบตั้งค่าการเชื่อมต่อ
+  const cfg = document.getElementById('configBar');
+  if (cfg) cfg.style.display = hasPerm('settings') ? '' : 'none';
+
+  // ปุ่มตามสิทธิ์ (คูปอง/สำรองข้อมูล ฯลฯ) — ใช้ class perm-xxx
+  document.querySelectorAll('[class*="perm-"]').forEach(el => {
+    const m = el.className.match(/perm-([a-z_]+)/);
+    if (m) el.style.display = hasPerm(m[1]) ? '' : 'none';
+  });
+  // ปุ่มที่รู้จักโดยตรง
+  document.querySelectorAll('button[onclick="exportOrdersBackup()"]').forEach(b => b.style.display = hasPerm('backup') ? '' : 'none');
+  document.querySelectorAll('button[onclick="openCouponModal()"]').forEach(b => b.style.display = hasPerm('coupons') ? '' : 'none');
+}
+
+// ── เริ่มระบบ auth ตอนโหลดหน้า ──
+window.addEventListener('DOMContentLoaded', async () => {
+  // เจ้าของร้านที่ใช้ Master Key อยู่แล้ว → ผ่านเลย (เทียบเท่า owner)
+  if (isMasterMode()) { applyPerms(); return; }
+  const tok = authToken();
+  if (tok) {
+    // มี token → ตรวจกับ server + รีเฟรชสิทธิ์ล่าสุด
+    try {
+      const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
+      const r = await fetch(bu + '/auth/me', { headers: { 'Authorization': 'Bearer ' + tok } });
+      const d = await r.json().catch(()=>({}));
+      if (r.ok) {
+        localStorage.setItem('admin_auth_token', d.token);
+        localStorage.setItem('admin_auth_user', JSON.stringify(d.user));
+        authUser = d.user;
+        applyPerms();
+        return;
+      }
+    } catch(_) {
+      // backend ล่มชั่วคราว → ใช้ข้อมูลผู้ใช้ที่จำไว้ไปก่อน (สิทธิ์เดิม)
+      try { authUser = JSON.parse(localStorage.getItem('admin_auth_user') || 'null'); } catch(_) {}
+      if (authUser) { applyPerms(); return; }
+    }
+    localStorage.removeItem('admin_auth_token');
+    localStorage.removeItem('admin_auth_user');
+  }
+  showLoginOverlay();
+});
+
+// ═══ 👤 จัดการผู้ใช้ ═══
+function openUsersModal() {
+  document.getElementById('usersModal').style.display = 'flex';
+  renderPermCheckboxes();
+  resetUserForm();
+  loadUsersList();
+}
+function closeUsersModal() { document.getElementById('usersModal').style.display = 'none'; }
+
+function renderPermCheckboxes(checked) {
+  checked = checked || [];
+  document.getElementById('uf-perms').innerHTML = AUTH_PERMS.map(([k, label]) =>
+    `<label style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;">
+      <input type="checkbox" class="uf-perm" value="${k}" ${checked.includes(k)?'checked':''}> ${label}
+    </label>`).join('');
+}
+function ufRoleChanged() {
+  const role = document.getElementById('uf-role').value;
+  if (role === 'owner') renderPermCheckboxes(AUTH_PERMS.map(p=>p[0]));
+}
+
+async function loadUsersList() {
+  const box = document.getElementById('users-list');
+  const bu = getBackendUrl();
+  try {
+    const r = await fetch(bu + '/auth/users');
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'โหลดไม่ได้');
+    const roleTh = { owner:'👑 เจ้าของร้าน', manager:'🧑‍💼 ผู้จัดการ', staff:'🧑‍💻 แอดมิน' };
+    box.innerHTML = (d.users || []).map(u => `
+      <div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:${u.is_active?'#f9f9f9':'#fdf0f0'};border-radius:10px;margin-bottom:6px;font-size:13px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;">${u.display_name || u.username} <span style="font-size:11px;color:#888;font-weight:400;">@${u.username}</span> ${u.is_active?'':'<span style="color:#c0392b;font-size:11px;">(ปิดใช้งาน)</span>'}</div>
+          <div style="font-size:11px;color:#666;">${roleTh[u.role]||u.role} · สิทธิ์ ${u.role==='owner'?'ทั้งหมด':(u.perms||[]).length+' รายการ'}${u.last_login?' · เข้าล่าสุด '+new Date(u.last_login).toLocaleString('th-TH',{dateStyle:'short',timeStyle:'short'}):''}</div>
+        </div>
+        <button onclick='editUser(${JSON.stringify(JSON.stringify(u))})' style="background:#eef4fb;border:none;color:#2980b9;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:700;">แก้ไข</button>
+        <button onclick="toggleUserActive(${u.id}, ${u.is_active})" style="background:${u.is_active?'#fdf3e6':'#e8f7ee'};border:none;color:${u.is_active?'#e67e22':'#27ae60'};padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:700;">${u.is_active?'ปิด':'เปิด'}</button>
+        <button onclick="deleteUser(${u.id}, '${u.username}')" style="background:#fdeeee;border:none;color:#c0392b;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;font-weight:700;">ลบ</button>
+      </div>`).join('') || '<div style="color:#888;font-size:13px;">ยังไม่มีผู้ใช้</div>';
+  } catch(e) {
+    box.innerHTML = `<div style="color:#c0392b;font-size:13px;">❌ ${e.message}</div>`;
+  }
+}
+
+function resetUserForm() {
+  document.getElementById('uform-title').textContent = '➕ เพิ่มผู้ใช้ใหม่';
+  document.getElementById('uf-id').value = '';
+  document.getElementById('uf-user').value = '';
+  document.getElementById('uf-user').disabled = false;
+  document.getElementById('uf-name').value = '';
+  document.getElementById('uf-pass').value = '';
+  document.getElementById('uf-pass').placeholder = 'รหัสผ่าน (≥6 ตัว)';
+  document.getElementById('uf-role').value = 'staff';
+  document.getElementById('uf-err').textContent = '';
+  renderPermCheckboxes(['orders']);
+}
+
+function editUser(uJson) {
+  const u = JSON.parse(uJson);
+  document.getElementById('uform-title').textContent = '✏️ แก้ไข: ' + (u.display_name || u.username);
+  document.getElementById('uf-id').value = u.id;
+  document.getElementById('uf-user').value = u.username;
+  document.getElementById('uf-user').disabled = true;
+  document.getElementById('uf-name').value = u.display_name || '';
+  document.getElementById('uf-pass').value = '';
+  document.getElementById('uf-pass').placeholder = 'รหัสผ่านใหม่ (เว้นว่าง = ไม่เปลี่ยน)';
+  document.getElementById('uf-role').value = u.role;
+  renderPermCheckboxes(u.role === 'owner' ? AUTH_PERMS.map(p=>p[0]) : (u.perms || []));
+}
+
+async function saveUserForm() {
+  const bu = getBackendUrl();
+  const err = document.getElementById('uf-err');
+  const id = document.getElementById('uf-id').value;
+  const perms = [...document.querySelectorAll('.uf-perm:checked')].map(c => c.value);
+  const body = {
+    display_name: document.getElementById('uf-name').value,
+    role: document.getElementById('uf-role').value,
+    perms
+  };
+  const pass = document.getElementById('uf-pass').value;
+  try {
+    let r;
+    if (id) {
+      if (pass) body.new_password = pass;
+      r = await fetch(bu + '/auth/users/' + id, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    } else {
+      body.username = document.getElementById('uf-user').value;
+      body.password = pass;
+      r = await fetch(bu + '/auth/users', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) });
+    }
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
+    toast('✅ บันทึกผู้ใช้แล้ว');
+    resetUserForm();
+    loadUsersList();
+  } catch(e) { err.textContent = '❌ ' + e.message; }
+}
+
+async function toggleUserActive(id, current) {
+  const bu = getBackendUrl();
+  const r = await fetch(bu + '/auth/users/' + id, { method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ is_active: !current }) });
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { alert('❌ ' + (d.error || 'ไม่สำเร็จ')); return; }
+  loadUsersList();
+}
+
+async function deleteUser(id, username) {
+  if (!confirm(`ลบผู้ใช้ @${username}? การลบถาวร ย้อนกลับไม่ได้`)) return;
+  const bu = getBackendUrl();
+  const r = await fetch(bu + '/auth/users/' + id, { method:'DELETE' });
+  const d = await r.json().catch(()=>({}));
+  if (!r.ok) { alert('❌ ' + (d.error || 'ลบไม่สำเร็จ')); return; }
+  loadUsersList();
+}
+</script>
 </body>
 </html>
