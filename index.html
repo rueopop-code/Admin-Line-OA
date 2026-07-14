@@ -1575,6 +1575,10 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
         <input id="gap-phone" type="text" placeholder="08xxxxxxxx" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;">
       </div>
       <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text-3);">ที่อยู่ <span style="font-weight:400;color:#999;">(ไม่บังคับ)</span></label>
+        <input id="gap-addr" type="text" placeholder="เช่น 12 หมู่ 3 ต.ในเวียง อ.เมือง จ.แพร่" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;">
+      </div>
+      <div>
         <label style="font-size:12px;font-weight:700;color:var(--text-3);">ประเภท</label>
         <select id="gap-type" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;">
           <option value="shop">🏪 ร้านค้า</option>
@@ -5893,6 +5897,7 @@ async function fetchSalesPins(salesId) {
     const data = await res.json();
     const pins = Array.isArray(data) ? data.map(r => ({
       id: r.id, name: r.name, phone: r.phone||'',
+      address: r.address || '',
       type: r.type||'shop', note: r.note||'',
       lat: parseFloat(r.lat), lng: parseFloat(r.lng),
       createdAt: r.created_at,
@@ -6609,6 +6614,7 @@ function openGpsAddPinModal(lat, lng) {
   document.getElementById('gap-latlng').textContent = `📌 พิกัด: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   document.getElementById('gap-name').value  = '';
   document.getElementById('gap-phone').value = '';
+  document.getElementById('gap-addr').value  = '';
   document.getElementById('gap-note').value  = '';
   document.getElementById('gap-type').value  = 'shop';
   document.getElementById('gap-err').style.display = 'none';
@@ -6616,7 +6622,10 @@ function openGpsAddPinModal(lat, lng) {
   sel.innerHTML = allSalesStaff.map(s => `<option value="${s.salesId||s.id||''}">${s.name}</option>`).join('');
   document.getElementById('gps-addpin-modal').style.display = 'flex';
   reverseGeocodeTH(lat, lng).then(addr => {
-    if (addr) document.getElementById('gap-latlng').textContent = `📌 ${addr} (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+    if (!addr) return;
+    document.getElementById('gap-latlng').textContent = `📌 ${addr} (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
+    const addrEl = document.getElementById('gap-addr');
+    if (addrEl && !addrEl.value) addrEl.value = addr; // เดาให้ก่อน แก้ไขเองได้ถ้าไม่ตรง
   });
 }
 
@@ -6630,6 +6639,7 @@ async function submitGpsAddPin() {
   const sid   = document.getElementById('gap-sales').value;
   const name  = document.getElementById('gap-name').value.trim();
   const phone = document.getElementById('gap-phone').value.trim();
+  const addr  = document.getElementById('gap-addr').value.trim();
   const type  = document.getElementById('gap-type').value;
   const note  = document.getElementById('gap-note').value.trim();
   if (!sid)  { errEl.textContent = 'กรุณาเลือกเซล'; errEl.style.display = 'block'; return; }
@@ -6646,7 +6656,7 @@ async function submitGpsAddPin() {
         'Content-Type': 'application/json', 'Prefer': 'return=representation'
       },
       body: JSON.stringify({
-        sales_id: sid, name, phone, type, note,
+        sales_id: sid, name, phone, address: addr || null, type, note,
         lat: _gpsAddPinLatLng.lat, lng: _gpsAddPinLatLng.lng
       })
     });
@@ -6976,13 +6986,15 @@ function openCustDetail(salesId, pinIdx) {
 
   // ข้อมูล
   const addedDate = p.createdAt ? fmtThaiDT(p.createdAt) : '—';
-  document.getElementById('cdm-info').innerHTML = [
+  const infoRows = [
     { icon:'📋', label:'ประเภท',    val: typeLabels[p.type]||'—' },
     { icon:'📞', label:'เบอร์โทร',  val: p.phone||'—' },
     { icon:'📍', label:'พิกัด',     val: p.lat ? p.lat.toFixed(5)+', '+p.lng.toFixed(5) : '—' },
     { icon:'📅', label:'บันทึกเมื่อ', val: addedDate },
-  ].map(x => `
-    <div style="background:#f9f9f9;border-radius:10px;padding:10px;">
+  ];
+  if (p.address) infoRows.push({ icon:'🏠', label:'ที่อยู่', val: p.address, full:true });
+  document.getElementById('cdm-info').innerHTML = infoRows.map(x => `
+    <div style="background:#f9f9f9;border-radius:10px;padding:10px;${x.full ? 'grid-column:1/3;' : ''}">
       <div style="font-size:11px;color:var(--sub);margin-bottom:3px;">${x.icon} ${x.label}</div>
       <div style="font-size:13px;font-weight:600;">${x.val}</div>
     </div>`).join('');
