@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Admin — มนชิน ซัพพลาย</title>
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="manifest" href="admin-manifest.json">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Prompt:wght@600;700;800&display=swap" rel="stylesheet">
@@ -1106,7 +1109,7 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
     </div>
     <div class="config-field">
       <label>Backend URL (option)</label>
-      <input type="text" id="backend-url" placeholder="https://..." style="min-width:180px;">
+      <input type="text" id="backend-url" placeholder="https://..." value="https://lineoa-u0v2.onrender.com" style="min-width:180px;">
     </div>
     <div class="config-field">
       <label>Admin API Key (option)</label>
@@ -2297,7 +2300,12 @@ window.addEventListener('DOMContentLoaded', () => {
   const savedBackend = localStorage.getItem('admin_backend_url');
   if (savedUrl) document.getElementById('sb-url').value = savedUrl;
   if (savedKey) document.getElementById('sb-key').value = savedKey;
-  if (savedBackend) document.getElementById('backend-url').value = savedBackend;
+  if (savedBackend) {
+    document.getElementById('backend-url').value = savedBackend;
+  } else {
+    // ยังไม่เคยตั้งค่าไว้ — ใช้ Backend URL เริ่มต้นที่ผูกไว้ตายตัว แล้วบันทึกทันทีเพื่อไม่ต้องถามซ้ำ
+    localStorage.setItem('admin_backend_url', document.getElementById('backend-url').value.trim());
+  }
   const savedAdminKey = localStorage.getItem('admin_api_key');
   if (savedAdminKey) { const el = document.getElementById('admin-api-key'); if (el) el.value = savedAdminKey; }
 
