@@ -873,6 +873,70 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 }
 
 </style>
+<style id="mobile-responsive">
+/* ═══════════════════════════════════════════════════════════
+   📱 Mobile Responsive — ปรับทั้งหน้าให้พอดีจอมือถือทุกรุ่น
+   (additive ล้วน ๆ — จอใหญ่ไม่โดนกระทบ)
+   หลักการตาราง: "ไม่บีบคอลัมน์จนแถวยืดสูง แต่ให้ปัดซ้าย-ขวาแทน"
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+  /* ตารางทุกตัวที่อยู่ในกล่องเลื่อน: คงความกว้างอ่านง่าย → ปัดซ้ายขวา */
+  div[style*="overflow-x"] > table { min-width: 780px; }
+  /* ตารางใน modal: กล่องแม่เป็น overflow:hidden — ปล่อยให้ยืดหยุ่นตามจอ ไม่บังคับกว้าง */
+  .items-popup-table { width: 100%; }
+  th, td { padding: 8px 10px !important; font-size: 12.5px !important; }
+
+  /* หัวเว็บ: ลดขนาด ไม่ให้ดันกันตกบรรทัด */
+  header { padding: 8px 10px !important; gap: 6px !important; }
+  header h1, header .brand-title { font-size: 15px !important; line-height: 1.2 !important; }
+  header img, header .logo { width: 34px !important; height: 34px !important; }
+
+  /* แถบเมนู: เลื่อนซ้ายขวาลื่น ๆ ปุ่มกระชับ */
+  .admin-nav { top: 0 !important; }
+  .nav-tab { padding: 10px 12px !important; font-size: 12.5px !important; white-space: nowrap; flex: 0 0 auto; }
+  #auth-user-chip { font-size: 11px !important; padding: 3px 8px !important; }
+
+  /* การ์ดสถิติ: 2 คอลัมน์พอดีจอ */
+  .stats { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+  .stat-card { padding: 12px 12px 10px !important; }
+  .stat-card .stat-value, .stat-value { font-size: 20px !important; }
+  .stat-card .stat-label, .stat-label { font-size: 11px !important; }
+
+  /* กล่อง/การ์ดเนื้อหา: ชิดขอบจอมากขึ้น ใช้พื้นที่เต็ม */
+  .admin-page { padding: 8px !important; }
+  .card, .panel { padding: 12px !important; border-radius: 12px !important; }
+
+  /* หัวการ์ด (ชื่อ+ปุ่ม): เรียงลงและเต็มความกว้าง ไม่เบียดกัน */
+  .card > div[style*="display:flex"][style*="justify-content:space-between"],
+  .admin-page > div[style*="display:flex"][style*="justify-content:space-between"] {
+    flex-wrap: wrap !important; gap: 8px !important;
+  }
+
+  /* ปุ่มทั่วไป: นิ้วกดง่ายขึ้น */
+  button { min-height: 34px; }
+
+  /* Modal ทุกตัว: เต็มจอเกือบสุด + เลื่อนในตัวได้ */
+  #usersModal > div, #couponModal > div, .modal > div, .modal-box {
+    width: 96vw !important; max-width: 96vw !important;
+    max-height: 92vh !important; overflow-y: auto !important;
+  }
+
+  /* แผนที่ GPS: สูงพอดีจอ */
+  #gps-map, #route-map, #admin-sales-map { height: 52vh !important; min-height: 300px !important; }
+
+  /* หน้า Log/สถานะ: ชิปตัวกรองไม่ตกขอบ */
+  #errFilterChips { overflow-x: auto; flex-wrap: nowrap !important; padding-bottom: 4px; }
+  #errFilterChips .err-chip { flex: 0 0 auto; }
+  #errHours { margin-left: 8px !important; }
+}
+
+/* จอเล็กมาก (iPhone SE ฯลฯ) */
+@media (max-width: 400px) {
+  .stats { grid-template-columns: repeat(2, 1fr) !important; }
+  .nav-tab { padding: 9px 10px !important; font-size: 12px !important; }
+  th, td { font-size: 12px !important; }
+}
+</style>
 </head>
 <body>
 
@@ -944,6 +1008,8 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
   <button class="nav-tab" data-page="5" onclick="showPage(5)">💼 จัดการเซล</button>
   <button class="nav-tab" data-page="6" onclick="showPage(6)">📡 GPS เซล</button>
   <button class="nav-tab" data-page="7" onclick="showPage(7)">🗺️ เส้นทางเซล</button>
+  <button class="nav-tab" data-page="8" onclick="showPage(8)">🧾 Log ระบบ</button>
+  <button class="nav-tab" data-page="9" onclick="showPage(9)">🩺 สถานะระบบ</button>
   <span style="flex:1"></span>
   <span id="auth-user-chip" style="display:none;align-items:center;gap:8px;padding:4px 10px;background:rgba(255,255,255,.12);border-radius:20px;font-size:12px;color:#fff;">
     <span id="auth-user-name" style="font-weight:700;"></span>
@@ -1567,6 +1633,56 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
   <div id="route-legend-wrap" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px;"></div>
 
 </div><!-- /page-7 -->
+
+<!-- ═══════════ PAGE 8 : 🧾 Log ระบบ ═══════════ -->
+<div id="page-8" class="admin-page" style="display:none;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+    <h2 style="font-family:'Prompt',sans-serif;font-size:17px;color:#7E1610;margin:0;">🧾 Log ระบบ — Error ทั้ง 3 ระบบ</h2>
+    <button onclick="loadErrorLogPage()" style="background:#eef4fb;border:none;color:#2980b9;padding:8px 14px;border-radius:9px;font-size:13px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🔄 รีเฟรช</button>
+  </div>
+
+  <!-- แถบตั้งค่าแจ้งเตือน -->
+  <div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:13px;">
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;">
+      <input type="checkbox" id="errNotifyEnabled" onchange="saveErrNotifyCfg()"> 🔔 แจ้งเตือน Error เข้า LINE แอดมิน
+    </label>
+    <label style="display:flex;align-items:center;gap:6px;color:#666;">
+      เตือนซ้ำจุดเดิมไม่เกินทุก
+      <input type="number" id="errNotifyThrottle" min="1" max="1440" value="10" onchange="saveErrNotifyCfg()" style="width:60px;padding:5px 8px;border:1.5px solid #ddd;border-radius:8px;font-family:'Sarabun',sans-serif;"> นาที
+    </label>
+    <span id="errNotifyStatus" style="color:#888;font-size:12px;"></span>
+  </div>
+
+  <!-- ตัวกรอง -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;" id="errFilterChips">
+    <button class="err-chip" data-src="all" onclick="setErrFilter('all')" style="background:#7E1610;color:#fff;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">ทั้งหมด</button>
+    <button class="err-chip" data-src="backend" onclick="setErrFilter('backend')" style="background:#eee;color:#555;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🖥️ Backend</button>
+    <button class="err-chip" data-src="shop" onclick="setErrFilter('shop')" style="background:#eee;color:#555;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🛍️ หน้าร้าน</button>
+    <button class="err-chip" data-src="admin" onclick="setErrFilter('admin')" style="background:#eee;color:#555;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🛡️ แอดมิน</button>
+    <button class="err-chip" data-src="sales-app" onclick="setErrFilter('sales-app')" style="background:#eee;color:#555;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">💼 แอปเซล</button>
+    <select id="errHours" onchange="loadErrorLogPage()" style="margin-left:auto;padding:7px 10px;border:1.5px solid #ddd;border-radius:9px;font-size:12px;font-family:'Sarabun',sans-serif;background:#fff;">
+      <option value="24">24 ชม.ล่าสุด</option>
+      <option value="72" selected>3 วันล่าสุด</option>
+      <option value="168">7 วันล่าสุด</option>
+      <option value="720">30 วันล่าสุด</option>
+    </select>
+  </div>
+
+  <div id="errLogList" style="display:flex;flex-direction:column;gap:8px;">
+    <div style="color:#888;font-size:13px;padding:20px;text-align:center;">กำลังโหลด...</div>
+  </div>
+</div>
+
+<!-- ═══════════ PAGE 9 : 🩺 สถานะระบบ ═══════════ -->
+<div id="page-9" class="admin-page" style="display:none;">
+  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
+    <h2 style="font-family:'Prompt',sans-serif;font-size:17px;color:#7E1610;margin:0;">🩺 สถานะระบบ</h2>
+    <button onclick="loadSystemStatusPage()" style="background:#eef4fb;border:none;color:#2980b9;padding:8px 14px;border-radius:9px;font-size:13px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🔄 ตรวจใหม่</button>
+  </div>
+  <div id="sysStatusBody">
+    <div style="color:#888;font-size:13px;padding:20px;text-align:center;">กำลังตรวจสุขภาพระบบ...</div>
+  </div>
+</div>
 
 
 
@@ -7749,6 +7865,233 @@ async function deleteUser(id, username) {
   if (!r.ok) { alert('❌ ' + (d.error || 'ลบไม่สำเร็จ')); return; }
   loadUsersList();
 }
+</script>
+<script>
+// ═══════════════════════════════════════════════════════════════
+//  🧾 หน้า Log ระบบ + 🩺 หน้าสถานะระบบ
+// ═══════════════════════════════════════════════════════════════
+
+// ผูกสิทธิ์ 'system' ให้ 2 หน้าใหม่ (เฉพาะคนที่มีสิทธิ์ system ถึงเห็นแท็บ)
+try {
+  AUTH_PERMS.push(['system', '🧾 Log ระบบ / 🩺 สถานะระบบ']);
+  PAGE_PERM[8] = 'system';
+  PAGE_PERM[9] = 'system';
+} catch(_) {}
+
+// wrap showPage เดิม — เข้าเมื่อไหร่โหลดข้อมูลอัตโนมัติ
+(function () {
+  const _origShowPage = window.showPage;
+  window.showPage = function (n) {
+    _origShowPage(n);
+    if (n === 8) loadErrorLogPage();
+    if (n === 9) loadSystemStatusPage();
+  };
+})();
+
+// ── 🧾 Error Log page ──
+// แปลงคำตอบจาก backend — ถ้าได้ HTML กลับมา = backend บน Render ยังเป็นเวอร์ชันเก่า
+async function _jsonOrExplain(r) {
+  const txt = await r.text();
+  try { return JSON.parse(txt); }
+  catch (_) {
+    throw new Error('Backend บน Render ยังเป็นเวอร์ชันเก่า — อัปโหลด index.js ตัวใหม่ขึ้น repo LINEOA แล้วรอ deploy เสร็จ (~2-3 นาที) จากนั้นกดรีเฟรชอีกครั้ง');
+  }
+}
+
+let _errFilter = 'all';
+function setErrFilter(src) {
+  _errFilter = src;
+  document.querySelectorAll('.err-chip').forEach(c => {
+    const active = c.dataset.src === src;
+    c.style.background = active ? '#7E1610' : '#eee';
+    c.style.color = active ? '#fff' : '#555';
+  });
+  loadErrorLogPage();
+}
+
+async function loadErrorLogPage() {
+  const box = document.getElementById('errLogList');
+  const bu = getBackendUrl();
+  if (!bu) { box.innerHTML = '<div style="color:#c0392b;font-size:13px;padding:16px;">กรอก Backend URL ในแถบตั้งค่าก่อน</div>'; return; }
+  box.innerHTML = '<div style="color:#888;font-size:13px;padding:20px;text-align:center;">กำลังโหลด...</div>';
+  loadErrNotifyCfg();
+  try {
+    const hours = document.getElementById('errHours').value;
+    const r = await fetch(`${bu}/admin/error-logs?source=${_errFilter}&hours=${hours}`);
+    const d = await _jsonOrExplain(r);
+    if (!r.ok) throw new Error(d.error || 'โหลดไม่สำเร็จ');
+    const logs = d.logs || [];
+    if (!logs.length) {
+      box.innerHTML = '<div style="background:#e8f7ee;color:#1a6b3c;border-radius:12px;padding:22px;text-align:center;font-size:14px;font-weight:700;">✅ ไม่พบ Error ในช่วงเวลานี้ — ระบบทำงานเรียบร้อยดี</div>';
+      return;
+    }
+    const srcBadge = {
+      backend:    ['🖥️ Backend',  '#4a5a7a'],
+      shop:       ['🛍️ หน้าร้าน', '#C0392B'],
+      admin:      ['🛡️ แอดมิน',  '#7d5a00'],
+      'sales-app':['💼 แอปเซล',  '#1a6b3c'],
+    };
+    box.innerHTML = logs.map(l => {
+      const [label, color] = srcBadge[l.source] || [l.source || 'backend', '#666'];
+      const t = new Date(l.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'medium' });
+      return `<div style="background:#fff;border-radius:12px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid ${color};">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
+          <span style="background:${color};color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;">${label}</span>
+          <span style="font-size:12px;font-weight:700;color:#333;">${(l.scope||'').replace(/</g,'&lt;')}</span>
+          <span style="font-size:11px;color:#999;margin-left:auto;">🕒 ${t}</span>
+        </div>
+        <div style="font-size:13px;color:#444;word-break:break-word;">${(l.message||'').replace(/</g,'&lt;')}</div>
+        ${l.extra ? `<div style="font-size:11px;color:#888;margin-top:4px;word-break:break-all;">${String(l.extra).replace(/</g,'&lt;').slice(0,300)}</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    box.innerHTML = `<div style="color:#c0392b;font-size:13px;padding:16px;">❌ ${e.message}</div>`;
+  }
+}
+
+// ── ⚙️ ตั้งค่าแจ้งเตือน ──
+let _errCfgLoaded = false;
+async function loadErrNotifyCfg() {
+  if (_errCfgLoaded) return;
+  try {
+    const r = await fetch(getBackendUrl() + '/admin/error-notify-config');
+    const d = await _jsonOrExplain(r);
+    if (r.ok && d.config) {
+      document.getElementById('errNotifyEnabled').checked = !!d.config.enabled;
+      document.getElementById('errNotifyThrottle').value = d.config.throttleMin || 10;
+      _errCfgLoaded = true;
+    }
+  } catch(_) {}
+}
+async function saveErrNotifyCfg() {
+  const st = document.getElementById('errNotifyStatus');
+  try {
+    const r = await fetch(getBackendUrl() + '/admin/error-notify-config', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        enabled: document.getElementById('errNotifyEnabled').checked,
+        throttleMin: parseInt(document.getElementById('errNotifyThrottle').value) || 10
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || 'บันทึกไม่สำเร็จ');
+    st.textContent = '✅ บันทึกแล้ว';
+    setTimeout(() => st.textContent = '', 2500);
+  } catch(e) { st.textContent = '❌ ' + e.message; }
+}
+
+// ── 🩺 System Status page ──
+async function loadSystemStatusPage() {
+  const box = document.getElementById('sysStatusBody');
+  const bu = getBackendUrl();
+  if (!bu) { box.innerHTML = '<div style="color:#c0392b;font-size:13px;padding:16px;">กรอก Backend URL ในแถบตั้งค่าก่อน</div>'; return; }
+  box.innerHTML = '<div style="color:#888;font-size:13px;padding:20px;text-align:center;">⏳ กำลังตรวจสุขภาพระบบ...</div>';
+  try {
+    const r = await fetch(bu + '/admin/system-status');
+    const s = await _jsonOrExplain(r);
+    if (!r.ok) throw new Error(s.error || 'ตรวจไม่สำเร็จ');
+
+    const be = s.services?.backend || {};
+    const db = s.services?.database || {};
+    const ln = s.services?.line || {};
+    const sec = s.services?.security || {};
+    const m = s.metrics || {};
+    const upMin = be.uptimeMin || 0;
+    const upStr = upMin >= 1440 ? Math.floor(upMin/1440)+' วัน '+Math.floor((upMin%1440)/60)+' ชม.' : upMin >= 60 ? Math.floor(upMin/60)+' ชม. '+(upMin%60)+' นาที' : upMin+' นาที';
+    const memPct = Math.round((be.memoryMB || 0) / 512 * 100);
+    const dbPct = m.dbEstimatedMB != null ? Math.round(m.dbEstimatedMB / 500 * 100) : null;
+    const bar = (pct, warnAt, dangerAt) => {
+      const color = pct >= dangerAt ? '#c0392b' : pct >= warnAt ? '#e67e22' : '#27ae60';
+      return `<div style="background:#eee;border-radius:6px;height:8px;overflow:hidden;margin-top:6px;"><div style="width:${Math.min(pct,100)}%;height:100%;background:${color};"></div></div>`;
+    };
+    const okBadge = ok => ok ? '<span style="color:#27ae60;font-weight:700;">✅ ปกติ</span>' : '<span style="color:#c0392b;font-weight:700;">❌ มีปัญหา</span>';
+
+    // การ์ดบริการ
+    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px;">
+      <div style="background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+        <div style="font-weight:800;font-size:14px;margin-bottom:8px;">🖥️ Backend (Render) ${okBadge(be.ok)}</div>
+        <div style="font-size:12px;color:#666;line-height:1.9;">
+          ⏱️ ทำงานต่อเนื่อง: <b>${upStr}</b><br>
+          🧠 RAM: <b>${be.memoryMB || '?'} / 512 MB (${memPct}%)</b>${bar(memPct, 60, 80)}
+          <span style="font-size:11px;color:#999;">Node ${be.node || '-'}</span>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+        <div style="font-weight:800;font-size:14px;margin-bottom:8px;">🗄️ ฐานข้อมูล (Supabase) ${okBadge(db.ok)}</div>
+        <div style="font-size:12px;color:#666;line-height:1.9;">
+          ⚡ ความเร็วตอบ: <b>${db.latencyMs != null ? db.latencyMs + ' ms' : '-'}</b><br>
+          💾 ขนาด${m.dbSizeIsEstimate ? ' (ประมาณ)' : ' (จริง)'}: <b>${m.dbEstimatedMB != null ? m.dbEstimatedMB + ' / 500 MB' : 'วัดไม่ได้'}</b>
+          ${dbPct != null ? bar(dbPct, 60, 80) : ''}
+          📦 ออเดอร์ทั้งหมด: <b>${(db.totalOrders||0).toLocaleString()}</b> (วันนี้ ${db.todayOrders||0})<br>
+          💬 ข้อความแชท: <b>${(db.messages||0).toLocaleString()}</b>
+        </div>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+        <div style="font-weight:800;font-size:14px;margin-bottom:8px;">🔐 ความปลอดภัย & LINE</div>
+        <div style="font-size:12px;color:#666;line-height:1.9;">
+          LINE Token: ${ln.ok ? '✅' : '❌ ไม่ได้ตั้ง'}<br>
+          Webhook ตรวจลายเซ็น: ${ln.webhookSecured ? '✅' : '⚠️ ยังไม่ตั้ง'}<br>
+          Admin API Key: ${sec.adminKeySet ? '✅ ล็อกแล้ว' : '🚨 ยังไม่ได้ตั้ง!'}<br>
+          Error 24 ชม.: <b>${db.errors24h ?? '-'}</b> รายการ
+          ${m.errorsBySource ? '<br><span style="font-size:11px;color:#999;">' + Object.entries(m.errorsBySource).map(([k,v])=>k+': '+v).join(' · ') + '</span>' : ''}
+        </div>
+      </div>
+    </div>`;
+
+    // คำแนะนำ
+    const sevConf = {
+      crit:  { bg:'#fdeeee', bd:'#c0392b', icon:'🚨', label:'ด่วน' },
+      danger:{ bg:'#fdeeee', bd:'#c0392b', icon:'🚨', label:'ด่วน' },
+      warn:  { bg:'#fff8e6', bd:'#e67e22', icon:'⚠️', label:'เฝ้าระวัง' },
+      ok:    { bg:'#e8f7ee', bd:'#27ae60', icon:'✅', label:'ปกติ' },
+      info:  { bg:'#eef4fb', bd:'#2980b9', icon:'💡', label:'ความรู้' },
+    };
+    const recs = s.recommendations || [];
+    html += `<div style="font-weight:800;font-size:14px;margin-bottom:8px;">📋 คำแนะนำจากระบบ (${recs.length})</div>`;
+    html += recs.map(rc => {
+      const c = sevConf[rc.level || rc.sev] || sevConf.info;
+      return `<div style="background:${c.bg};border-left:4px solid ${c.bd};border-radius:10px;padding:11px 14px;margin-bottom:8px;">
+        <div style="font-size:13px;font-weight:800;color:#333;">${c.icon} ${rc.title}</div>
+        <div style="font-size:12px;color:#555;margin-top:3px;line-height:1.6;">${rc.detail || ''}</div>
+      </div>`;
+    }).join('') || '<div style="color:#888;font-size:13px;">ไม่มีคำแนะนำ</div>';
+
+    // คู่มืออัพเกรด
+    const ug = s.upgradeGuide || [];
+    if (ug.length) {
+      html += `<div style="font-weight:800;font-size:14px;margin:16px 0 8px;">💳 ตารางช่วยตัดสินใจ: เมื่อไหร่ควรจ่ายเพิ่ม/อัพเกรด</div>`;
+      html += ug.map(u => `<div style="background:#fff;border-radius:10px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06);font-size:12px;line-height:1.8;">
+        <b style="font-size:13px;">${u.service}</b><br>
+        🆓 ตอนนี้ (ฟรี): ${u.free}<br>
+        💳 แบบเสียเงิน: ${u.paid}<br>
+        ⏰ <b style="color:#7E1610;">ควรอัพเกรดเมื่อ:</b> ${u.when}
+      </div>`).join('');
+    }
+    html += `<div style="font-size:11px;color:#aaa;margin-top:10px;">ตรวจเมื่อ: ${new Date(s.checkedAt).toLocaleString('th-TH')} · ใช้เวลา ${s.responseMs || '-'} ms</div>`;
+    box.innerHTML = html;
+  } catch(e) {
+    box.innerHTML = `<div style="color:#c0392b;font-size:13px;padding:16px;">❌ ${e.message}</div>`;
+  }
+}
+
+// ── 🛰️ ส่ง error ของหน้าแอดมินเองเข้าระบบ Log (source: 'admin') ──
+(function installAdminErrorReporter() {
+  let sent = 0;
+  function report(scope, msg, extra) {
+    if (sent >= 5) return; // จำกัด 5 ครั้ง/การเปิดหน้า กันยิงรัว
+    sent++;
+    try {
+      const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
+      if (!bu) return;
+      fetch(bu + '/log-error', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ source:'admin', scope, message:String(msg).slice(0,500), extra: extra ? String(extra).slice(0,500) : null })
+      }).catch(()=>{});
+    } catch(_) {}
+  }
+  window.addEventListener('error', e => report('js-error', e.message, (e.filename||'') + ':' + e.lineno));
+  window.addEventListener('unhandledrejection', e => report('promise-rejection', (e.reason && e.reason.message) || e.reason));
+})();
 </script>
 </body>
 </html>
