@@ -1035,6 +1035,13 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
         <button onclick="showSetupForm()" style="background:none;border:none;color:#2980b9;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;">ครั้งแรก? สร้างบัญชีเจ้าของร้าน →</button>
       </div>
     </div>
+    <!-- 🌐 ตั้งค่า Backend URL ครั้งแรก (แสดงเมื่อยังไม่เคยตั้งค่าในเบราว์เซอร์นี้) -->
+    <div id="bu-form" style="display:none;">
+      <div style="font-size:12px;color:#555;background:#fff8e6;border:1px solid #f0dfa8;border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.6;">ยังไม่ได้ตั้งค่า <b>Backend URL</b> ในเบราว์เซอร์นี้ — กรอก URL ของ Backend (เช่นลิงก์ Render ของคุณ) ก่อนเข้าสู่ระบบ</div>
+      <input id="bu-url" placeholder="https://your-backend.onrender.com" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;font-family:'Sarabun',sans-serif;margin-bottom:8px;outline:none;" onkeyup="if(event.key==='Enter')saveBackendUrlFirst()">
+      <div id="bu-err" style="font-size:12px;color:#c0392b;min-height:16px;margin-bottom:6px;"></div>
+      <button onclick="saveBackendUrlFirst()" style="width:100%;padding:12px;background:linear-gradient(120deg,#C0392B,#7E1610);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;font-family:'Sarabun',sans-serif;cursor:pointer;">บันทึกและดำเนินการต่อ</button>
+    </div>
     <div id="setup-form" style="display:none;">
       <div style="font-size:12px;color:#555;background:#fff8e6;border:1px solid #f0dfa8;border-radius:8px;padding:8px 10px;margin-bottom:10px;line-height:1.6;">สร้างบัญชี<b>เจ้าของร้าน</b>คนแรก — ต้องใช้ Master Key (env <code>ADMIN_API_KEY</code> บน Render) ยืนยันว่าเป็นเจ้าของจริง</div>
       <input id="su-key" type="password" placeholder="Master Key (ADMIN_API_KEY)" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:13px;font-family:'Sarabun',sans-serif;margin-bottom:8px;outline:none;">
@@ -7607,19 +7614,39 @@ function hasPerm(p) {
 function showLoginOverlay() {
   const el = document.getElementById('loginOv');
   if (el) el.style.display = 'flex';
+  const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
+  if (!bu) {
+    // ยังไม่เคยตั้งค่า Backend URL ในเบราว์เซอร์นี้เลย — ต้องให้กรอกก่อน
+    // เพราะแถบตั้งค่า (config bar) ที่มีช่อง Backend URL ถูกจอ login นี้บังอยู่ เข้าไม่ถึง
+    document.getElementById('login-form').style.display = 'none';
+    document.getElementById('setup-form').style.display = 'none';
+    document.getElementById('bu-form').style.display = 'block';
+    return;
+  }
   // ปุ่ม "สร้างบัญชีเจ้าของร้าน" แสดงเฉพาะตอนระบบยังไม่มี owner เท่านั้น
   // (แอดมิน/คนทั่วไปจะไม่เห็นปุ่มนี้เลยหลังตั้งระบบเสร็จ)
-  const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
-  if (bu) {
-    fetch(bu + '/auth/status').then(r => r.json()).then(d => {
-      const w = document.getElementById('setup-link-wrap');
-      if (w) w.hidden = !!d.has_owner;
-    }).catch(() => {});
-  }
+  fetch(bu + '/auth/status').then(r => r.json()).then(d => {
+    const w = document.getElementById('setup-link-wrap');
+    if (w) w.hidden = !!d.has_owner;
+  }).catch(() => {});
 }
 function hideLoginOverlay() { const el = document.getElementById('loginOv'); if (el) el.style.display = 'none'; }
-function showSetupForm() { document.getElementById('login-form').style.display='none'; document.getElementById('setup-form').style.display='block'; }
-function showLoginForm() { document.getElementById('setup-form').style.display='none'; document.getElementById('login-form').style.display='block'; }
+function showSetupForm() { document.getElementById('login-form').style.display='none'; document.getElementById('bu-form').style.display='none'; document.getElementById('setup-form').style.display='block'; }
+function showLoginForm() { document.getElementById('setup-form').style.display='none'; document.getElementById('bu-form').style.display='none'; document.getElementById('login-form').style.display='block'; }
+
+// ── ตั้งค่า Backend URL ครั้งแรก (ตอนยังเข้าไม่ถึงแถบตั้งค่าเพราะจอ login บังอยู่) ──
+function saveBackendUrlFirst() {
+  const err = document.getElementById('bu-err');
+  let url = (document.getElementById('bu-url').value || '').trim().replace(/\/+$/, '');
+  if (!url) { err.textContent = 'กรอก Backend URL ก่อน'; return; }
+  if (!/^https?:\/\//i.test(url)) { err.textContent = 'URL ต้องขึ้นต้นด้วย http:// หรือ https://'; return; }
+  localStorage.setItem('admin_backend_url', url);
+  const buEl = document.getElementById('backend-url');
+  if (buEl) buEl.value = url;
+  document.getElementById('bu-form').style.display = 'none';
+  document.getElementById('login-form').style.display = 'block';
+  showLoginOverlay(); // เช็คสถานะ has_owner ใหม่ด้วย URL ที่เพิ่งบันทึก
+}
 
 async function authLogin() {
   const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
