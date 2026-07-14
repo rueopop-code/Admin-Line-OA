@@ -1578,6 +1578,11 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
         <label style="font-size:12px;font-weight:700;color:var(--text-3);">ที่อยู่ <span style="font-weight:400;color:#999;">(ไม่บังคับ)</span></label>
         <input id="gap-addr" type="text" placeholder="เช่น 12 หมู่ 3 ต.ในเวียง อ.เมือง จ.แพร่" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;">
       </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div><label style="font-size:12px;font-weight:700;color:var(--text-3);">จังหวัด</label><input id="gap-province" type="text" placeholder="แพร่" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;"></div>
+        <div><label style="font-size:12px;font-weight:700;color:var(--text-3);">อำเภอ</label><input id="gap-district" type="text" placeholder="เมืองแพร่" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;"></div>
+        <div><label style="font-size:12px;font-weight:700;color:var(--text-3);">ตำบล</label><input id="gap-subdistrict" type="text" placeholder="ในเวียง" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;"></div>
+      </div>
       <div>
         <label style="font-size:12px;font-weight:700;color:var(--text-3);">ประเภท</label>
         <select id="gap-type" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;">
@@ -1626,6 +1631,20 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
   <!-- Filter เซล -->
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;" id="route-filter-bar">
     <button onclick="filterRouteMap('all')" id="rfbtn-all" style="padding:6px 14px;border-radius:20px;border:1.5px solid var(--red);background:var(--red);color:#fff;font-family:'Sarabun',sans-serif;font-size:12px;font-weight:700;cursor:pointer;">ทั้งหมด</button>
+  </div>
+
+  <!-- Filter พื้นที่ (จังหวัด/อำเภอ/ตำบล) — หาลูกค้าง่ายขึ้น + ดูเส้นทางเฉพาะโซนที่สนใจ -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:10px 14px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-md);" id="route-area-bar">
+    <span style="font-size:12px;font-weight:700;color:var(--text-3);">📍 กรองพื้นที่:</span>
+    <select id="raf-province" onchange="filterRouteArea()" style="padding:5px 10px;border:1.5px solid var(--border2);border-radius:20px;font-size:12px;font-family:var(--font);background:var(--gray-50);">
+      <option value="">ทุกจังหวัด</option>
+    </select>
+    <select id="raf-district" onchange="filterRouteArea()" style="padding:5px 10px;border:1.5px solid var(--border2);border-radius:20px;font-size:12px;font-family:var(--font);background:var(--gray-50);">
+      <option value="">ทุกอำเภอ</option>
+    </select>
+    <select id="raf-subdistrict" onchange="filterRouteArea()" style="padding:5px 10px;border:1.5px solid var(--border2);border-radius:20px;font-size:12px;font-family:var(--font);background:var(--gray-50);">
+      <option value="">ทุกตำบล</option>
+    </select>
   </div>
 
   <!-- แผนที่หลัก -->
@@ -5827,6 +5846,34 @@ function reverseGeocodeTH(lat, lng) {
   return run;
 }
 
+// ── Reverse geocode แบบแยกจังหวัด/อำเภอ/ตำบล (สำหรับตัวกรองค้นหา + auto-fill ที่อยู่) ──
+// แยก cache/queue ของตัวเองต่างหาก ไม่ใช้ร่วมกับ reverseGeocodeTH ด้านบน กันกระทบของเดิม
+const _geoStructCache = (() => { try { return JSON.parse(localStorage.getItem('geo_struct_cache')||'{}'); } catch(_) { return {}; } })();
+let _geoStructQueue = Promise.resolve();
+function reverseGeocodeStruct(lat, lng) {
+  const key = _geoAddrKey(lat, lng);
+  if (_geoStructCache[key]) return Promise.resolve(_geoStructCache[key]);
+  const run = _geoStructQueue.then(async () => {
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=16&addressdetails=1&accept-language=th`);
+      const d = await r.json();
+      const a = d.address || {};
+      const province    = a.province || a.state || '';
+      const district     = a.county || a.district || a.city_district || a.town || '';
+      const subdistrict  = a.suburb || a.quarter || a.village || a.hamlet || a.neighbourhood || '';
+      const obj = { province, district, subdistrict, display: d.display_name || '' };
+      _geoStructCache[key] = obj;
+      try { localStorage.setItem('geo_struct_cache', JSON.stringify(_geoStructCache)); } catch(_){}
+      return obj;
+    } catch(_) { return { province:'', district:'', subdistrict:'', display:'' }; }
+    finally {
+      await new Promise(res => setTimeout(res, 1100)); // เว้นจังหวะเรียก API ตามนโยบายของ Nominatim
+    }
+  });
+  _geoStructQueue = run.catch(() => ({}));
+  return run;
+}
+
 let allSalesStaff = [], allSalesOrders = [], adminSalesMap = null, sdMap = null;
 
 // เบอร์โทรที่มาจาก Google Sheet (ผ่าน Apps Script) บางทีถูกเก็บเป็นตัวเลข
@@ -5898,6 +5945,7 @@ async function fetchSalesPins(salesId) {
     const pins = Array.isArray(data) ? data.map(r => ({
       id: r.id, name: r.name, phone: r.phone||'',
       address: r.address || '',
+      province: r.province || '', district: r.district || '', subdistrict: r.subdistrict || '',
       type: r.type||'shop', note: r.note||'',
       lat: parseFloat(r.lat), lng: parseFloat(r.lng),
       createdAt: r.created_at,
@@ -6107,9 +6155,8 @@ function renderAdminSalesMap() {
           html: `<div style="width:22px;height:22px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:10px;">${icons[p.type]||'📍'}</div>`,
           iconSize:[22,22], iconAnchor:[11,11], className:''
         })
-      }).addTo(adminSalesMap).bindPopup(buildPopup1(''), {autoClose:false, closeOnClick:false, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN1 % PIN_POPUP_OFFSETS.length]});
+      }).addTo(adminSalesMap).bindPopup(buildPopup1(''), {autoClose:true, closeOnClick:true, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN1 % PIN_POPUP_OFFSETS.length]});
       _pinN1++;
-      _mk1.openPopup();
       reverseGeocodeTH(p.lat, p.lng).then(addr => { if (addr) _mk1.setPopupContent(buildPopup1(addr)); });
       allBounds.push([p.lat,p.lng]);
     });
@@ -6200,9 +6247,8 @@ function openSalesDetail(salesId, focusSection, showOrders) {
     pins.forEach(p=>{
       const ic={shop:'🏪',home:'🏠',business:'🏢',other:'📍'};
       const buildPopup2 = (addr) => `<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b>${p.phone?'<br><span style="font-size:10px;">📞 '+p.phone+'</span>':''}${p.createdAt?`<br><span style="font-size:9px;color:#888;">🕒 ปักเมื่อ ${fmtThaiDT(p.createdAt)}</span>`:''}${addr?`<br><span style="font-size:9px;color:#999;">📍 ${addr}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`;
-      const _mk2 = L.marker([p.lat,p.lng],{icon:L.divIcon({html:`<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;">${ic[p.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''})}).addTo(sdMap).bindPopup(buildPopup2(''), {autoClose:false, closeOnClick:false, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN2 % PIN_POPUP_OFFSETS.length]});
+      const _mk2 = L.marker([p.lat,p.lng],{icon:L.divIcon({html:`<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;">${ic[p.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''})}).addTo(sdMap).bindPopup(buildPopup2(''), {autoClose:true, closeOnClick:true, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN2 % PIN_POPUP_OFFSETS.length]});
       _pinN2++;
-      _mk2.openPopup();
       reverseGeocodeTH(p.lat, p.lng).then(addr => { if (addr) _mk2.setPopupContent(buildPopup2(addr)); });
       bounds.push([p.lat,p.lng]);
     });
@@ -6615,6 +6661,9 @@ function openGpsAddPinModal(lat, lng) {
   document.getElementById('gap-name').value  = '';
   document.getElementById('gap-phone').value = '';
   document.getElementById('gap-addr').value  = '';
+  document.getElementById('gap-province').value    = '';
+  document.getElementById('gap-district').value    = '';
+  document.getElementById('gap-subdistrict').value = '';
   document.getElementById('gap-note').value  = '';
   document.getElementById('gap-type').value  = 'shop';
   document.getElementById('gap-err').style.display = 'none';
@@ -6626,6 +6675,12 @@ function openGpsAddPinModal(lat, lng) {
     document.getElementById('gap-latlng').textContent = `📌 ${addr} (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
     const addrEl = document.getElementById('gap-addr');
     if (addrEl && !addrEl.value) addrEl.value = addr; // เดาให้ก่อน แก้ไขเองได้ถ้าไม่ตรง
+  });
+  reverseGeocodeStruct(lat, lng).then(g => {
+    const pEl = document.getElementById('gap-province'), dEl = document.getElementById('gap-district'), sEl = document.getElementById('gap-subdistrict');
+    if (pEl && !pEl.value) pEl.value = g.province || '';
+    if (dEl && !dEl.value) dEl.value = g.district || '';
+    if (sEl && !sEl.value) sEl.value = g.subdistrict || '';
   });
 }
 
@@ -6640,6 +6695,9 @@ async function submitGpsAddPin() {
   const name  = document.getElementById('gap-name').value.trim();
   const phone = document.getElementById('gap-phone').value.trim();
   const addr  = document.getElementById('gap-addr').value.trim();
+  const province    = document.getElementById('gap-province').value.trim();
+  const district     = document.getElementById('gap-district').value.trim();
+  const subdistrict  = document.getElementById('gap-subdistrict').value.trim();
   const type  = document.getElementById('gap-type').value;
   const note  = document.getElementById('gap-note').value.trim();
   if (!sid)  { errEl.textContent = 'กรุณาเลือกเซล'; errEl.style.display = 'block'; return; }
@@ -6656,7 +6714,9 @@ async function submitGpsAddPin() {
         'Content-Type': 'application/json', 'Prefer': 'return=representation'
       },
       body: JSON.stringify({
-        sales_id: sid, name, phone, address: addr || null, type, note,
+        sales_id: sid, name, phone, address: addr || null,
+        province: province || null, district: district || null, subdistrict: subdistrict || null,
+        type, note,
         lat: _gpsAddPinLatLng.lat, lng: _gpsAddPinLatLng.lng
       })
     });
@@ -6731,6 +6791,7 @@ function setGpsAdminStatus(state, msg) {
 let routeMainMap     = null;
 let routeLayersMap   = {};   // salesId → { markers:[], polyline }
 let activeRouteFilter = 'all';
+let activeRouteAreaFilter = { province:'', district:'', subdistrict:'' };
 
 async function loadRoutePage() {
   const wrap = document.getElementById('route-legend-wrap');
@@ -6762,6 +6823,7 @@ async function loadRoutePage() {
   renderRouteMap('all');
   renderRouteLegend();
   renderRouteFilterBar();
+  _populateRouteAreaOptions();
   // sync Tab5 stats ด้วย
   if (typeof renderSalesStats === 'function') renderSalesStats();
   if (typeof renderSalesList === 'function') renderSalesList();
@@ -6814,6 +6876,37 @@ function renderRouteFilterBar() {
   });
 }
 
+function _allPinsFlat() {
+  const all = [];
+  allSalesStaff.forEach(s => { const sid = s.salesId||s.id||''; getSalesPins(sid).forEach(p => all.push(p)); });
+  return all;
+}
+
+function _populateRouteAreaOptions() {
+  const pEl = document.getElementById('raf-province'), dEl = document.getElementById('raf-district'), sEl = document.getElementById('raf-subdistrict');
+  if (!pEl || !dEl || !sEl) return;
+  const curP = pEl.value, curD = dEl.value, curS = sEl.value;
+  const all = _allPinsFlat();
+  pEl.innerHTML = '<option value="">ทุกจังหวัด</option>' + _uniqOptionsAdmin(all, 'province');
+  dEl.innerHTML = '<option value="">ทุกอำเภอ</option>' + _uniqOptionsAdmin(all, 'district');
+  sEl.innerHTML = '<option value="">ทุกตำบล</option>' + _uniqOptionsAdmin(all, 'subdistrict');
+  pEl.value = curP; dEl.value = curD; sEl.value = curS;
+}
+
+function _uniqOptionsAdmin(pins, field) {
+  const vals = [...new Set(pins.map(p => (p[field]||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'th'));
+  return vals.map(v => `<option value="${v}">${v}</option>`).join('');
+}
+
+function filterRouteArea() {
+  activeRouteAreaFilter = {
+    province:    document.getElementById('raf-province')?.value || '',
+    district:     document.getElementById('raf-district')?.value || '',
+    subdistrict:  document.getElementById('raf-subdistrict')?.value || ''
+  };
+  renderRouteMap(activeRouteFilter);
+}
+
 function filterRouteMap(filter) {
   activeRouteFilter = filter;
   renderRouteFilterBar();
@@ -6849,21 +6942,30 @@ function renderRouteMap(filter) {
     if (!pins.length) return;
     if (filter !== 'all' && filter !== sid) return;
 
+    const af = activeRouteAreaFilter || { province:'', district:'', subdistrict:'' };
+    const matchesArea = p =>
+      (!af.province    || (p.province||'')    === af.province) &&
+      (!af.district     || (p.district||'')     === af.district) &&
+      (!af.subdistrict  || (p.subdistrict||'')  === af.subdistrict);
+    const visiblePins = pins.filter(matchesArea);
+    if (!visiblePins.length) return;
+
     routeLayersMap[sid] = { markers:[], polyline:null };
 
-    // วาดเส้นทาง
-    if (pins.length >= 2) {
+    // วาดเส้นทาง — เชื่อมเฉพาะจุดที่ผ่านตัวกรองพื้นที่ (ถ้ามีการกรอง) ให้เห็นเป็นเส้นทางของโซนนั้นชัดเจน
+    if (visiblePins.length >= 2) {
       // polyline เบื้องต้นก่อน (แสดงทันที) แล้ว road route ทับ
       const polyline = L.polyline(
-        pins.map(p => [p.lat, p.lng]),
+        visiblePins.map(p => [p.lat, p.lng]),
         { color, weight:3, opacity:.25, dashArray:'6,4', className:'route-line-' + idx }
       ).addTo(routeMainMap);
       routeLayersMap[sid].polyline = polyline;
-      adminDrawRoadRouteFromPins(routeMainMap, pins, color, 'route_' + sid);
+      adminDrawRoadRouteFromPins(routeMainMap, visiblePins, color, 'route_' + sid);
     }
 
-    // วาง markers
+    // วาง markers — ไล่จาก pins ต้นฉบับเสมอ (ไม่ใช่ visiblePins) เพื่อให้ pidx ตรงกับ index จริงที่ openCustDetail() ใช้อ้างอิง
     pins.forEach((p, pidx) => {
+      if (!matchesArea(p)) return; // ถูกกรองออกด้วยตัวกรองพื้นที่ — ไม่วาดหมุดนี้
       const icon = typeIcons[p.type] || '📍';
       const marker = L.marker([p.lat, p.lng], {
         icon: L.divIcon({
@@ -6890,9 +6992,8 @@ function renderRouteMap(filter) {
             ${p.photo_url?`<img src="${p.photo_url}" onclick="event.stopPropagation();openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:60px;object-fit:cover;border-radius:6px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">` : ''}
             <div style="font-size:9px;color:${color};font-weight:700;margin-top:3px;">จุดที่ ${pidx+1}/${pins.length} · แตะดูรายละเอียด ›</div>
           </div>`;
-      marker.bindPopup(buildPopup3(''), {autoClose:false, closeOnClick:false, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN3 % PIN_POPUP_OFFSETS.length]});
+      marker.bindPopup(buildPopup3(''), {autoClose:true, closeOnClick:true, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN3 % PIN_POPUP_OFFSETS.length]});
       _pinN3++;
-      marker.openPopup();
       reverseGeocodeTH(p.lat, p.lng).then(addr => { if (addr) marker.setPopupContent(buildPopup3(addr)); });
       routeLayersMap[sid].markers.push(marker);
       allBounds.push([p.lat, p.lng]);
@@ -6993,6 +7094,8 @@ function openCustDetail(salesId, pinIdx) {
     { icon:'📅', label:'บันทึกเมื่อ', val: addedDate },
   ];
   if (p.address) infoRows.push({ icon:'🏠', label:'ที่อยู่', val: p.address, full:true });
+  const areaBits = [p.subdistrict, p.district, p.province].filter(Boolean);
+  if (areaBits.length) infoRows.push({ icon:'📍', label:'ตำบล/อำเภอ/จังหวัด', val: areaBits.join(' / '), full:true });
   document.getElementById('cdm-info').innerHTML = infoRows.map(x => `
     <div style="background:#f9f9f9;border-radius:10px;padding:10px;${x.full ? 'grid-column:1/3;' : ''}">
       <div style="font-size:11px;color:var(--sub);margin-bottom:3px;">${x.icon} ${x.label}</div>
