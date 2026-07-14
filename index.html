@@ -6655,7 +6655,10 @@ function _deactivateAddPinMode() {
   _addPinActiveMap = null;
 }
 
+let _gapModalSession = 0; // กันผลลัพธ์ geocode ของหมุดเก่าเขียนทับฟอร์มของหมุดใหม่ (ถ้าปิด/เปิด modal เร็วระหว่างรอ geocode ที่คิวหน่วงไว้)
+
 function openGpsAddPinModal(lat, lng) {
+  const _mySession = ++_gapModalSession;
   _gpsAddPinLatLng = { lat, lng };
   document.getElementById('gap-latlng').textContent = `📌 พิกัด: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   document.getElementById('gap-name').value  = '';
@@ -6671,12 +6674,13 @@ function openGpsAddPinModal(lat, lng) {
   sel.innerHTML = allSalesStaff.map(s => `<option value="${s.salesId||s.id||''}">${s.name}</option>`).join('');
   document.getElementById('gps-addpin-modal').style.display = 'flex';
   reverseGeocodeTH(lat, lng).then(addr => {
-    if (!addr) return;
+    if (_mySession !== _gapModalSession || !addr) return; // modal ถูกปิด/เปิดใหม่ไปแล้วระหว่างรอ — ทิ้งผลลัพธ์เก่านี้
     document.getElementById('gap-latlng').textContent = `📌 ${addr} (${lat.toFixed(5)}, ${lng.toFixed(5)})`;
     const addrEl = document.getElementById('gap-addr');
     if (addrEl && !addrEl.value) addrEl.value = addr; // เดาให้ก่อน แก้ไขเองได้ถ้าไม่ตรง
   });
   reverseGeocodeStruct(lat, lng).then(g => {
+    if (_mySession !== _gapModalSession) return; // modal ถูกปิด/เปิดใหม่ไปแล้วระหว่างรอ — ทิ้งผลลัพธ์เก่านี้
     const pEl = document.getElementById('gap-province'), dEl = document.getElementById('gap-district'), sEl = document.getElementById('gap-subdistrict');
     if (pEl && !pEl.value) pEl.value = g.province || '';
     if (dEl && !dEl.value) dEl.value = g.district || '';
