@@ -2675,8 +2675,20 @@ function renderOrders(orders) {
           ? `<span onclick="quickSetPayment('${escapeAttr(o.order_id)}')" title="คลิกเพื่อเปลี่ยน" style="display:inline-block;background:#eaf4fd;color:#2980b9;border:1px solid #b3d4f0;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:700;cursor:pointer;">${escapeHtml(pl)}</span>`
           : `<span onclick="quickSetPayment('${escapeAttr(o.order_id)}')" title="คลิกเพื่อตั้งค่า" style="display:inline-block;background:#f5f5f5;color:#999;border:1px dashed #ccc;border-radius:10px;padding:2px 8px;font-size:11px;font-weight:600;cursor:pointer;">+ ตั้งค่า</span>`;
 
+    // 🚨 ใหม่: badge เตือนกรณีระบบตรวจสลิปแล้วสงสัย (สลิปซ้ำ / วันที่ผิดปกติ) — แยกจากยอดไม่ตรงธรรมดา
+    // เพื่อให้แอดมินเห็นปุ๊บรู้ปั๊บว่าเคสไหนต้องรีบเช็คด่วนกว่า ไม่ต้องเปิดแชทเข้าไปดูก่อนถึงจะรู้
+    const FRAUD_FLAG_MAP = {
+      duplicate  : { text: '🚨 สงสัยสลิปซ้ำ',        bg: '#fdecea', color: '#a4161a', border: '#f1948a' },
+      stale_date : { text: '🚨 วันที่สลิปเก่าผิดปกติ', bg: '#fdecea', color: '#a4161a', border: '#f1948a' },
+      future_date: { text: '🚨 วันที่สลิปล่วงหน้า',    bg: '#fdecea', color: '#a4161a', border: '#f1948a' },
+    };
+    const fraudFlagInfo = !isGhost && o.payment_flag ? FRAUD_FLAG_MAP[o.payment_flag] : null;
+    const fraudBadge = fraudFlagInfo
+      ? `<br><span title="ตรวจสอบด่วน — ดูรายละเอียดในแชทออเดอร์" style="display:inline-block;margin-top:3px;background:${fraudFlagInfo.bg};color:${fraudFlagInfo.color};border:1px solid ${fraudFlagInfo.border};border-radius:10px;padding:2px 8px;font-size:10px;font-weight:800;">${fraudFlagInfo.text}</span>`
+      : '';
+
     return `
-      <tr class="${isNew ? 'row-new' : ''} ${isGhost ? '' : 'row-clickable'}" ${isGhost ? '' : `onclick="rowOpenOrderDetail(event,'${escapeAttr(o.order_id)}')"`}>
+      <tr class="${isNew ? 'row-new' : ''} ${isGhost ? '' : 'row-clickable'}" ${fraudFlagInfo ? 'style="background:#fff5f5;"' : ''} ${isGhost ? '' : `onclick="rowOpenOrderDetail(event,'${escapeAttr(o.order_id)}')"`}>
         <td>${orderIdDisplay}</td>
         <td><strong>${escapeHtml(o.customer_name || '-')}</strong><br>${lineNameDisplay}${cidDisplay}</td>
         <td>${salesBadge}</td>
@@ -2685,7 +2697,7 @@ function renderOrders(orders) {
           <div class="items-list">${shortItems || '<em>—</em>'}</div>
         </td>
         <td>${totalDisplay}</td>
-        <td>${paymentBadge}</td>
+        <td>${paymentBadge}${fraudBadge}</td>
         <td>${statusCell}</td>
         <td style="font-size:12px;color:var(--sub);white-space:nowrap;">${date}</td>
         <td>
@@ -5230,20 +5242,33 @@ function _updateChatPaymentBar(o) {
     'paid'          : { text: '📋 ได้รับสลิปแล้ว รอยืนยัน', color: '#2980b9', bg: '#eaf4fd' },
     'confirmed'     : { text: '✅ ยืนยันชำระแล้ว',           color: '#27ae60', bg: '#e8f8f5' },
   };
-  const s = statusMap[ps] || { text: '💳 โอนเงิน', color: '#555', bg: '#f5f5f5' };
+  // 🚨 ใหม่: ถ้าระบบตรวจแล้วสงสัยฉ้อโกง (สลิปซ้ำ/วันที่ผิดปกติ) ให้ทับข้อความปกติด้วยคำเตือนที่ชัดเจนกว่า
+  const FRAUD_FLAG_TEXT = {
+    duplicate  : { text: '🚨 สงสัยสลิปซ้ำ — ตรวจสอบด่วน', color: '#a4161a', bg: '#fdecea' },
+    stale_date : { text: '🚨 วันที่ในสลิปเก่าผิดปกติ',      color: '#a4161a', bg: '#fdecea' },
+    future_date: { text: '🚨 วันที่ในสลิปล่วงหน้าผิดปกติ',  color: '#a4161a', bg: '#fdecea' },
+  };
+  const s = (o.payment_flag && FRAUD_FLAG_TEXT[o.payment_flag]) || statusMap[ps] || { text: '💳 โอนเงิน', color: '#555', bg: '#f5f5f5' };
   wrap.style.background = s.bg;
   if (statusEl) { statusEl.textContent = s.text; statusEl.style.color = s.color; }
 
   // ── slip info ──
   if (slipEl) {
     const parts = [];
-    if (o.slip_amount) parts.push(`ยอดที่โอน: ฿${Number(o.slip_amount).toLocaleString()}`);
-    if (o.total)       parts.push(`ยอดออเดอร์: ฿${Number(o.total).toLocaleString()}`);
+    if (o.slip_amount) parts.push(`ยอดที่ลูกค้าพิมพ์: ฿${Number(o.slip_amount).toLocaleString()}`);
+    if (o.slip_ocr_amount != null) parts.push(`ยอดที่ระบบอ่านจากรูป: ฿${Number(o.slip_ocr_amount).toLocaleString()}`);
+    if (o.total) parts.push(`ยอดออเดอร์: ฿${Number(o.total).toLocaleString()}`);
     if (ps === 'slip_mismatch' && o.slip_amount && o.total) {
       const diff = Number(o.total) - Number(o.slip_amount);
       if (diff > 0) parts.push(`⚠️ ขาดอีก ฿${diff.toFixed(2)}`);
       else          parts.push(`โอนเกิน ฿${Math.abs(diff).toFixed(2)}`);
     }
+    // 🆕 วันที่/เวลา + เลขอ้างอิงที่ระบบอ่านได้จากสลิป — ช่วยแอดมินเทียบตอนตรวจ manual
+    if (o.slip_datetime) {
+      const dt = new Date(o.slip_datetime);
+      if (!isNaN(dt.getTime())) parts.push(`📅 วันที่ในสลิป: ${dt.toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' })}`);
+    }
+    if (o.slip_ref) parts.push(`🔖 เลขอ้างอิง: ${o.slip_ref}`);
     slipEl.textContent = parts.join(' • ');
   }
 
