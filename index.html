@@ -1679,6 +1679,20 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
     <span id="errNotifyStatus" style="color:#888;font-size:12px;"></span>
   </div>
 
+  <!-- 👥 ใครเข้าใช้งานระบบแอดมินบ้าง -->
+  <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+      <div style="font-weight:800;font-size:14px;color:#333;">👥 ใครเข้าใช้งานระบบแอดมินบ้าง</div>
+      <button onclick="loadUserSessionsLog()" style="background:#eef4fb;border:none;color:#2980b9;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🔄 รีเฟรช</button>
+    </div>
+    <div id="userSessionsList" style="display:flex;flex-direction:column;gap:6px;">
+      <div style="color:#888;font-size:13px;padding:14px;text-align:center;">กำลังโหลด...</div>
+    </div>
+    <div style="font-size:11px;color:#999;margin-top:8px;line-height:1.6;">
+      ⓘ แสดงเฉพาะบัญชีแอดมิน (เจ้าของร้าน/ผู้จัดการ/แอดมิน) ที่ล็อกอินผ่านหน้านี้ — บัญชีเซลที่ล็อกอินผ่านแอปเซลแยกต่างหาก ยังไม่แสดงในรายการนี้ ส่วนคอลัมน์ "อุปกรณ์" จะเริ่มมีข้อมูลตั้งแต่การล็อกอินครั้งถัดไปเป็นต้นไป (บัญชีที่ล็อกอินค้างไว้อยู่แล้วจะยังไม่มีข้อมูลจนกว่าจะล็อกอินใหม่)
+    </div>
+  </div>
+
   <!-- ตัวกรอง -->
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;" id="errFilterChips">
     <button class="err-chip" data-src="all" onclick="setErrFilter('all')" style="background:#7E1610;color:#fff;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">ทั้งหมด</button>
@@ -5649,7 +5663,7 @@ function toggleAdminSecretCodeField() {
 // ═══════════════════════════════════════════
 //  FETCH WITH RETRY (existing)
 // ═══════════════════════════════════════════
-async function fetchWithRetry(url, opts = {}, { retries = 4, baseDelay = 4000 } = {}) {
+async function fetchWithRetry(url, opts = {}, { retries = 4, baseDelay = 4000, onRetry = null } = {}) {
   for (let i = 0; i <= retries; i++) {
     try {
       const r = await fetch(url, { ...opts, signal: AbortSignal.timeout(15000) });
@@ -5659,6 +5673,7 @@ async function fetchWithRetry(url, opts = {}, { retries = 4, baseDelay = 4000 } 
     } catch (e) {
       if (i === retries) throw e;
       const delay = baseDelay * (i + 1);
+      if (onRetry) { try { onRetry(i + 1, retries); } catch(_) {} }
       await new Promise(res => setTimeout(res, delay));
     }
   }
@@ -7739,6 +7754,28 @@ function hasPerm(p) {
   return (authUser.perms || []).includes(p);
 }
 
+// ── ป้ายอุปกรณ์/เบราว์เซอร์ของเครื่องที่กำลังใช้งานอยู่ (ส่งไปให้ backend บันทึกตอน login) ──
+function getClientDeviceLabel() {
+  try {
+    const ua = navigator.userAgent || '';
+    let os = 'ไม่ทราบเครื่อง';
+    if (/Windows/i.test(ua)) os = 'Windows';
+    else if (/Macintosh|Mac OS X/i.test(ua)) os = 'Mac';
+    else if (/iPhone/i.test(ua)) os = 'iPhone';
+    else if (/iPad/i.test(ua)) os = 'iPad';
+    else if (/Android/i.test(ua)) os = 'Android';
+    else if (/Linux/i.test(ua)) os = 'Linux';
+    let browser = 'เบราว์เซอร์ไม่ทราบชื่อ';
+    if (/Edg\//i.test(ua)) browser = 'Edge';
+    else if (/OPR\/|Opera/i.test(ua)) browser = 'Opera';
+    else if (/Chrome\//i.test(ua)) browser = 'Chrome';
+    else if (/CriOS\//i.test(ua)) browser = 'Chrome (iOS)';
+    else if (/Firefox\//i.test(ua)) browser = 'Firefox';
+    else if (/Safari\//i.test(ua)) browser = 'Safari';
+    return os + ' · ' + browser;
+  } catch(_) { return 'ไม่ทราบอุปกรณ์'; }
+}
+
 // แนบ Authorization: Bearer อัตโนมัติทุก request ไป backend
 (function installBearerInjector() {
   const _f = window.fetch.bind(window);
@@ -7763,7 +7800,7 @@ function showLoginOverlay() {
   // (แอดมิน/คนทั่วไปจะไม่เห็นปุ่มนี้เลยหลังตั้งระบบเสร็จ)
   const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
   if (bu) {
-    fetch(bu + '/auth/status').then(r => r.json()).then(d => {
+    fetchWithRetry(bu + '/auth/status', {}, { retries: 3, baseDelay: 3000 }).then(r => r.json()).then(d => {
       const w = document.getElementById('setup-link-wrap');
       if (w) w.hidden = !!d.has_owner;
     }).catch(() => {});
@@ -7779,22 +7816,33 @@ async function authLogin() {
   if (!bu) { err.textContent = 'ยังไม่ได้ตั้ง Backend URL — เชื่อมต่อครั้งแรกด้วย Master Key ก่อน'; return; }
   const btn = document.getElementById('lg-btn');
   btn.disabled = true; btn.textContent = '⏳ กำลังตรวจสอบ...';
+  err.textContent = '';
   try {
-    const r = await fetch(bu + '/auth/login', {
+    const r = await fetchWithRetry(bu + '/auth/login', {
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ username: document.getElementById('lg-user').value, password: document.getElementById('lg-pass').value })
+      body: JSON.stringify({
+        username: document.getElementById('lg-user').value,
+        password: document.getElementById('lg-pass').value,
+        device: getClientDeviceLabel()
+      })
+    }, {
+      onRetry: (attempt) => { btn.textContent = '⏳ เซิร์ฟเวอร์กำลังเริ่มทำงาน กรุณารอสักครู่ (' + attempt + '/4)...'; }
     });
     const d = await r.json().catch(()=>({}));
     if (r.status === 404 && d.error === 'no_users') { showSetupForm(); return; }
     if (!r.ok) throw new Error(d.error || 'เข้าสู่ระบบไม่สำเร็จ');
     localStorage.setItem('admin_auth_token', d.token);
     localStorage.setItem('admin_auth_user', JSON.stringify(d.user));
+    localStorage.setItem('admin_auth_device', getClientDeviceLabel());
     authUser = d.user;
     hideLoginOverlay();
     applyPerms();
     toast('👋 สวัสดี ' + (d.user.display_name || d.user.username));
   } catch(e) {
-    err.textContent = '❌ ' + e.message;
+    const isNetErr = e.name === 'TypeError' || e.name === 'TimeoutError' || /fetch/i.test(e.message || '');
+    err.textContent = isNetErr
+      ? '❌ เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (เซิร์ฟเวอร์อาจกำลังพักการทำงานหลังไม่มีคนใช้งาน) — ลองกดเข้าสู่ระบบอีกครั้งใน 30 วินาที'
+      : '❌ ' + e.message;
   } finally { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
 }
 
@@ -7802,20 +7850,25 @@ async function authSetup() {
   const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
   const err = document.getElementById('su-err');
   if (!bu) { err.textContent = 'กรอก Backend URL ในแถบตั้งค่าก่อน'; return; }
+  err.textContent = '';
   try {
-    const r = await fetch(bu + '/auth/setup', {
+    const r = await fetchWithRetry(bu + '/auth/setup', {
       method:'POST',
       headers:{ 'Content-Type':'application/json', 'x-admin-key': document.getElementById('su-key').value.trim() },
       body: JSON.stringify({
         username: document.getElementById('su-user').value,
         password: document.getElementById('su-pass').value,
-        display_name: document.getElementById('su-name').value
+        display_name: document.getElementById('su-name').value,
+        device: getClientDeviceLabel()
       })
+    }, {
+      onRetry: (attempt) => { err.textContent = '⏳ เซิร์ฟเวอร์กำลังเริ่มทำงาน กรุณารอสักครู่ (' + attempt + '/4)...'; }
     });
     const d = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(d.error || 'สร้างไม่สำเร็จ');
     localStorage.setItem('admin_auth_token', d.token);
     localStorage.setItem('admin_auth_user', JSON.stringify(d.user));
+    localStorage.setItem('admin_auth_device', getClientDeviceLabel());
     authUser = d.user;
     hideLoginOverlay();
     applyPerms();
@@ -7882,7 +7935,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     // มี token → ตรวจกับ server + รีเฟรชสิทธิ์ล่าสุด
     try {
       const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
-      const r = await fetch(bu + '/auth/me', { headers: { 'Authorization': 'Bearer ' + tok } });
+      const r = await fetchWithRetry(bu + '/auth/me?device=' + encodeURIComponent(getClientDeviceLabel()), { headers: { 'Authorization': 'Bearer ' + tok } }, { retries: 3, baseDelay: 3000 });
       const d = await r.json().catch(()=>({}));
       if (r.ok) {
         localStorage.setItem('admin_auth_token', d.token);
@@ -7927,7 +7980,7 @@ async function loadUsersList() {
   const box = document.getElementById('users-list');
   const bu = getBackendUrl();
   try {
-    const r = await fetch(bu + '/auth/users');
+    const r = await fetchWithRetry(bu + '/auth/users', {}, { retries: 3, baseDelay: 3000 });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || 'โหลดไม่ได้');
     const roleTh = { owner:'👑 เจ้าของร้าน', manager:'🧑‍💼 ผู้จัดการ', staff:'🧑‍💻 แอดมิน' };
@@ -8035,7 +8088,7 @@ try {
   const _origShowPage = window.showPage;
   window.showPage = function (n) {
     _origShowPage(n);
-    if (n === 8) loadErrorLogPage();
+    if (n === 8) { loadErrorLogPage(); loadUserSessionsLog(); }
     if (n === 9) loadSystemStatusPage();
   };
 })();
@@ -8061,6 +8114,37 @@ function setErrFilter(src) {
   loadErrorLogPage();
 }
 
+// ── 👥 ใครเข้าใช้งานระบบแอดมินบ้าง (ใช้ endpoint /auth/users เดิมที่มีอยู่แล้ว) ──
+async function loadUserSessionsLog() {
+  const box = document.getElementById('userSessionsList');
+  if (!box) return;
+  const bu = getBackendUrl();
+  if (!bu) { box.innerHTML = '<div style="color:#c0392b;font-size:13px;padding:14px;">กรอก Backend URL ในแถบตั้งค่าก่อน</div>'; return; }
+  box.innerHTML = '<div style="color:#888;font-size:13px;padding:14px;text-align:center;">กำลังโหลด...</div>';
+  try {
+    const r = await fetchWithRetry(bu + '/auth/users', {}, { retries: 3, baseDelay: 3000 });
+    const d = await r.json().catch(()=>({}));
+    if (!r.ok) throw new Error(d.error || 'โหลดไม่ได้');
+    const roleTh = { owner:'👑 เจ้าของร้าน', manager:'🧑‍💼 ผู้จัดการ', staff:'🧑‍💻 แอดมิน' };
+    const users = d.users || [];
+    if (!users.length) { box.innerHTML = '<div style="color:#888;font-size:13px;padding:14px;text-align:center;">ยังไม่มีบัญชีผู้ใช้</div>'; return; }
+    // เรียงคนที่เข้าล่าสุดไว้บนสุด
+    users.sort((a, b) => new Date(b.last_login || 0) - new Date(a.last_login || 0));
+    box.innerHTML = users.map(u => {
+      const device = u.last_device || u.device || null;
+      const lastLogin = u.last_login ? new Date(u.last_login).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' }) : 'ยังไม่เคยเข้าสู่ระบบ';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:${u.is_active?'#f9f9f9':'#fdf0f0'};border-radius:10px;font-size:13px;">
+        <div style="flex:1;min-width:0;">
+          <div style="font-weight:700;">${(u.display_name || u.username || '').replace(/</g,'&lt;')} <span style="font-size:11px;color:#888;font-weight:400;">@${(u.username||'').replace(/</g,'&lt;')}</span> ${u.is_active?'':'<span style="color:#c0392b;font-size:11px;">(ปิดใช้งาน)</span>'}</div>
+          <div style="font-size:11px;color:#666;">${roleTh[u.role]||u.role} · 🕒 เข้าล่าสุด ${lastLogin} · 💻 ${device ? device.replace(/</g,'&lt;') : 'ยังไม่มีข้อมูลอุปกรณ์'}</div>
+        </div>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    box.innerHTML = `<div style="color:#c0392b;font-size:13px;padding:14px;">❌ ${e.message}</div>`;
+  }
+}
+
 async function loadErrorLogPage() {
   const box = document.getElementById('errLogList');
   const bu = getBackendUrl();
@@ -8069,7 +8153,7 @@ async function loadErrorLogPage() {
   loadErrNotifyCfg();
   try {
     const hours = document.getElementById('errHours').value;
-    const r = await fetch(`${bu}/admin/error-logs?source=${_errFilter}&hours=${hours}`);
+    const r = await fetchWithRetry(`${bu}/admin/error-logs?source=${_errFilter}&hours=${hours}`, {}, { retries: 3, baseDelay: 3000 });
     const d = await _jsonOrExplain(r);
     if (!r.ok) throw new Error(d.error || 'โหลดไม่สำเร็จ');
     const logs = d.logs || [];
@@ -8139,7 +8223,7 @@ async function loadSystemStatusPage() {
   if (!bu) { box.innerHTML = '<div style="color:#c0392b;font-size:13px;padding:16px;">กรอก Backend URL ในแถบตั้งค่าก่อน</div>'; return; }
   box.innerHTML = '<div style="color:#888;font-size:13px;padding:20px;text-align:center;">⏳ กำลังตรวจสุขภาพระบบ...</div>';
   try {
-    const r = await fetch(bu + '/admin/system-status');
+    const r = await fetchWithRetry(bu + '/admin/system-status', {}, { retries: 3, baseDelay: 3000 });
     const s = await _jsonOrExplain(r);
     if (!r.ok) throw new Error(s.error || 'ตรวจไม่สำเร็จ');
 
