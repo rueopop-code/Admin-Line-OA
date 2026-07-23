@@ -4065,6 +4065,26 @@ function openEditModal(orderId) {
 }
 
 // ── EM Modal: Parse sizes field → array of {label, price, stock} ──
+// ── เรียงขนาดสินค้าประเภทไซส์/เบอร์ (เช่น 2.5x5, 3x5, 20x30) ตามตัวเลขจากน้อยไปมาก ──
+function sizeSortNums(label) {
+  return (String(label == null ? '' : label).match(/\d+(?:\.\d+)?/g) || []).map(Number);
+}
+function compareSizeLabels(a, b) {
+  const na = sizeSortNums(a), nb = sizeSortNums(b);
+  if (na.length && nb.length) {
+    const len = Math.max(na.length, nb.length);
+    for (let i = 0; i < len; i++) {
+      const va = na[i], vb = nb[i];
+      if (va === undefined) return -1;
+      if (vb === undefined) return 1;
+      if (va !== vb) return va - vb;
+    }
+    return 0;
+  }
+  if (na.length && !nb.length) return -1;
+  if (!na.length && nb.length) return 1;
+  return 0;
+}
 function emParseSizes(s) {
   // s is already parsed (object/array), not a string
   if (!s) return [];
@@ -4078,7 +4098,7 @@ function emParseSizes(s) {
         return { label: String(label), price, stock };
       }
       return { label: String(v), price: 0, stock: null };
-    }).filter(v => v.label);
+    }).filter(v => v.label).sort((a, b) => compareSizeLabels(a.label, b.label));
   } else if (typeof s === 'object') {
     return Object.entries(s).map(([k, v]) => {
       if (typeof v === 'object' && v !== null) {
@@ -4087,7 +4107,7 @@ function emParseSizes(s) {
         return { label: k, price, stock };
       }
       return { label: k, price: parseFloat(v) || 0, stock: null };
-    }).filter(v => v.label);
+    }).filter(v => v.label).sort((a, b) => compareSizeLabels(a.label, b.label));
   }
   return [];
 }
@@ -4173,7 +4193,7 @@ function emGetSizesFromProd(prod) {
   try {
     const s = typeof sizesVal === 'string' ? JSON.parse(sizesVal) : sizesVal;
     if (Array.isArray(s) && s.every(v => typeof v === 'string' || typeof v === 'number')) {
-      return s.map(v => ({ label: String(v), price: 0, stock: null }));
+      return s.map(v => ({ label: String(v), price: 0, stock: null })).sort((a, b) => compareSizeLabels(a.label, b.label));
     }
   } catch(e) {}
   return [];
