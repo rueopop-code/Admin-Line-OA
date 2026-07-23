@@ -3245,7 +3245,7 @@ function renderEnhancedItems(items) {
                 data-field="name" data-variant="${escapeAttr(it._variant||'')}"
                 oninput="onProductSearch(this, ${idx})"
                 onfocus="onProductFocus(this, ${idx})"
-                onblur="setTimeout(()=>hideProductSuggestions(${idx}), 250)"
+                onblur="setTimeout(()=>{ if(!document.getElementById('psugg-${idx}')?.contains(document.activeElement)) hideProductSuggestions(${idx}); }, 250)"
                 style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;width:100%;outline:none;"
                 onfocusin="this.style.borderColor='var(--red)'" onfocusout="this.style.borderColor='var(--border)'">
               <div class="product-suggestions" id="psugg-${idx}"></div>
@@ -3299,7 +3299,7 @@ function eeSelectVariant(idx, label, price) {
   renderEnhancedItems(items);
 }
 
-function _buildSuggestions(suggEl, idx, filterVal) {
+function _buildSuggestions(suggEl, idx, filterVal, focusInner = true) {
   const val = (filterVal||'').toLowerCase().trim();
   const list = val
     ? allProducts.filter(p => p.name?.toLowerCase().includes(val))
@@ -3326,8 +3326,9 @@ function _buildSuggestions(suggEl, idx, filterVal) {
     <div class="sugg-items-list">${itemsHtml}</div>`;
   suggEl.style.display = 'block';
 
-  // Auto-focus search box
-  if (showSearch) {
+  // Auto-focus search box (เฉพาะตอนเปิดจากปุ่มลูกศร — ถ้าผู้ใช้กำลังพิมพ์ในช่องหลักอยู่ ห้ามแย่งโฟกัส
+  // ไม่งั้น onblur ของช่องหลักจะทำงานแล้วปิด dropdown ทันทีหลังเปิด)
+  if (showSearch && focusInner) {
     setTimeout(() => {
       const si = suggEl.querySelector('.sugg-search-row input');
       if (si) si.focus();
@@ -3382,14 +3383,14 @@ function onProductFocus(input, idx) {
   });
   const suggEl = document.getElementById(`psugg-${idx}`);
   if (!suggEl || suggEl.style.display === 'block') return;
-  _buildSuggestions(suggEl, idx, input.value);
+  _buildSuggestions(suggEl, idx, input.value, false);
 }
 
 function onProductSearch(input, idx) {
   if (!allProducts.length) return;
   const suggEl = document.getElementById(`psugg-${idx}`);
   if (!suggEl) return;
-  _buildSuggestions(suggEl, idx, input.value);
+  _buildSuggestions(suggEl, idx, input.value, false);
   updateStockPreview();
 }
 
@@ -4248,7 +4249,7 @@ function renderEditItems(items) {
               data-field="name" data-variant="${escapeAttr(it._variant||'')}"
               oninput="emOnProductSearch(this,${idx})"
               onfocus="emOnProductFocus(this,${idx})"
-              onblur="setTimeout(()=>emHideSugg(${idx}),250)"
+              onblur="setTimeout(()=>{ if(!document.getElementById('em-psugg-${idx}')?.contains(document.activeElement)) emHideSugg(${idx}); }, 250)"
               style="padding:5px 8px;border:1px solid var(--border2);border-radius:6px;font-size:12px;font-family:inherit;width:100%;outline:none;"
               onfocusin="this.style.borderColor='var(--red-500)'" onfocusout="this.style.borderColor='var(--border2)'">
             <div class="product-suggestions" id="em-psugg-${idx}" style="display:none;"></div>
@@ -4267,7 +4268,7 @@ function renderEditItems(items) {
 }
 
 // ── EM product search helpers ──
-function emBuildSugg(suggEl, idx, filterVal) {
+function emBuildSugg(suggEl, idx, filterVal, focusInner = true) {
   const val = (filterVal||'').toLowerCase().trim();
   const list = val
     ? allProducts.filter(p => p.name?.toLowerCase().includes(val))
@@ -4293,7 +4294,7 @@ function emBuildSugg(suggEl, idx, filterVal) {
       onkeydown="if(event.key==='Escape')emHideSugg(${idx})"></div>` : ''}
     <div class="sugg-items-list">${itemsHtml}</div>`;
   suggEl.style.display = 'block';
-  if (showSearch) setTimeout(() => { const si = suggEl.querySelector('.sugg-search-row input'); if (si) si.focus(); }, 30);
+  if (showSearch && focusInner) setTimeout(() => { const si = suggEl.querySelector('.sugg-search-row input'); if (si) si.focus(); }, 30);
 }
 
 function emOnSuggSearch(searchInput, idx) {
@@ -4334,14 +4335,14 @@ function emOnProductFocus(input, idx) {
   document.querySelectorAll('.product-suggestions').forEach(el => { if (el.id !== `em-psugg-${idx}`) el.style.display='none'; });
   const suggEl = document.getElementById(`em-psugg-${idx}`);
   if (!suggEl || suggEl.style.display === 'block') return;
-  emBuildSugg(suggEl, idx, input.value);
+  emBuildSugg(suggEl, idx, input.value, false);
 }
 
 function emOnProductSearch(input, idx) {
   if (!allProducts.length) return;
   const suggEl = document.getElementById(`em-psugg-${idx}`);
   if (!suggEl) return;
-  emBuildSugg(suggEl, idx, input.value);
+  emBuildSugg(suggEl, idx, input.value, false);
 }
 
 function emHideSugg(idx) {
