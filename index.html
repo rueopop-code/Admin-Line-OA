@@ -1431,6 +1431,10 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
         <a id="cdm-phone-btn" href="" style="flex:1;padding:10px;border-radius:10px;background:#e8f5e9;color:#27ae60;border:1.5px solid #27ae60;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:none;">📞 โทร</a>
         <a id="cdm-maps-btn" href="" target="_blank" style="flex:1;padding:10px;border-radius:10px;background:#e3f2fd;color:#1565c0;border:1.5px solid #1565c0;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;text-align:center;text-decoration:none;display:none;">🗺️ Google Maps</a>
       </div>
+      <div style="display:flex;gap:8px;margin-top:8px;">
+        <button onclick="editCustDetailPin()" style="flex:1;padding:10px;border-radius:10px;background:#fff;color:var(--red);border:1.5px solid var(--red);font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">✏️ แก้ไขข้อมูล/รูป</button>
+        <button onclick="deleteCustDetailPin()" style="flex:1;padding:10px;border-radius:10px;background:#fdecea;color:#e74c3c;border:1.5px solid #e74c3c;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">🗑️ ลบ</button>
+      </div>
     </div>
   </div>
 </div>
@@ -1557,7 +1561,7 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 <div id="gps-addpin-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:5500;align-items:center;justify-content:center;padding:16px;">
   <div style="background:#fff;border-radius:18px;width:100%;max-width:380px;max-height:90vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,.25);">
     <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
-      <div style="font-size:16px;font-weight:700;">📍 ปักหมุดลูกค้าใหม่</div>
+      <div style="font-size:16px;font-weight:700;" id="gap-modal-title">📍 ปักหมุดลูกค้าใหม่</div>
       <button onclick="closeGpsAddPinModal()" style="background:var(--gray-100);border:none;width:30px;height:30px;border-radius:50%;font-size:16px;cursor:pointer;">×</button>
     </div>
     <div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px;">
@@ -1565,6 +1569,15 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
       <div>
         <label style="font-size:12px;font-weight:700;color:var(--text-3);">เซล (เจ้าของหมุด) *</label>
         <select id="gap-sales" style="width:100%;padding:9px 10px;border:1.5px solid var(--border2);border-radius:8px;font-family:'Sarabun',sans-serif;font-size:14px;margin-top:4px;"></select>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:700;color:var(--text-3);">📸 รูปสถานที่/ลูกค้า <span style="font-weight:400;color:#999;">(ไม่บังคับ)</span></label>
+        <div id="gap-photo-preview" style="display:none;margin-top:6px;position:relative;max-width:180px;">
+          <img id="gap-photo-img" src="" style="width:100%;border-radius:10px;object-fit:cover;max-height:140px;display:block;">
+          <button type="button" onclick="removeGapPhoto()" style="position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;background:#e74c3c;color:#fff;border:2px solid #fff;font-size:13px;cursor:pointer;">×</button>
+        </div>
+        <input id="gap-photo-input" type="file" accept="image/*" onchange="onGapPhotoSelected(this)" style="margin-top:6px;font-size:12px;">
+        <div id="gap-photo-status" style="display:none;font-size:11px;color:#888;margin-top:4px;"></div>
       </div>
       <div>
         <label style="font-size:12px;font-weight:700;color:var(--text-3);">ชื่อลูกค้า/ร้านค้า *</label>
@@ -1598,6 +1611,7 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
       </div>
       <div id="gap-err" style="display:none;color:#e74c3c;font-size:12px;font-weight:700;"></div>
       <button id="gap-submit-btn" onclick="submitGpsAddPin()" class="btn-primary" style="width:100%;padding:11px;font-size:14px;">✔ บันทึกหมุด</button>
+      <button id="gap-delete-btn" onclick="deleteGpsPinFromModal()" style="display:none;width:100%;padding:10px;background:#fdecea;border:1.5px solid #e74c3c;border-radius:8px;color:#e74c3c;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">🗑️ ลบหมุดนี้</button>
     </div>
   </div>
 </div>
@@ -6279,7 +6293,7 @@ function openSalesDetail(salesId, focusSection, showOrders) {
       (buyers.map(b => `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:#f9f9f9;border-radius:8px;margin-bottom:6px;font-size:13px;"><span style="font-weight:600;">${escapeHtml(b.name)}</span><span style="text-align:right;"><span style="font-weight:700;color:${color};">฿${b.total.toLocaleString()}</span><span style="color:var(--sub);font-size:11px;margin-left:6px;">(${b.count} ออเดอร์)</span></span></div>`).join('')||'<div style="color:var(--sub);font-size:13px;padding:8px 0;">ยังไม่มีลูกค้าซื้อ</div>');
   }
 
-  _sdPinState = { salesId, color, mode:'all', date:'', month:'' };
+  _sdPinState = { salesId, color, mode:'all', date:'', month:'', search:'' };
   renderSdPinList();
 
   document.getElementById('sales-detail-modal').style.display = 'block';
@@ -6307,7 +6321,7 @@ function openSalesDetail(salesId, focusSection, showOrders) {
     let _pinN2 = 0;
     pins.forEach(p=>{
       const ic={shop:'🏪',home:'🏠',business:'🏢',other:'📍'};
-      const buildPopup2 = (addr) => `<div style="font-family:'Sarabun',sans-serif;min-width:100px;max-width:120px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b>${p.phone?'<br><span style="font-size:10px;">📞 '+p.phone+'</span>':''}${p.createdAt?`<br><span style="font-size:9px;color:#888;">🕒 ปักเมื่อ ${fmtThaiDT(p.createdAt)}</span>`:''}${addr?`<br><span style="font-size:9px;color:#999;">📍 ${addr}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}</div>`;
+      const buildPopup2 = (addr) => `<div style="font-family:'Sarabun',sans-serif;min-width:110px;max-width:130px;line-height:1.25;"><b style="font-size:12px;">${p.name}</b>${p.phone?'<br><span style="font-size:10px;">📞 '+p.phone+'</span>':''}${p.createdAt?`<br><span style="font-size:9px;color:#888;">🕒 ปักเมื่อ ${fmtThaiDT(p.createdAt)}</span>`:''}${addr?`<br><span style="font-size:9px;color:#999;">📍 ${addr}</span>`:''}${p.photo_url?`<br><img src="${p.photo_url}" onclick="openImageLightbox('${p.photo_url}', event)" style="width:100%;max-height:56px;object-fit:cover;border-radius:5px;margin-top:3px;display:block;cursor:zoom-in;" onerror="this.style.display='none'">`:''}<div style="display:flex;gap:4px;margin-top:5px;"><button onclick="openGpsEditPinModal('${salesId}','${p.id}')" style="flex:1;padding:4px 3px;background:${color};border:none;border-radius:5px;font-size:10px;color:#fff;font-weight:700;cursor:pointer;">✏️ แก้ไข</button><button onclick="deleteGpsPin('${salesId}','${p.id}')" style="flex:1;padding:4px 3px;background:#fdecea;border:1px solid #e74c3c;border-radius:5px;font-size:10px;color:#e74c3c;font-weight:700;cursor:pointer;">🗑️ ลบ</button></div></div>`;
       const _mk2 = L.marker([p.lat,p.lng],{icon:L.divIcon({html:`<div style="width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:11px;">${ic[p.type]||'📍'}</div>`,iconSize:[24,24],iconAnchor:[12,12],className:''})}).addTo(sdMap).bindPopup(buildPopup2(''), {autoClose:true, closeOnClick:true, closeButton:true, offset:PIN_POPUP_OFFSETS[_pinN2 % PIN_POPUP_OFFSETS.length]});
       _pinN2++;
       reverseGeocodeTH(p.lat, p.lng).then(addr => { if (addr) _mk2.setPopupContent(buildPopup2(addr)); });
@@ -6322,7 +6336,7 @@ function openSalesDetail(salesId, focusSection, showOrders) {
 function closeSalesDetail() { document.getElementById('sales-detail-modal').style.display='none'; }
 
 // ── รายชื่อหมุดใน modal รายละเอียดเซล + ตัวกรองแบบปฏิทิน + เวลาที่ปัก ──
-let _sdPinState = { salesId:'', color:'#C0392B', mode:'all', date:'', month:'' };
+let _sdPinState = { salesId:'', color:'#C0392B', mode:'all', date:'', month:'', search:'' };
 
 function setSdPinMode(mode, val) {
   _sdPinState.mode = mode;
@@ -6366,44 +6380,76 @@ function _sdPinFilterLabel() {
 function renderSdPinList() {
   const box = document.getElementById('sd-customers');
   if (!box) return;
-  const { salesId, color, mode, date, month } = _sdPinState;
-  // ใช้ cache ตรง ๆ เพื่อให้เห็นหมุดทั้งหมด (ไม่โดน filter วันของหน้าเส้นทางเซล)
-  const allPins = (_pinsCache[salesId] || []);
-  const pins = allPins.filter(_sdPinMatches);
+  const { salesId, color, mode, search } = _sdPinState;
 
   const chip = (key, label) => {
     const active = mode === key;
     return `<button onclick="setSdPinMode('${key}')" style="padding:5px 12px;border-radius:20px;border:1.5px solid ${color};background:${active?color:'#fff'};color:${active?'#fff':color};font-family:'Sarabun',sans-serif;font-size:11px;font-weight:700;cursor:pointer;">${label}</button>`;
   };
   const pickStyle = `padding:5px 8px;border:1.5px solid ${color}55;border-radius:10px;font-size:12px;font-family:'Sarabun',sans-serif;background:#fff;color:#333;outline:none;cursor:pointer;`;
-  const filterLbl = _sdPinFilterLabel();
-
-  const ic = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
-  const listHtml = pins.map(p => {
-    const i = allPins.indexOf(p); // index จริงใน cache
-    return `<div onclick="openCustDetailFromCache('${salesId}',${i})" style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:#f9f9f9;border-radius:8px;margin-bottom:6px;font-size:13px;cursor:pointer;">
-      <span>${ic[p.type]||'📍'}</span>
-      <span style="flex:1;min-width:0;">
-        <span style="font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</span>
-        ${p.createdAt?`<span style="font-size:10px;color:#888;">🕒 ปักเมื่อ ${fmtThaiDT(p.createdAt)}</span>`:''}
-      </span>
-      ${p.phone?`<span style="color:${color};font-size:12px;flex-shrink:0;">📞 ${p.phone}</span>`:''}
-      <span style="color:#ccc;font-size:14px;">›</span>
-    </div>`;
-  }).join('');
 
   box.innerHTML = `
-    <h4 id="sd-customers-hdr" style="font-size:14px;font-weight:700;margin-bottom:8px;">📍 ลูกค้าที่ปักหมุด (${pins.length}${mode!=='all'?`/${allPins.length}`:''} คน)${filterLbl?` <span style="font-size:11px;color:${color};font-weight:700;">· ${filterLbl}</span>`:''}</h4>
+    <h4 id="sd-customers-hdr" style="font-size:14px;font-weight:700;margin-bottom:8px;"></h4>
+    <input type="text" id="sd-search-input" value="${search.replace(/"/g,'&quot;')}" oninput="setSdPinSearch(this.value)" placeholder="🔍 ค้นหาชื่อ / เบอร์โทรลูกค้า"
+      style="width:100%;box-sizing:border-box;padding:7px 10px;border:1.5px solid ${color}55;border-radius:8px;font-size:12px;font-family:'Sarabun',sans-serif;margin-bottom:8px;">
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
       <span style="font-size:11px;font-weight:700;color:var(--sub);">📅 กรองวันที่ปัก:</span>
       ${chip('all','ทั้งหมด')}
       ${chip('today','วันนี้')}
       ${chip('yesterday','เมื่อวาน')}
       ${chip('7d','7 วันล่าสุด')}
-      <input type="date" value="${mode==='date'?date:''}" onchange="setSdPinMode('date',this.value)" title="เลือกวันจากปฏิทิน" style="${pickStyle}${mode==='date'?`box-shadow:0 0 0 2px ${color}44;`:''}">
-      <input type="month" value="${mode==='month'?month:''}" onchange="setSdPinMode('month',this.value)" title="เลือกทั้งเดือน" style="${pickStyle}${mode==='month'?`box-shadow:0 0 0 2px ${color}44;`:''}">
+      <input type="date" value="${mode==='date'?_sdPinState.date:''}" onchange="setSdPinMode('date',this.value)" title="เลือกวันจากปฏิทิน" style="${pickStyle}${mode==='date'?`box-shadow:0 0 0 2px ${color}44;`:''}">
+      <input type="month" value="${mode==='month'?_sdPinState.month:''}" onchange="setSdPinMode('month',this.value)" title="เลือกทั้งเดือน" style="${pickStyle}${mode==='month'?`box-shadow:0 0 0 2px ${color}44;`:''}">
     </div>
-    ${listHtml || '<div style="color:var(--sub);font-size:13px;padding:8px 0;">'+(mode!=='all'?'ไม่มีหมุดในช่วงที่เลือก':'ยังไม่มีหมุด')+'</div>'}`;
+    <div id="sd-pin-list-body"></div>`;
+  _sdPinRenderListBody();
+}
+
+// วาดใหม่เฉพาะส่วนหัวข้อ+รายการ ไม่แตะช่องค้นหา — กันช่องค้นหาเสียโฟกัสทุกครั้งที่พิมพ์
+// (ของเดิม re-render ทั้งกล่องรวมถึง <input> ค้นหาเอง ทำให้พิมพ์ได้ทีละตัวอักษรแล้วโฟกัสหลุด)
+function _sdPinRenderListBody() {
+  const bodyEl = document.getElementById('sd-pin-list-body');
+  const hdrEl  = document.getElementById('sd-customers-hdr');
+  if (!bodyEl) return;
+  const { salesId, color, mode, search } = _sdPinState;
+  const allPins = (_pinsCache[salesId] || []);
+  let pins = allPins.filter(_sdPinMatches);
+  const q = search.toLowerCase();
+  const qDigits = q.replace(/[^0-9]/g, '');
+  if (q) {
+    pins = pins.filter(p => {
+      const nameMatch = (p.name||'').toLowerCase().includes(q);
+      const phoneDigits = (p.phone||'').replace(/[^0-9]/g, '');
+      const phoneMatch = qDigits ? phoneDigits.includes(qDigits) : (p.phone||'').toLowerCase().includes(q);
+      return nameMatch || phoneMatch;
+    });
+  }
+  const filterLbl = _sdPinFilterLabel();
+
+  const ic = { shop:'🏪', home:'🏠', business:'🏢', other:'📍' };
+  const listHtml = pins.map(p => {
+    const i = allPins.indexOf(p); // index จริงใน cache
+    return `<div style="display:flex;align-items:center;gap:8px;padding:9px 10px;background:#f9f9f9;border-radius:8px;margin-bottom:6px;font-size:13px;">
+      <div onclick="openCustDetailFromCache('${salesId}',${i})" style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;cursor:pointer;">
+        <span>${ic[p.type]||'📍'}</span>
+        <span style="flex:1;min-width:0;">
+          <span style="font-weight:600;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${p.name}</span>
+          ${p.createdAt?`<span style="font-size:10px;color:#888;">🕒 ปักเมื่อ ${fmtThaiDT(p.createdAt)}</span>`:''}
+        </span>
+        ${p.phone?`<span style="color:${color};font-size:12px;flex-shrink:0;">📞 ${p.phone}</span>`:''}
+      </div>
+      <button onclick="event.stopPropagation();openGpsEditPinModal('${salesId}','${p.id}')" title="แก้ไขข้อมูล/รูป" style="flex-shrink:0;padding:5px 7px;background:#fff;border:1.5px solid ${color}55;border-radius:7px;font-size:12px;color:${color};cursor:pointer;">✏️</button>
+      <button onclick="event.stopPropagation();deleteGpsPin('${salesId}','${p.id}')" title="ลบ" style="flex-shrink:0;padding:5px 7px;background:#fff;border:1.5px solid #f3c9c7;border-radius:7px;font-size:12px;color:#c0392b;cursor:pointer;">🗑️</button>
+    </div>`;
+  }).join('');
+
+  if (hdrEl) hdrEl.innerHTML = `📍 ลูกค้าที่ปักหมุด (${pins.length}${(mode!=='all'||q)?`/${allPins.length}`:''} คน)${filterLbl?` <span style="font-size:11px;color:${color};font-weight:700;">· ${filterLbl}</span>`:''}`;
+  bodyEl.innerHTML = listHtml || '<div style="color:var(--sub);font-size:13px;padding:8px 0;">'+((mode!=='all'||q)?'ไม่พบลูกค้าตามเงื่อนไขที่เลือก':'ยังไม่มีหมุด')+'</div>';
+}
+
+function setSdPinSearch(val) {
+  _sdPinState.search = (val || '').trim();
+  _sdPinRenderListBody(); // อัปเดตเฉพาะรายการ ไม่แตะช่องค้นหา กันโฟกัสหลุด
 }
 
 function openEditSalesById(salesId) {
@@ -6717,10 +6763,14 @@ function _deactivateAddPinMode() {
 }
 
 let _gapModalSession = 0; // กันผลลัพธ์ geocode ของหมุดเก่าเขียนทับฟอร์มของหมุดใหม่ (ถ้าปิด/เปิด modal เร็วระหว่างรอ geocode ที่คิวหน่วงไว้)
+let _gapEditId      = null; // id ของหมุดที่กำลังแก้ไข (null = โหมดเพิ่มใหม่)
+let _gapEditSalesId = null;
 
 function openGpsAddPinModal(lat, lng) {
   const _mySession = ++_gapModalSession;
+  _gapEditId = null; _gapEditSalesId = null;
   _gpsAddPinLatLng = { lat, lng };
+  document.getElementById('gap-modal-title').textContent = '📍 ปักหมุดลูกค้าใหม่';
   document.getElementById('gap-latlng').textContent = `📌 พิกัด: ${lat.toFixed(5)}, ${lng.toFixed(5)}`;
   document.getElementById('gap-name').value  = '';
   document.getElementById('gap-phone').value = '';
@@ -6731,7 +6781,11 @@ function openGpsAddPinModal(lat, lng) {
   document.getElementById('gap-note').value  = '';
   document.getElementById('gap-type').value  = 'shop';
   document.getElementById('gap-err').style.display = 'none';
+  document.getElementById('gap-delete-btn').style.display = 'none';
+  document.getElementById('gap-submit-btn').textContent = '✔ บันทึกหมุด';
+  clearGapPhoto();
   const sel = document.getElementById('gap-sales');
+  sel.disabled = false;
   sel.innerHTML = allSalesStaff.map(s => `<option value="${s.salesId||s.id||''}">${s.name}</option>`).join('');
   document.getElementById('gps-addpin-modal').style.display = 'flex';
   reverseGeocodeTH(lat, lng).then(addr => {
@@ -6749,8 +6803,119 @@ function openGpsAddPinModal(lat, lng) {
   });
 }
 
+// ── เปิด modal เดียวกันในโหมดแก้ไขหมุดที่มีอยู่แล้ว (เรียกจาก cust-detail-modal / รายการลูกค้าที่ปักหมุด) ──
+function openGpsEditPinModal(salesId, pinId) {
+  const pins = _pinsCache[salesId] || [];
+  const p = pins.find(x => x.id === pinId);
+  if (!p) { toast('ไม่พบข้อมูลหมุดนี้ (อาจถูกลบไปแล้ว)', 'error'); return; }
+  const _mySession = ++_gapModalSession;
+  _gapEditId = pinId; _gapEditSalesId = salesId;
+  _gpsAddPinLatLng = { lat: p.lat, lng: p.lng };
+  document.getElementById('gap-modal-title').textContent = '✏️ แก้ไขข้อมูลลูกค้า';
+  document.getElementById('gap-latlng').textContent = p.lat
+    ? `📌 พิกัด: ${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}` : '';
+  document.getElementById('gap-name').value  = p.name  || '';
+  document.getElementById('gap-phone').value = p.phone || '';
+  document.getElementById('gap-addr').value  = p.address || '';
+  document.getElementById('gap-province').value    = p.province    || '';
+  document.getElementById('gap-district').value    = p.district    || '';
+  document.getElementById('gap-subdistrict').value = p.subdistrict || '';
+  document.getElementById('gap-note').value  = p.note || '';
+  document.getElementById('gap-type').value  = p.type || 'shop';
+  document.getElementById('gap-err').style.display = 'none';
+  document.getElementById('gap-delete-btn').style.display = 'block';
+  document.getElementById('gap-submit-btn').textContent = '✔ บันทึกการแก้ไข';
+  clearGapPhoto();
+  if (p.photo_url) {
+    _gapPhotoUrl = p.photo_url;
+    document.getElementById('gap-photo-img').src = p.photo_url;
+    document.getElementById('gap-photo-preview').style.display = 'block';
+  }
+  const sel = document.getElementById('gap-sales');
+  sel.disabled = false;
+  sel.innerHTML = allSalesStaff.map(s => `<option value="${s.salesId||s.id||''}">${s.name}</option>`).join('');
+  sel.value = salesId;
+  document.getElementById('gps-addpin-modal').style.display = 'flex';
+  // ลูกค้าเก่าที่ยังไม่มีจังหวัด/อำเภอ/ตำบลบันทึกไว้ — เดาย้อนหลังจากพิกัด (เติมเฉพาะช่องว่าง)
+  if (p.lat && p.lng && (!p.address || !p.province || !p.district || !p.subdistrict)) {
+    reverseGeocodeStruct(p.lat, p.lng).then(g => {
+      if (_mySession !== _gapModalSession) return;
+      const addrEl = document.getElementById('gap-addr');
+      if (g.display && addrEl && !addrEl.value) addrEl.value = g.display;
+      const pEl = document.getElementById('gap-province'), dEl = document.getElementById('gap-district'), sEl = document.getElementById('gap-subdistrict');
+      if (pEl && !pEl.value) pEl.value = g.province || '';
+      if (dEl && !dEl.value) dEl.value = g.district || '';
+      if (sEl && !sEl.value) sEl.value = g.subdistrict || '';
+    }).catch(()=>{});
+  }
+}
+
 function closeGpsAddPinModal() {
   document.getElementById('gps-addpin-modal').style.display = 'none';
+  _gapEditId = null; _gapEditSalesId = null;
+  clearGapPhoto();
+}
+
+// ── รูปหมุด (เพิ่ม/แก้ไข) — อัปโหลดขึ้น Cloudinary เหมือนแอปเซล ──
+let _gapPhotoFile = null;
+let _gapPhotoUrl  = null; // URL ที่อัปแล้วหรือ URL เดิม (กรณีแก้ไข)
+
+let _gapPhotoRemoved = false; // true = ผู้ใช้กดปุ่ม × ลบรูปเดิมออกโดยตั้งใจ (ต้องส่ง null ไปลบจริงในฐานข้อมูล ไม่ใช่แค่เว้นฟิลด์ไว้)
+
+function onGapPhotoSelected(input) {
+  const file = input.files[0];
+  if (!file) return;
+  _gapPhotoFile = file;
+  _gapPhotoUrl  = null;
+  _gapPhotoRemoved = false; // เลือกรูปใหม่แล้ว ไม่ใช่การลบ
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('gap-photo-img').src = e.target.result;
+    document.getElementById('gap-photo-preview').style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+  input.value = ''; // reset ให้เลือกไฟล์เดิมซ้ำได้
+}
+
+// รีเซ็ตสถานะรูปในฟอร์ม — ใช้ตอนเปิด modal ใหม่/ปิด modal เท่านั้น (ไม่ใช่การลบรูปเดิมของลูกค้าที่มีอยู่)
+function clearGapPhoto() {
+  _gapPhotoFile = null;
+  _gapPhotoUrl  = null;
+  _gapPhotoRemoved = false;
+  const preview = document.getElementById('gap-photo-preview');
+  if (preview) { preview.style.display = 'none'; document.getElementById('gap-photo-img').src = ''; }
+  const status = document.getElementById('gap-photo-status');
+  if (status) { status.style.display = 'none'; status.textContent = ''; }
+  const inp = document.getElementById('gap-photo-input');
+  if (inp) inp.value = '';
+}
+
+// ผู้ใช้กดปุ่ม × บนรูปพรีวิว — ตั้งใจลบรูปที่มีอยู่ของลูกค้ารายนี้ออก
+function removeGapPhoto() {
+  clearGapPhoto();
+  _gapPhotoRemoved = true;
+}
+
+async function uploadGapPhoto() {
+  if (_gapPhotoRemoved) return null; // ผู้ใช้ตั้งใจลบรูป — ไม่อัปโหลดอะไร ให้คืน null ไปเคลียร์ค่าในฐานข้อมูล
+  if (!_gapPhotoFile) return _gapPhotoUrl || null;
+  const status = document.getElementById('gap-photo-status');
+  if (status) { status.style.display = 'block'; status.textContent = '⏳ กำลังอัปโหลดรูป...'; }
+  try {
+    const fd = new FormData();
+    fd.append('file', _gapPhotoFile);
+    fd.append('upload_preset', 'monshin');
+    const res  = await fetch('https://api.cloudinary.com/v1_1/dwet6be8c/image/upload', { method:'POST', body:fd });
+    const data = await res.json();
+    if (!data.secure_url) throw new Error('Cloudinary error');
+    _gapPhotoUrl  = data.secure_url;
+    _gapPhotoFile = null;
+    if (status) status.textContent = '✅ อัปโหลดสำเร็จ';
+    return _gapPhotoUrl;
+  } catch(e) {
+    if (status) status.textContent = '⚠️ อัปโหลดรูปไม่สำเร็จ';
+    return null;
+  }
 }
 
 async function submitGpsAddPin() {
@@ -6770,33 +6935,106 @@ async function submitGpsAddPin() {
   if (!_gpsAddPinLatLng) { errEl.textContent = 'ไม่พบพิกัดที่เลือก'; errEl.style.display = 'block'; return; }
 
   const btn = document.getElementById('gap-submit-btn');
-  btn.disabled = true; btn.textContent = 'กำลังบันทึก...';
+  const savingLabel = _gapEditId ? 'กำลังบันทึกการแก้ไข...' : 'กำลังบันทึก...';
+  btn.disabled = true; btn.textContent = savingLabel;
   try {
-    const res = await fetch(`${SB_URL_SALES}/rest/v1/sales_pins`, {
-      method: 'POST',
-      headers: {
-        'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES,
-        'Content-Type': 'application/json', 'Prefer': 'return=representation'
-      },
-      body: JSON.stringify({
-        sales_id: sid, name, phone, address: addr || null,
-        province: province || null, district: district || null, subdistrict: subdistrict || null,
-        type, note,
-        lat: _gpsAddPinLatLng.lat, lng: _gpsAddPinLatLng.lng
-      })
-    });
-    if (!res.ok) throw new Error('บันทึกไม่สำเร็จ');
-    delete _pinsCache[sid]; // ล้าง cache เพื่อโหลดหมุดใหม่รอบถัดไป
-    await fetchSalesPins(sid);
-    closeGpsAddPinModal();
-    _deactivateAddPinMode(); // ปิดโหมดปักหมุดหลังบันทึกสำเร็จ
-    await _addPinRefreshFn();
-    toast('✅ ปักหมุดลูกค้าสำเร็จ', 'success');
+    const photoUrl = await uploadGapPhoto();
+
+    if (_gapEditId) {
+      // ── โหมดแก้ไขหมุดเดิม ──
+      const res = await fetch(`${SB_URL_SALES}/rest/v1/sales_pins?id=eq.${_gapEditId}`, {
+        method: 'PATCH',
+        headers: {
+          'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES,
+          'Content-Type': 'application/json', 'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          sales_id: sid, name, phone, address: addr || null,
+          province: province || null, district: district || null, subdistrict: subdistrict || null,
+          type, note,
+          photo_url: photoUrl
+        })
+      });
+      if (!res.ok) throw new Error('บันทึกไม่สำเร็จ');
+      // ถ้าย้ายเจ้าของหมุดไปเซลอื่น ต้องล้าง cache ของทั้งเซลเก่า+ใหม่
+      delete _pinsCache[_gapEditSalesId];
+      delete _pinsCache[sid];
+      await fetchSalesPins(sid);
+      closeGpsAddPinModal();
+      await _addPinRefreshFn();
+      _refreshAfterPinChange([_gapEditSalesId, sid]);
+      toast('✅ แก้ไขข้อมูลลูกค้าแล้ว', 'success');
+    } else {
+      // ── โหมดปักหมุดใหม่ ──
+      const res = await fetch(`${SB_URL_SALES}/rest/v1/sales_pins`, {
+        method: 'POST',
+        headers: {
+          'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES,
+          'Content-Type': 'application/json', 'Prefer': 'return=representation'
+        },
+        body: JSON.stringify({
+          sales_id: sid, name, phone, address: addr || null,
+          province: province || null, district: district || null, subdistrict: subdistrict || null,
+          type, note,
+          lat: _gpsAddPinLatLng.lat, lng: _gpsAddPinLatLng.lng,
+          photo_url: photoUrl || null
+        })
+      });
+      if (!res.ok) throw new Error('บันทึกไม่สำเร็จ');
+      delete _pinsCache[sid]; // ล้าง cache เพื่อโหลดหมุดใหม่รอบถัดไป
+      await fetchSalesPins(sid);
+      closeGpsAddPinModal();
+      _deactivateAddPinMode(); // ปิดโหมดปักหมุดหลังบันทึกสำเร็จ
+      await _addPinRefreshFn();
+      _refreshAfterPinChange([sid]);
+      toast('✅ ปักหมุดลูกค้าสำเร็จ', 'success');
+    }
   } catch (e) {
     errEl.textContent = 'บันทึกไม่สำเร็จ: ' + e.message;
     errEl.style.display = 'block';
   } finally {
-    btn.disabled = false; btn.textContent = '✔ บันทึกหมุด';
+    btn.disabled = false; btn.textContent = _gapEditId ? '✔ บันทึกการแก้ไข' : '✔ บันทึกหมุด';
+  }
+}
+
+// ── ลบหมุดลูกค้า (จากปุ่ม 🗑️ ในโมดัลนี้ หรือจาก cust-detail-modal) ──
+async function deleteGpsPinFromModal() {
+  if (!_gapEditId || !_gapEditSalesId) return;
+  await deleteGpsPin(_gapEditSalesId, _gapEditId, () => closeGpsAddPinModal());
+}
+
+// ── หลังแก้ไข/ลบหมุดสำเร็จ: รีเฟรชสถิติหน้า "จัดการเซล" (การ์ดรวม/การ์ดต่อเซล)
+// และถ้า modal รายละเอียดเซลที่เกี่ยวข้องเปิดค้างอยู่ ให้รีเฟรชแผนที่/รายการในนั้นด้วย
+// ไม่งั้นตัวเลขจะค้างเป็นค่าเก่าจนกว่าจะปิดเปิด modal ใหม่เอง
+function _refreshAfterPinChange(affectedSalesIds) {
+  if (typeof renderSalesStats === 'function') renderSalesStats();
+  if (typeof renderSalesList  === 'function') renderSalesList();
+  const sdModal = document.getElementById('sales-detail-modal');
+  const sdOpenForAffected = sdModal && sdModal.style.display !== 'none' && _sdPinState.salesId
+    && affectedSalesIds.includes(_sdPinState.salesId);
+  if (sdOpenForAffected && typeof openSalesDetail === 'function') {
+    openSalesDetail(_sdPinState.salesId); // วาดแผนที่/รายการใน modal นี้ใหม่ทั้งหมด (renderSdPinList รวมอยู่ในนี้แล้ว ไม่ต้องเรียกซ้ำ)
+  } else if (typeof renderSdPinList === 'function') {
+    renderSdPinList(); // modal ปิดอยู่หรือเป็นของเซลอื่น — sync ข้อมูลไว้เฉยๆ เผื่อเปิดใหม่ (ไม่มีผลถ้า element ซ่อนอยู่)
+  }
+}
+
+async function deleteGpsPin(salesId, pinId, onDone) {
+  if (!confirm('ลบลูกค้ารายนี้? การลบไม่สามารถย้อนกลับได้')) return;
+  try {
+    const res = await fetch(`${SB_URL_SALES}/rest/v1/sales_pins?id=eq.${pinId}`, {
+      method: 'DELETE',
+      headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES }
+    });
+    if (!res.ok) throw new Error('ลบไม่สำเร็จ');
+    delete _pinsCache[salesId];
+    await fetchSalesPins(salesId);
+    if (typeof onDone === 'function') onDone();
+    await _addPinRefreshFn();
+    _refreshAfterPinChange([salesId]);
+    toast('🗑️ ลบลูกค้าแล้ว', 'success');
+  } catch (e) {
+    toast('⚠️ ลบไม่สำเร็จ: ' + e.message, 'error');
   }
 }
 
@@ -7142,6 +7380,9 @@ function openCustDetail(salesId, pinIdx) {
   const p     = pins[pinIdx];
   if (!p) return;
 
+  // เก็บ context ไว้ให้ปุ่มแก้ไข/ลบใน modal นี้รู้ว่ากำลังดูหมุดของเซลคนไหน รายการไหน
+  _cdmCurrent = { salesId, pinId: p.id };
+
   const typeLabels = { shop:'🏪 ร้านค้า', home:'🏠 บ้าน', business:'🏢 ธุรกิจ', other:'📍 อื่นๆ' };
 
   // header
@@ -7223,6 +7464,21 @@ function openCustDetail(salesId, pinIdx) {
 
 function closeCustDetail() {
   document.getElementById('cust-detail-modal').style.display = 'none';
+}
+
+// ── แก้ไข/ลบ หมุดลูกค้า จาก cust-detail-modal (ปุ่ม ✏️/🗑️) ──
+let _cdmCurrent = null; // { salesId, pinId } ของหมุดที่กำลังเปิดดูอยู่
+
+function editCustDetailPin() {
+  if (!_cdmCurrent) return;
+  closeCustDetail();
+  openGpsEditPinModal(_cdmCurrent.salesId, _cdmCurrent.pinId);
+}
+
+function deleteCustDetailPin() {
+  if (!_cdmCurrent) return;
+  const { salesId, pinId } = _cdmCurrent;
+  deleteGpsPin(salesId, pinId, () => closeCustDetail());
 }
 
 // hook showPage 7
