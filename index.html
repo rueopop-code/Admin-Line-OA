@@ -301,18 +301,18 @@ tr:last-child td{border-bottom:none}
 #page-2 .customer-card td:nth-child(1){color:var(--text-4);font-size:12px;font-variant-numeric:tabular-nums}
 
 /* ── สีแถวตามสถานะออเดอร์ (CSS :has — ไม่แตะ JS) ── */
-tbody tr:has(.status-select option[value="pending"]:checked)   td:first-child{border-left:5px solid #EA6A10}
-tbody tr:has(.status-select option[value="sent"]:checked)      td:first-child{border-left:5px solid #2563EB}
-tbody tr:has(.status-select option[value="confirmed"]:checked) td:first-child{border-left:5px solid #16A34A}
-tbody tr:has(.status-select option[value="shipped"]:checked)   td:first-child{border-left:5px solid #7C3AED}
-tbody tr:has(.status-select option[value="done"]:checked)      td:first-child{border-left:5px solid #047857}
-tbody tr:has(.status-select option[value="cancelled"]:checked) td:first-child{border-left:5px solid #9CA3AF}
-tbody tr:has(.status-select option[value="pending"]:checked)   {background:#FFF6EA}
-tbody tr:has(.status-select option[value="sent"]:checked)      {background:#F1F7FF}
-tbody tr:has(.status-select option[value="confirmed"]:checked) {background:#EFFBF3}
-tbody tr:has(.status-select option[value="shipped"]:checked)   {background:#F7F4FF}
-tbody tr:has(.status-select option[value="done"]:checked)      {background:#ECFAF5}
-tbody tr:has(.status-select option[value="cancelled"]:checked) {background:#F7F7F7;opacity:.68}
+tbody tr:has(.status-picker-btn[data-status="pending"])   td:first-child{border-left:5px solid #EA6A10}
+tbody tr:has(.status-picker-btn[data-status="sent"])      td:first-child{border-left:5px solid #2563EB}
+tbody tr:has(.status-picker-btn[data-status="confirmed"]) td:first-child{border-left:5px solid #16A34A}
+tbody tr:has(.status-picker-btn[data-status="shipped"])   td:first-child{border-left:5px solid #7C3AED}
+tbody tr:has(.status-picker-btn[data-status="done"])      td:first-child{border-left:5px solid #047857}
+tbody tr:has(.status-picker-btn[data-status="cancelled"]) td:first-child{border-left:5px solid #9CA3AF}
+tbody tr:has(.status-picker-btn[data-status="pending"])   {background:#FFF6EA}
+tbody tr:has(.status-picker-btn[data-status="sent"])      {background:#F1F7FF}
+tbody tr:has(.status-picker-btn[data-status="confirmed"]) {background:#EFFBF3}
+tbody tr:has(.status-picker-btn[data-status="shipped"])   {background:#F7F4FF}
+tbody tr:has(.status-picker-btn[data-status="done"])      {background:#ECFAF5}
+tbody tr:has(.status-picker-btn[data-status="cancelled"]) {background:#F7F7F7;opacity:.68}
 
 /* ── แถวกดได้: เปิดหน้ารายละเอียด ── */
 tbody tr.row-clickable{cursor:pointer}
@@ -321,7 +321,6 @@ tbody tr.row-clickable:hover td:first-child{box-shadow:inset 3px 0 0 var(--gold)
 /* ── cursor ชี้ได้ทุกจุดที่คลิกได้ ── */
 .items-cell-clickable{cursor:pointer}
 .items-cell-clickable:hover .items-list{color:var(--red-500);text-decoration:underline;text-decoration-style:dotted;text-underline-offset:3px}
-.status-select{cursor:pointer}
 tbody tr td[onclick]{cursor:pointer}
 
 /* ── ROW ACTION BUTTONS ── */
@@ -365,12 +364,41 @@ tbody tr td[onclick]{cursor:pointer}
 .aib-blue{background:var(--blue-bg);border-color:#C3D6FA}
 .aib-red{background:var(--red-50);border-color:var(--border-red)}
 .aib-gray{background:var(--gray-100);border-color:var(--border2)}
-.status-select{
-  padding:5px 9px;border:1px solid var(--border2);border-radius:9px;font-size:11px;
-  font-weight:600;background:var(--surface2);cursor:pointer;color:var(--text-2);
-  font-family:var(--font);outline:none;transition:border-color .15s,box-shadow .15s;
+.status-picker{position:relative;display:inline-block}
+.status-picker-btn{
+  appearance:none;-webkit-appearance:none;-moz-appearance:none;
+  display:inline-flex;align-items:center;gap:6px;
+  padding:6px 10px 6px 12px;border:1.5px solid var(--border2);border-radius:20px;font-size:11.5px;
+  font-weight:700;background-color:var(--surface2);cursor:pointer;color:var(--text-2);
+  font-family:var(--font);outline:none;letter-spacing:.1px;
+  box-shadow:0 1px 2px rgba(60,20,10,.05);
+  transition:border-color .15s,box-shadow .15s,background-color .15s,color .15s,opacity .15s,transform .12s;
 }
-.status-select:focus{border-color:var(--red-500);box-shadow:0 0 0 3px rgba(153,33,33,.08)}
+.status-picker-btn:hover{box-shadow:0 2px 8px rgba(60,20,10,.12);transform:translateY(-1px)}
+.status-picker-btn:active{transform:translateY(0) scale(.98)}
+.status-picker-btn:focus-visible{border-color:var(--red-500);box-shadow:0 0 0 3px rgba(153,33,33,.10)}
+.status-picker-btn .sp-chev{display:inline-flex;transition:transform .18s}
+.status-picker-btn[aria-expanded="true"] .sp-chev{transform:rotate(180deg)}
+/* ── สถานะตามสี: ปุ่มเปลี่ยนสีตามค่าปัจจุบันทันที (โปรและอ่านง่ายขึ้น) ── */
+.status-picker-btn[data-status="pending"]  {background-color:#FFF3E0;color:#B45309;border-color:#F3D19E}
+.status-picker-btn[data-status="sent"]     {background-color:#EAF2FF;color:#1D4ED8;border-color:#B9D3FF}
+.status-picker-btn[data-status="confirmed"]{background-color:#E9F9EF;color:#15803D;border-color:#A9E4BC}
+.status-picker-btn[data-status="shipped"]  {background-color:#F3EEFF;color:#6D28D9;border-color:#D7C9FA}
+.status-picker-btn[data-status="done"]     {background-color:#E4F7F1;color:#047857;border-color:#A6E5D2}
+.status-picker-btn[data-status="cancelled"]{background-color:var(--gray-100);color:var(--text-3);border-color:var(--border2)}
+.status-picker-btn.sp-saving{opacity:.55;cursor:wait;pointer-events:none;transform:none!important}
+/* ── เมนู popup ตัวเดียวใช้ร่วมกันทุกแถว (portal) — position:fixed กันโดนตารางที่ overflow ตัดขอบ ── */
+#globalStatusMenu{
+  position:fixed;min-width:184px;background:var(--surface);border:1px solid var(--border2);border-radius:12px;
+  box-shadow:var(--shadow-lg);padding:6px;z-index:6000;
+  opacity:0;transform:translateY(-6px) scale(.98);pointer-events:none;
+  transition:opacity .15s ease,transform .15s ease;
+}
+#globalStatusMenu.open{opacity:1;transform:translateY(0) scale(1);pointer-events:auto}
+.sp-menu-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600;color:var(--text-2);transition:background .12s}
+.sp-menu-item:hover,.sp-menu-item.kbd-focus{background:var(--gray-100)}
+.sp-menu-item.active{background:var(--red-50)}
+.sp-menu-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .act-btn{padding:6px 12px;border-radius:var(--r-sm);border:1px solid;font-size:12px;font-weight:600;cursor:pointer;font-family:var(--font);transition:all .15s;display:inline-flex;align-items:center;gap:5px}
 .act-btn:active{transform:scale(.97)}
 .act-btn-green{background:var(--green-bg);border-color:rgba(21,128,61,.28);color:var(--green)}.act-btn-green:hover{background:#DFF6E6}
@@ -940,6 +968,87 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
   th, td { font-size: 12px !important; }
 }
 </style>
+
+<style id="pro-redesign-v3">
+/* ═══════════════════════════════════════════════════════════════
+   🏛️ PRO REDESIGN v3 — "Executive Dashboard" pass
+   • Additive only — selector/ID เดิมทุกตัวไม่ถูกแตะ, JS logic เดิมหมด
+   • ใช้ตกแต่งหน้า 1-9: การ์ดสรุป, ตาราง, log, gauge — โทนแดง-ทอง เดิม
+   ═══════════════════════════════════════════════════════════════ */
+
+/* ── หัวข้อหน้า: เส้นใต้ทอง + subtitle บรรทัดรอง ให้ดูเป็นระบบองค์กร ── */
+.pro-page-head{display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border2);position:relative}
+.pro-page-head::after{content:'';position:absolute;left:0;bottom:-1px;width:64px;height:2px;background:linear-gradient(90deg,var(--gold),var(--gold-soft))}
+.pro-page-head .pro-head-text .page-title{margin-bottom:3px}
+.pro-page-head .pro-head-sub{font-size:12px;color:var(--text-3);letter-spacing:.2px}
+.pro-head-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* ── ตารางระดับ Executive: หัวตารางเข้มขึ้น ตัวเลขจัดเรียงคงที่ แถวอ่านง่ายขึ้น ── */
+.pro-table-wrap{border:1px solid var(--border2);border-radius:var(--r-lg);overflow:hidden}
+thead tr th{position:relative}
+th{letter-spacing:.4px}
+.pro-table-wrap table thead tr{background:linear-gradient(180deg,#F8F1E0,#F3EAD4)}
+.pro-table-wrap table tbody tr:nth-child(even){background:rgba(201,162,39,.028)}
+.pro-count-pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;color:var(--red-700);background:var(--red-50);border:1px solid var(--border-red);border-radius:20px;padding:3px 11px}
+
+/* ── Dashboard stat tiles (หน้า 4/8/9): การ์ดตัวเลขหลักพร้อมไอคอนวงกลม ── */
+.pro-kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:18px}
+.pro-kpi{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-lg);padding:16px 17px;box-shadow:var(--shadow-sm);display:flex;align-items:center;gap:13px;position:relative;overflow:hidden;transition:box-shadow .18s,transform .18s}
+.pro-kpi:hover{box-shadow:var(--shadow);transform:translateY(-2px)}
+.pro-kpi-icon{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;background:var(--red-50);color:var(--red-600);box-shadow:inset 0 0 0 1px var(--border-red)}
+.pro-kpi-icon.gold{background:var(--gold-pale);color:#8A6D10}
+.pro-kpi-icon.green{background:var(--green-bg);color:var(--green)}
+.pro-kpi-icon.blue{background:var(--blue-bg);color:var(--blue)}
+.pro-kpi-icon.amber{background:var(--amber-bg);color:var(--amber)}
+.pro-kpi-body{min-width:0}
+.pro-kpi-num{font-family:var(--font-display);font-size:21px;font-weight:700;color:var(--text);line-height:1.15;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pro-kpi-lbl{font-size:11px;color:var(--text-3);font-weight:600;letter-spacing:.3px;margin-top:2px}
+
+/* ── Gauge (สถานะระบบ) — SVG semicircle, ธีมแดง-ทอง ── */
+.pro-gauge-wrap{display:flex;flex-direction:column;align-items:center;padding-top:4px}
+.pro-gauge-wrap svg{width:100%;max-width:180px;height:auto}
+.pro-gauge-num{font-family:var(--font-display);font-weight:700}
+.pro-gauge-labels{display:flex;justify-content:space-between;width:100%;max-width:180px;font-size:10.5px;color:var(--text-3);margin-top:-6px}
+
+/* ── Service card (สถานะระบบ) ── */
+.pro-svc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:14px;margin-bottom:18px}
+.pro-svc-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-lg);padding:16px;box-shadow:var(--shadow-sm);border-top:3px solid var(--red-600)}
+.pro-svc-title{font-family:var(--font-display);font-weight:700;font-size:14px;color:var(--text);display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.pro-svc-badge-ok{color:var(--green);font-weight:700;font-size:12px;display:inline-flex;align-items:center;gap:4px}
+.pro-svc-badge-bad{color:var(--danger);font-weight:700;font-size:12px;display:inline-flex;align-items:center;gap:4px}
+.pro-svc-line{font-size:12.5px;color:var(--text-2);line-height:1.9}
+.pro-bar-track{background:var(--gray-200);border-radius:6px;height:7px;overflow:hidden;margin:6px 0 8px}
+.pro-bar-fill{height:100%;border-radius:6px;transition:width .4s}
+.pro-rec-card{border-radius:var(--r-md);padding:11px 14px;margin-bottom:8px;border-left:4px solid;font-size:12.5px}
+.pro-rec-title{font-weight:700;font-size:13px;color:var(--text);margin-bottom:2px}
+.pro-upgrade-card{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-md);padding:13px 15px;margin-bottom:9px;box-shadow:var(--shadow-sm);font-size:12.5px;line-height:1.85}
+
+/* ── Log ระบบ (หน้า 8): filter chips, session cards, timeline ── */
+.pro-log-toolbar{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-lg);padding:13px 15px;margin-bottom:14px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;font-size:13px;box-shadow:var(--shadow-sm)}
+.pro-log-toolbar label{display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;color:var(--text-2)}
+.pro-log-section{background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-lg);padding:15px;margin-bottom:14px;box-shadow:var(--shadow-sm)}
+.pro-log-section-hdr{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.pro-log-section-title{font-family:var(--font-display);font-weight:700;font-size:13.5px;color:var(--red-700);display:flex;align-items:center;gap:7px}
+.pro-mini-btn{background:var(--red-50);border:1px solid var(--border-red);color:var(--red-700);padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;transition:background .15s}
+.pro-mini-btn:hover{background:var(--red-100)}
+.pro-session-row{display:flex;align-items:center;gap:10px;padding:10px 11px;background:var(--gray-50);border:1px solid var(--border);border-radius:9px;font-size:13px}
+.pro-session-row + .pro-session-row{margin-top:6px}
+.pro-session-row.offline{background:var(--red-50);border-color:var(--border-red)}
+.pro-session-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.pro-session-name{font-weight:700;color:var(--text)}
+.pro-session-meta{font-size:11.5px;color:var(--text-3);margin-top:2px}
+.pro-err-chip{border:none;padding:7px 15px;border-radius:20px;font-size:12px;font-weight:700;font-family:var(--font);cursor:pointer;transition:background .15s,color .15s;background:var(--gray-100);color:var(--text-2)}
+.pro-err-chip.active{background:linear-gradient(150deg,var(--red-700),var(--red-500));color:#fff;box-shadow:0 3px 10px rgba(100,20,20,.22)}
+.pro-log-entry{background:var(--surface);border:1px solid var(--border2);border-left:4px solid var(--red-500);border-radius:var(--r-md);padding:12px 14px;box-shadow:var(--shadow-sm)}
+.pro-log-entry + .pro-log-entry{margin-top:8px}
+.pro-log-badge{color:#fff;font-size:10.5px;font-weight:700;padding:2px 10px;border-radius:10px;letter-spacing:.2px}
+.pro-log-scope{font-size:12px;font-weight:700;color:var(--text)}
+.pro-log-time{font-size:11px;color:var(--text-3);margin-left:auto;white-space:nowrap}
+.pro-log-msg{font-size:13px;color:var(--text-2);word-break:break-word;margin-top:3px}
+.pro-log-extra{font-size:11px;color:var(--text-4);margin-top:4px;word-break:break-all}
+.pro-log-empty-ok{background:var(--green-bg);color:var(--green-text);border-radius:var(--r-lg);padding:24px;text-align:center;font-size:14px;font-weight:700;border:1px solid #b7e3c4}
+.pro-hint-note{font-size:11px;color:var(--text-4);margin-top:9px;line-height:1.7}
+</style>
 </head>
 <body>
 
@@ -1176,7 +1285,7 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
         <span id="last-updated" style="font-size:12px;color:var(--sub);">—</span>
       </div>
     </div>
-    <div style="overflow-x:auto;">
+    <div class="pro-table-wrap" style="overflow-x:auto;">
       <table>
         <thead>
           <tr>
@@ -1204,9 +1313,10 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 <!-- PAGE 2: ฐานข้อมูลลูกค้า -->
 <div id="page-2" class="admin-page" style="display:none;">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-    <div>
+  <div class="pro-page-head">
+    <div class="pro-head-text">
       <div class="page-title"><svg width="20" height="20"><use href="#ic-users"/></svg>ฐานข้อมูลลูกค้า</div>
+      <div class="pro-head-sub">รายชื่อ ประวัติซื้อ และยอดสะสมของลูกค้าทุกคน</div>
     </div>
     <button onclick="renderCustomerDB()" class="btn-primary">
       <svg width="14" height="14"><use href="#ic-refresh"/></svg>รีเฟรช
@@ -1225,9 +1335,9 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
   <div class="customer-card">
     <div class="orders-head">
       <h2>รายชื่อลูกค้า</h2>
-      <span id="custCount" style="font-size:12px;color:var(--sub);">—</span>
+      <span id="custCount" class="pro-count-pill">—</span>
     </div>
-    <div style="overflow-x:auto;">
+    <div class="pro-table-wrap" style="overflow-x:auto;">
       <table>
         <thead>
           <tr>
@@ -1247,9 +1357,10 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 <!-- PAGE 3: แก้ไขออเดอร์ -->
 <div id="page-3" class="admin-page" style="display:none;">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-    <div>
+  <div class="pro-page-head">
+    <div class="pro-head-text">
       <div class="page-title"><svg width="20" height="20"><use href="#ic-package"/></svg>แก้ไขออเดอร์ &amp; สินค้า</div>
+      <div class="pro-head-sub">แก้ไขรายการสินค้าในออเดอร์ พร้อมปรับสต็อกอัตโนมัติ</div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
       <div id="p3StockStatus" style="padding:6px 12px;background:var(--green-bg);border:1px solid #a5d6a7;border-radius:8px;font-size:12px;color:var(--green-text);display:none;">
@@ -1285,7 +1396,7 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
     <div class="orders-head">
       <h2>รายการออเดอร์ (แก้ไขได้)</h2>
     </div>
-    <div style="overflow-x:auto;">
+    <div class="pro-table-wrap" style="overflow-x:auto;">
       <table>
         <thead>
           <tr>
@@ -1305,9 +1416,10 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 <!-- PAGE 4: สรุปยอดขาย -->
 <div id="page-4" class="admin-page" style="display:none;">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-    <div>
+  <div class="pro-page-head">
+    <div class="pro-head-text">
       <div class="page-title"><svg width="20" height="20"><use href="#ic-chart"/></svg>สรุปยอดขาย</div>
+      <div class="pro-head-sub">ภาพรวมรายได้ ออเดอร์ และสินค้าขายดี ตามช่วงเวลาที่เลือก</div>
     </div>
     <button onclick="renderCharts()" class="btn-primary">
       <svg width="14" height="14"><use href="#ic-refresh"/></svg>อัปเดตกราฟ
@@ -1344,23 +1456,23 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
   <div id="periodRangeLabel" style="font-size:12px;color:var(--text-3);margin:-10px 0 14px;padding-left:2px;"></div>
 
   <div class="sales-stat-row" id="salesSummaryStats">
-    <div class="sales-stat"><div class="num" id="s-revenue">—</div><div class="lbl">รายได้รวม</div></div>
-    <div class="sales-stat"><div class="num" id="s-orders">—</div><div class="lbl">จำนวนออเดอร์</div></div>
-    <div class="sales-stat"><div class="num" id="s-avg">—</div><div class="lbl">เฉลี่ย/ออเดอร์</div></div>
-    <div class="sales-stat"><div class="num" id="s-topday">—</div><div class="lbl">วันที่ขายดีสุด</div></div>
+    <div class="sales-stat"><span style="font-size:11px;">💰</span> <div class="num" id="s-revenue">—</div><div class="lbl">รายได้รวม</div></div>
+    <div class="sales-stat"><span style="font-size:11px;">🧾</span> <div class="num" id="s-orders">—</div><div class="lbl">จำนวนออเดอร์</div></div>
+    <div class="sales-stat"><span style="font-size:11px;">📐</span> <div class="num" id="s-avg">—</div><div class="lbl">เฉลี่ย/ออเดอร์</div></div>
+    <div class="sales-stat"><span style="font-size:11px;">🏆</span> <div class="num" id="s-topday">—</div><div class="lbl">วันที่ขายดีสุด</div></div>
   </div>
 
   <div class="chart-grid">
     <div class="chart-card full">
-      <div class="chart-title">กราฟแท่ง — รายได้รายวัน</div>
+      <div class="chart-title">📊 กราฟแท่ง — รายได้รายวัน</div>
       <div class="chart-container" style="height:280px;"><canvas id="chartBar"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">กราฟเส้น — ออเดอร์รายวัน</div>
+      <div class="chart-title">📈 กราฟเส้น — ออเดอร์รายวัน</div>
       <div class="chart-container"><canvas id="chartLine"></canvas></div>
     </div>
     <div class="chart-card">
-      <div class="chart-title">กราฟวงกลม — สินค้าขายดี (Top 8)</div>
+      <div class="chart-title">🥧 กราฟวงกลม — สินค้าขายดี (Top 8)</div>
       <div class="chart-container"><canvas id="chartPie"></canvas></div>
     </div>
   </div>
@@ -1369,7 +1481,7 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
     <div class="orders-head">
       <h2><svg width="15" height="15"><use href="#ic-chart"/></svg>สินค้าขายดีสุด</h2>
     </div>
-    <div style="overflow-x:auto;">
+    <div class="pro-table-wrap" style="overflow-x:auto;">
       <table>
         <thead>
           <tr><th>#</th><th>สินค้า</th><th>จำนวนที่ขาย</th><th>รายได้รวม</th><th>ออเดอร์ที่มีสินค้านี้</th></tr>
@@ -1441,8 +1553,11 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 
 <div id="page-5" class="admin-page" style="display:none;">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
-    <div class="page-title"><svg width="20" height="20"><use href="#ic-briefcase"/></svg>จัดการเซล</div>
+  <div class="pro-page-head">
+    <div class="pro-head-text">
+      <div class="page-title"><svg width="20" height="20"><use href="#ic-briefcase"/></svg>จัดการเซล</div>
+      <div class="pro-head-sub">ภาพรวมทีมเซล ยอดขาย และหมุดลูกค้าของแต่ละคน</div>
+    </div>
     <button onclick="loadSalesPage()" class="btn-primary">🔄 โหลดใหม่</button>
   </div>
 
@@ -1525,8 +1640,11 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 <!-- PAGE 6: GPS เซล -->
 <div id="page-6" class="admin-page" style="display:none;">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
-    <div class="page-title"><svg width="20" height="20"><use href="#ic-gps"/></svg>GPS เซล</div>
+  <div class="pro-page-head">
+    <div class="pro-head-text">
+      <div class="page-title"><svg width="20" height="20"><use href="#ic-gps"/></svg>GPS เซล</div>
+      <div class="pro-head-sub">ติดตามตำแหน่งเซลภาคสนามแบบเรียลไทม์</div>
+    </div>
     <div style="display:flex;align-items:center;gap:10px;">
       <div id="gps-admin-status" style="display:flex;align-items:center;gap:6px;font-size:13px;">
         <div id="gps-admin-dot" style="width:10px;height:10px;border-radius:50%;background:#ccc;"></div>
@@ -1620,8 +1738,11 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 <!-- PAGE 7: เส้นทางเซล -->
 <div id="page-7" class="admin-page" style="display:none;">
 
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;">
-    <div class="page-title"><svg width="20" height="20"><use href="#ic-map"/></svg>เส้นทางเซล</div>
+  <div class="pro-page-head">
+    <div class="pro-head-text">
+      <div class="page-title"><svg width="20" height="20"><use href="#ic-map"/></svg>เส้นทางเซล</div>
+      <div class="pro-head-sub">เส้นทางเดินทางจริงของเซลแต่ละคนในแต่ละวัน</div>
+    </div>
     <div style="display:flex;align-items:center;gap:10px;">
       <button id="route-addpin-btn" onclick="toggleGpsAddPinMode(routeMainMap,'route-addpin-btn','route-addpin-hint',()=>loadRoutePage())" class="btn-primary" style="background:#27ae60;">➕ ปักหมุดลูกค้า</button>
       <button onclick="loadRoutePage()" class="btn-primary">🔄 โหลดใหม่</button>
@@ -1676,65 +1797,112 @@ mark.search-hl{background:#FCE9A8;color:#8A4A0E;padding:0 2px;border-radius:3px;
 
 <!-- ═══════════ PAGE 8 : 🧾 Log ระบบ ═══════════ -->
 <div id="page-8" class="admin-page" style="display:none;">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-    <h2 style="font-family:'Prompt',sans-serif;font-size:17px;color:#7E1610;margin:0;">🧾 Log ระบบ — Error ทั้ง 3 ระบบ</h2>
-    <button onclick="loadErrorLogPage()" style="background:#eef4fb;border:none;color:#2980b9;padding:8px 14px;border-radius:9px;font-size:13px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🔄 รีเฟรช</button>
+  <div class="pro-page-head">
+    <div class="pro-head-text">
+      <div class="page-title"><svg width="20" height="20"><use href="#ic-search"/></svg>Log ระบบ — Error &amp; การเข้าใช้งานทั้งหมด</div>
+      <div class="pro-head-sub">ประวัติเข้าใช้งานของแอดมิน + เซล และ Error ของ Backend / หน้าร้าน / แอดมิน / แอปเซล ในที่เดียว</div>
+    </div>
+    <div class="pro-head-actions">
+      <button onclick="loadErrorLogPage();loadUserSessionsLog();loadSalesSessionsLog();" class="btn-primary">
+        <svg width="14" height="14"><use href="#ic-refresh"/></svg>รีเฟรชทั้งหมด
+      </button>
+    </div>
   </div>
 
   <!-- แถบตั้งค่าแจ้งเตือน -->
-  <div style="background:#fff;border-radius:12px;padding:12px 14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);display:flex;align-items:center;gap:14px;flex-wrap:wrap;font-size:13px;">
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-weight:700;">
+  <div class="pro-log-toolbar">
+    <label>
       <input type="checkbox" id="errNotifyEnabled" onchange="saveErrNotifyCfg()"> 🔔 แจ้งเตือน Error เข้า LINE แอดมิน
     </label>
-    <label style="display:flex;align-items:center;gap:6px;color:#666;">
+    <label style="font-weight:400;color:var(--text-3);">
       เตือนซ้ำจุดเดิมไม่เกินทุก
-      <input type="number" id="errNotifyThrottle" min="1" max="1440" value="10" onchange="saveErrNotifyCfg()" style="width:60px;padding:5px 8px;border:1.5px solid #ddd;border-radius:8px;font-family:'Sarabun',sans-serif;"> นาที
+      <input type="number" id="errNotifyThrottle" min="1" max="1440" value="10" onchange="saveErrNotifyCfg()" style="width:60px;padding:5px 8px;border:1.5px solid var(--border2);border-radius:8px;font-family:var(--font);"> นาที
     </label>
-    <span id="errNotifyStatus" style="color:#888;font-size:12px;"></span>
+    <span id="errNotifyStatus" style="color:var(--text-3);font-size:12px;"></span>
   </div>
 
   <!-- 👥 ใครเข้าใช้งานระบบแอดมินบ้าง -->
-  <div style="background:#fff;border-radius:12px;padding:14px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
-    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-      <div style="font-weight:800;font-size:14px;color:#333;">👥 ใครเข้าใช้งานระบบแอดมินบ้าง</div>
-      <button onclick="loadUserSessionsLog()" style="background:#eef4fb;border:none;color:#2980b9;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🔄 รีเฟรช</button>
+  <div class="pro-log-section">
+    <div class="pro-log-section-hdr">
+      <div class="pro-log-section-title"><svg width="15" height="15"><use href="#ic-users"/></svg>เข้าใช้งานหน้าแอดมิน</div>
+      <button onclick="loadUserSessionsLog()" class="pro-mini-btn">🔄 รีเฟรช</button>
     </div>
     <div id="userSessionsList" style="display:flex;flex-direction:column;gap:6px;">
-      <div style="color:#888;font-size:13px;padding:14px;text-align:center;">กำลังโหลด...</div>
+      <div style="color:var(--text-3);font-size:13px;padding:14px;text-align:center;">กำลังโหลด...</div>
     </div>
-    <div style="font-size:11px;color:#999;margin-top:8px;line-height:1.6;">
-      ⓘ แสดงเฉพาะบัญชีแอดมิน (เจ้าของร้าน/ผู้จัดการ/แอดมิน) ที่ล็อกอินผ่านหน้านี้ — บัญชีเซลที่ล็อกอินผ่านแอปเซลแยกต่างหาก ยังไม่แสดงในรายการนี้ ส่วนคอลัมน์ "อุปกรณ์" จะเริ่มมีข้อมูลตั้งแต่การล็อกอินครั้งถัดไปเป็นต้นไป (บัญชีที่ล็อกอินค้างไว้อยู่แล้วจะยังไม่มีข้อมูลจนกว่าจะล็อกอินใหม่)
+    <div class="pro-hint-note">
+      ⓘ แสดงบัญชีแอดมิน (เจ้าของร้าน/ผู้จัดการ/แอดมิน) ที่ล็อกอินผ่านหน้านี้ — คอลัมน์ "อุปกรณ์" จะเริ่มมีข้อมูลตั้งแต่การล็อกอินครั้งถัดไปเป็นต้นไป (บัญชีที่ล็อกอินค้างไว้อยู่แล้วจะยังไม่มีข้อมูลจนกว่าจะล็อกอินใหม่)
+    </div>
+  </div>
+
+  <!-- 💼 ใครเข้าใช้งานแอปเซลบ้าง -->
+  <div class="pro-log-section">
+    <div class="pro-log-section-hdr">
+      <div class="pro-log-section-title"><svg width="15" height="15"><use href="#ic-briefcase"/></svg>เข้าใช้งานแอปเซล (ภาคสนาม)</div>
+      <button onclick="loadSalesSessionsLog()" class="pro-mini-btn">🔄 รีเฟรช</button>
+    </div>
+    <div id="salesSessionsList" style="display:flex;flex-direction:column;gap:6px;">
+      <div style="color:var(--text-3);font-size:13px;padding:14px;text-align:center;">กำลังโหลด...</div>
+    </div>
+    <div class="pro-hint-note">
+      ⓘ ระบบยังไม่มีการบันทึก "เวลาล็อกอิน" ของบัญชีเซลโดยตรง — แถวด้านล่างจึงอ้างอิงจาก <b>เวลาส่งพิกัด GPS ล่าสุด</b> ของแอปเซล (ออนไลน์ = ส่งพิกัดมาไม่เกิน 3 นาที) แทน ซึ่งสะท้อนว่าเซลคนนั้นกำลังเปิด/ใช้งานแอปอยู่จริง
+    </div>
+  </div>
+
+  <!-- 📝 การทำงานล่าสุด (บันทึกในเครื่องนี้) -->
+  <div class="pro-log-section">
+    <div class="pro-log-section-hdr">
+      <div class="pro-log-section-title"><svg width="15" height="15"><use href="#ic-package"/></svg>การทำงานล่าสุด</div>
+      <div style="display:flex;gap:8px;">
+        <button onclick="renderActivityLog()" class="pro-mini-btn">🔄 รีเฟรช</button>
+        <button onclick="clearActivityLog()" class="pro-mini-btn" style="background:var(--gray-100);border-color:var(--border2);color:var(--text-3);">🧹 ล้างประวัติ</button>
+      </div>
+    </div>
+    <div id="activityLogList" style="display:flex;flex-direction:column;">
+      <div style="color:var(--text-3);font-size:13px;padding:14px;text-align:center;">กำลังโหลด...</div>
+    </div>
+    <div class="pro-hint-note">
+      ⓘ บันทึกการเปลี่ยนสถานะ / แก้ไข / ลบออเดอร์ ที่ทำจาก<b>เบราว์เซอร์เครื่องนี้</b>เท่านั้น (เก็บในเครื่อง ไม่ได้ส่งขึ้นเซิร์ฟเวอร์ ไม่ sync ข้ามเครื่อง/แอดมินคนอื่น) — ถ้าต้องการบันทึกกิจกรรมรวมทุกเครื่อง/ทุกแอดมินไว้ส่วนกลาง จะต้องเพิ่มระบบบันทึกฝั่ง backend
     </div>
   </div>
 
   <!-- ตัวกรอง -->
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;" id="errFilterChips">
-    <button class="err-chip" data-src="all" onclick="setErrFilter('all')" style="background:#7E1610;color:#fff;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">ทั้งหมด</button>
-    <button class="err-chip" data-src="backend" onclick="setErrFilter('backend')" style="background:#eee;color:#555;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🖥️ Backend</button>
-    <button class="err-chip" data-src="shop" onclick="setErrFilter('shop')" style="background:#eee;color:#555;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🛍️ หน้าร้าน</button>
-    <button class="err-chip" data-src="admin" onclick="setErrFilter('admin')" style="background:#eee;color:#555;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🛡️ แอดมิน</button>
-    <button class="err-chip" data-src="sales-app" onclick="setErrFilter('sales-app')" style="background:#eee;color:#555;border:none;padding:7px 14px;border-radius:20px;font-size:12px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">💼 แอปเซล</button>
-    <select id="errHours" onchange="loadErrorLogPage()" style="margin-left:auto;padding:7px 10px;border:1.5px solid #ddd;border-radius:9px;font-size:12px;font-family:'Sarabun',sans-serif;background:#fff;">
-      <option value="24">24 ชม.ล่าสุด</option>
-      <option value="72" selected>3 วันล่าสุด</option>
-      <option value="168">7 วันล่าสุด</option>
-      <option value="720">30 วันล่าสุด</option>
-    </select>
+  <div class="pro-log-section" style="padding-bottom:10px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;" id="errFilterChips">
+      <button class="err-chip pro-err-chip active" data-src="all" onclick="setErrFilter('all')">ทั้งหมด</button>
+      <button class="err-chip pro-err-chip" data-src="backend" onclick="setErrFilter('backend')">🖥️ Backend</button>
+      <button class="err-chip pro-err-chip" data-src="shop" onclick="setErrFilter('shop')">🛍️ หน้าร้าน</button>
+      <button class="err-chip pro-err-chip" data-src="admin" onclick="setErrFilter('admin')">🛡️ แอดมิน</button>
+      <button class="err-chip pro-err-chip" data-src="sales-app" onclick="setErrFilter('sales-app')">💼 แอปเซล</button>
+      <select id="errHours" onchange="loadErrorLogPage()" style="margin-left:auto;padding:7px 10px;border:1.5px solid var(--border2);border-radius:9px;font-size:12px;font-family:var(--font);background:#fff;">
+        <option value="24">24 ชม.ล่าสุด</option>
+        <option value="72" selected>3 วันล่าสุด</option>
+        <option value="168">7 วันล่าสุด</option>
+        <option value="720">30 วันล่าสุด</option>
+      </select>
+    </div>
   </div>
 
-  <div id="errLogList" style="display:flex;flex-direction:column;gap:8px;">
-    <div style="color:#888;font-size:13px;padding:20px;text-align:center;">กำลังโหลด...</div>
+  <div id="errLogList" style="display:flex;flex-direction:column;">
+    <div style="color:var(--text-3);font-size:13px;padding:20px;text-align:center;">กำลังโหลด...</div>
   </div>
 </div>
 
 <!-- ═══════════ PAGE 9 : 🩺 สถานะระบบ ═══════════ -->
 <div id="page-9" class="admin-page" style="display:none;">
-  <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:12px;">
-    <h2 style="font-family:'Prompt',sans-serif;font-size:17px;color:#7E1610;margin:0;">🩺 สถานะระบบ</h2>
-    <button onclick="loadSystemStatusPage()" style="background:#eef4fb;border:none;color:#2980b9;padding:8px 14px;border-radius:9px;font-size:13px;font-weight:700;font-family:'Sarabun',sans-serif;cursor:pointer;">🔄 ตรวจใหม่</button>
+  <div class="pro-page-head">
+    <div class="pro-head-text">
+      <div class="page-title"><svg width="20" height="20"><use href="#ic-info"/></svg>สถานะระบบ</div>
+      <div class="pro-head-sub">สุขภาพ Backend · ฐานข้อมูล · ความปลอดภัย แบบเรียลไทม์</div>
+    </div>
+    <div class="pro-head-actions">
+      <button onclick="loadSystemStatusPage()" class="btn-primary">
+        <svg width="14" height="14"><use href="#ic-refresh"/></svg>ตรวจใหม่
+      </button>
+    </div>
   </div>
   <div id="sysStatusBody">
-    <div style="color:#888;font-size:13px;padding:20px;text-align:center;">กำลังตรวจสุขภาพระบบ...</div>
+    <div style="color:var(--text-3);font-size:13px;padding:20px;text-align:center;">กำลังตรวจสุขภาพระบบ...</div>
   </div>
 </div>
 
@@ -2294,6 +2462,19 @@ const STATUS_LABELS = {
   done     : '🎉 เสร็จสิ้น',
   cancelled: '❌ ยกเลิก',
 };
+// ── สำหรับ status-picker (ปุ่ม+เมนู popup แบบ custom) — แยก emoji/label จาก STATUS_LABELS และกำหนดสีต่อสถานะ ──
+const STATUS_META = {};
+Object.entries(STATUS_LABELS).forEach(([val, str]) => {
+  const idx = str.indexOf(' ');
+  STATUS_META[val] = { emoji: str.slice(0, idx), label: str.slice(idx + 1) };
+});
+const STATUS_COLOR = {
+  pending  : '#B45309',
+  confirmed: '#15803D',
+  shipped  : '#6D28D9',
+  done     : '#047857',
+  cancelled: '#807A73',
+};
 
 let sb = null;
 let allOrders = [];
@@ -2541,6 +2722,7 @@ function isGhostOrder(o) {
 }
 
 function renderOrders(orders) {
+  closeStatusMenu(); // กันเมนู popup ค้างลอยอยู่ถ้าตารางถูกวาดใหม่ทั้งหมดระหว่างที่เมนูเปิดอยู่ (เช่น พิมพ์ค้นหา/กดตัวกรอง)
   const tbody = document.getElementById('orders-tbody');
   const normPhone = (p) => String(p || '').replace(/\D/g, '');
   const normName = (n) => String(n || '').trim().toLowerCase();
@@ -2656,11 +2838,13 @@ function renderOrders(orders) {
     const totalDisplay = isGhost ? `<span style="color:var(--sub);">—</span>` : `<strong>฿${(o.total||0).toLocaleString()}</strong>`;
     const statusCell = isGhost
       ? `<span style="font-size:12px;color:#1565c0;">💬 แชทเท่านั้น</span>`
-      : `<select class="status-select" onchange="updateStatus('${escapeAttr(o.order_id)}', this.value)">
-          ${Object.entries(STATUS_LABELS).map(([val, label]) =>
-            `<option value="${val}" ${val===st?'selected':''}>${label}</option>`
-          ).join('')}
-        </select>`;
+      : `<div class="status-picker">
+          <button type="button" class="status-picker-btn" data-status="${st}" aria-haspopup="listbox" aria-expanded="false"
+            onclick="toggleStatusMenu(this, '${escapeAttr(o.order_id)}')">
+            <span class="sp-emoji">${(STATUS_META[st]||{}).emoji||''}</span><span class="sp-text">${(STATUS_META[st]||{}).label||st||'-'}</span>
+            <i class="sp-chev"><svg width="12" height="12" viewBox="0 0 20 20" fill="none"><polyline points="5.5 8 10 12.5 14.5 8" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></i>
+          </button>
+        </div>`;
     const editBtn = isGhost
       ? `<button class="icon-btn" onclick="openLinkModal('${escapeAttr(o.order_id)}')" style="background:#e3f2fd;color:#1565c0;" title="ผูกบัญชี LINE กับออเดอร์">🔗</button>
          <button class="icon-btn" onclick="openMergeOrdersModal('${escapeAttr(o.order_id)}')" style="background:#e8f5e9;color:#06C755;" title="ผูกกับออเดอร์จริง">🔁</button>`
@@ -2861,7 +3045,7 @@ function filterToCustomer(name) {
 
 // ═══ แถวกดได้ → เปิดหน้ารายละเอียด (กันชนกับปุ่ม/ดรอปดาวน์ในแถว) ═══
 function rowOpenOrderDetail(event, orderId) {
-  if (event.target.closest('button, select, a, input, .status-select, .items-cell-clickable, span[onclick]')) return;
+  if (event.target.closest('button, select, a, input, .status-picker, .items-cell-clickable, span[onclick]')) return;
   openItemsPopup(orderId);
 }
 
@@ -3556,6 +3740,7 @@ async function saveEnhancedEdit() {
   try {
     const { error } = await sb.from('orders').update(update).eq('order_id', eeEditingOrderId);
     if (error) throw error;
+    const savedEeOrderId = eeEditingOrderId;
 
     // Update local state
     const o = allOrders.find(x => x.order_id === eeEditingOrderId);
@@ -3569,6 +3754,7 @@ async function saveEnhancedEdit() {
     renderPage3Orders();
     closeEnhancedEdit();
     toast('✅ บันทึกและปรับสต็อกสำเร็จ!', 'success');
+    logActivity('📦', `แก้ไขสินค้า+สต็อกออเดอร์ #${savedEeOrderId}`, `ยอดใหม่ ฿${total.toLocaleString()}`);
   } catch (e) {
     toast('บันทึกไม่สำเร็จ: ' + e.message, 'error');
   }
@@ -3857,16 +4043,121 @@ function renderCharts() {
 // ═══════════════════════════════════════════
 //  STATUS UPDATE (existing)
 // ═══════════════════════════════════════════
-async function updateStatus(orderId, status) {
+// ═══════════════════════════════════════════
+//  STATUS PICKER — ปุ่ม+เมนู popup แทน <select> เดิม (โปรกว่า, คุมดีไซน์ได้ทุกเบราว์เซอร์)
+// ═══════════════════════════════════════════
+let _spOpenBtn = null;
+let _spOpenOrderId = null;
+let _spFocusIdx = -1;
+
+function _spEnsureMenu() {
+  let menu = document.getElementById('globalStatusMenu');
+  if (!menu) {
+    menu = document.createElement('div');
+    menu.id = 'globalStatusMenu';
+    menu.setAttribute('role', 'listbox');
+    document.body.appendChild(menu);
+  }
+  return menu;
+}
+
+function paintStatusBtn(btn, status) {
+  const meta = STATUS_META[status] || { emoji: '', label: status || '-' };
+  btn.dataset.status = status;
+  const em = btn.querySelector('.sp-emoji');
+  const tx = btn.querySelector('.sp-text');
+  if (em) em.textContent = meta.emoji;
+  if (tx) tx.textContent = meta.label;
+}
+
+function closeStatusMenu() {
+  const menu = document.getElementById('globalStatusMenu');
+  if (menu) menu.classList.remove('open');
+  if (_spOpenBtn) _spOpenBtn.setAttribute('aria-expanded', 'false');
+  _spOpenBtn = null;
+  _spOpenOrderId = null;
+  _spFocusIdx = -1;
+}
+
+function _spHighlight(menu, idx) {
+  const items = menu.querySelectorAll('.sp-menu-item');
+  items.forEach((it, i) => it.classList.toggle('kbd-focus', i === idx));
+  if (items[idx]) items[idx].scrollIntoView({ block: 'nearest' });
+}
+
+function toggleStatusMenu(btn, orderId) {
+  if (_spOpenBtn === btn) { closeStatusMenu(); return; }
+  closeStatusMenu();
+  const menu = _spEnsureMenu();
+  const current = btn.dataset.status;
+  menu.innerHTML = Object.entries(STATUS_META).map(([val, meta]) => {
+    const active = val === current;
+    return `<div class="sp-menu-item${active ? ' active' : ''}" role="option" aria-selected="${active}" data-val="${val}">
+      <span class="sp-menu-dot" style="background:${STATUS_COLOR[val] || '#999'}"></span>
+      <span>${meta.emoji}</span><span style="flex:1">${meta.label}</span>
+      ${active ? `<svg width="14" height="14" viewBox="0 0 20 20" fill="none"><polyline points="4 10.5 8 14.5 16 6" stroke="${STATUS_COLOR[val] || '#999'}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>` : ''}
+    </div>`;
+  }).join('');
+  menu.querySelectorAll('.sp-menu-item').forEach(item => {
+    item.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const val = item.dataset.val;
+      closeStatusMenu();
+      updateStatus(orderId, val, btn);
+    });
+  });
+  const rect = btn.getBoundingClientRect();
+  const menuWidth = 184, menuMaxHeight = 260;
+  let left = rect.right - menuWidth;
+  if (left < 8) left = 8;
+  if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8;
+  let top = rect.bottom + 6;
+  if (top + menuMaxHeight > window.innerHeight - 8) top = Math.max(8, rect.top - 6 - menuMaxHeight);
+  menu.style.left = left + 'px';
+  menu.style.top = top + 'px';
+  menu.classList.add('open');
+  btn.setAttribute('aria-expanded', 'true');
+  _spOpenBtn = btn;
+  _spOpenOrderId = orderId;
+  _spFocusIdx = -1;
+}
+
+document.addEventListener('click', (e) => {
+  if (_spOpenBtn && !e.target.closest('.status-picker') && !e.target.closest('#globalStatusMenu')) closeStatusMenu();
+});
+document.addEventListener('keydown', (e) => {
+  if (!_spOpenBtn) return;
+  const menu = document.getElementById('globalStatusMenu');
+  if (!menu) return;
+  const items = menu.querySelectorAll('.sp-menu-item');
+  if (e.key === 'Escape') { e.preventDefault(); closeStatusMenu(); }
+  else if (e.key === 'ArrowDown') { e.preventDefault(); _spFocusIdx = Math.min(items.length - 1, _spFocusIdx + 1); _spHighlight(menu, _spFocusIdx); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); _spFocusIdx = Math.max(0, _spFocusIdx - 1); _spHighlight(menu, _spFocusIdx); }
+  else if (e.key === 'Enter') { if (_spFocusIdx >= 0 && items[_spFocusIdx]) { e.preventDefault(); items[_spFocusIdx].click(); } }
+});
+window.addEventListener('scroll', () => { if (_spOpenBtn) closeStatusMenu(); }, true);
+window.addEventListener('resize', () => { if (_spOpenBtn) closeStatusMenu(); });
+
+async function updateStatus(orderId, status, btnEl) {
   if (!sb) return;
+  const oForGuard = allOrders.find(x => x.order_id === orderId);
+  const oldStatusForGuard = oForGuard ? oForGuard.status : null;
+  if (status === 'cancelled' && oldStatusForGuard !== 'cancelled') {
+    const STATUS_TH_CONFIRM = { pending:'รอดำเนินการ', sent:'ส่ง LINE แล้ว', confirmed:'ยืนยันแล้ว', shipped:'กำลังจัดส่ง', done:'เสร็จสิ้น' };
+    const okCancel = confirm(`ยืนยันยกเลิกออเดอร์ #${orderId}?\n\nสถานะปัจจุบัน: ${STATUS_TH_CONFIRM[oldStatusForGuard] || oldStatusForGuard || '-'}`);
+    if (!okCancel) return; // ปุ่มยังไม่ถูกเปลี่ยนหน้าตาเลย (ต่างจาก native select) จึงไม่ต้อง revert ค่าใดๆ
+  }
+  if (btnEl) btnEl.classList.add('sp-saving');
   try {
     const o = allOrders.find(x => x.order_id === orderId);
     const oldStatus = o ? o.status : null;
     const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
     if (error) throw error;
     if (o) o.status = status;
+    if (btnEl) paintStatusBtn(btnEl, status);
     renderStats(allOrders);
     toast('อัปเดตสถานะแล้ว ✓', 'success');
+    logActivity('🔄', `เปลี่ยนสถานะออเดอร์ #${orderId}`, `${statusLabelTh(oldStatus)} → ${statusLabelTh(status)}`);
 
     const bu = getBackendUrl();
     if (bu && oldStatus !== status) {
@@ -3899,6 +4190,8 @@ async function updateStatus(orderId, status) {
     }
   } catch (e) {
     toast('อัปเดตไม่สำเร็จ: ' + e.message, 'error');
+  } finally {
+    if (btnEl) btnEl.classList.remove('sp-saving');
   }
 }
 
@@ -3915,6 +4208,7 @@ async function deleteOrder(orderId) {
     renderOrders(allOrders);
     renderStats(allOrders);
     toast('ลบออเดอร์แล้ว ✓', 'success');
+    logActivity('🗑️', `ลบออเดอร์ #${orderId}`, '');
   } catch (e) {
     toast('ลบไม่สำเร็จ: ' + e.message, 'error');
   }
@@ -4603,12 +4897,14 @@ async function saveOrderEdit() {
   try {
     const { error } = await sb.from('orders').update(update).eq('order_id', editingOrderId);
     if (error) throw error;
+    const savedOrderId = editingOrderId;
     const o = allOrders.find(x => x.order_id === editingOrderId);
     if (o) Object.assign(o, update);
     renderOrders(allOrders);
     renderStats(allOrders);
     closeEditModal();
     toast('บันทึกการแก้ไขแล้ว ✓', 'success');
+    logActivity('✏️', `แก้ไขออเดอร์ #${savedOrderId}`, `ยอดใหม่ ฿${total.toLocaleString()}`);
   } catch (e) {
     toast('บันทึกไม่สำเร็จ: ' + e.message, 'error');
   }
@@ -8365,7 +8661,7 @@ try {
   const _origShowPage = window.showPage;
   window.showPage = function (n) {
     _origShowPage(n);
-    if (n === 8) { loadErrorLogPage(); loadUserSessionsLog(); }
+    if (n === 8) { loadErrorLogPage(); loadUserSessionsLog(); loadSalesSessionsLog(); renderActivityLog(); }
     if (n === 9) loadSystemStatusPage();
   };
 })();
@@ -8384,9 +8680,7 @@ let _errFilter = 'all';
 function setErrFilter(src) {
   _errFilter = src;
   document.querySelectorAll('.err-chip').forEach(c => {
-    const active = c.dataset.src === src;
-    c.style.background = active ? '#7E1610' : '#eee';
-    c.style.color = active ? '#fff' : '#555';
+    c.classList.toggle('active', c.dataset.src === src);
   });
   loadErrorLogPage();
 }
@@ -8410,16 +8704,96 @@ async function loadUserSessionsLog() {
     box.innerHTML = users.map(u => {
       const device = u.last_device || u.device || null;
       const lastLogin = u.last_login ? new Date(u.last_login).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' }) : 'ยังไม่เคยเข้าสู่ระบบ';
-      return `<div style="display:flex;align-items:center;gap:10px;padding:9px 11px;background:${u.is_active?'#f9f9f9':'#fdf0f0'};border-radius:10px;font-size:13px;">
+      return `<div class="pro-session-row${u.is_active?'':' offline'}">
+        <span class="pro-session-dot" style="background:${u.is_active?'#15803D':'#B0A9A1'};"></span>
         <div style="flex:1;min-width:0;">
-          <div style="font-weight:700;">${(u.display_name || u.username || '').replace(/</g,'&lt;')} <span style="font-size:11px;color:#888;font-weight:400;">@${(u.username||'').replace(/</g,'&lt;')}</span> ${u.is_active?'':'<span style="color:#c0392b;font-size:11px;">(ปิดใช้งาน)</span>'}</div>
-          <div style="font-size:11px;color:#666;">${roleTh[u.role]||u.role} · 🕒 เข้าล่าสุด ${lastLogin} · 💻 ${device ? device.replace(/</g,'&lt;') : 'ยังไม่มีข้อมูลอุปกรณ์'}</div>
+          <div class="pro-session-name">${(u.display_name || u.username || '').replace(/</g,'&lt;')} <span style="font-size:11px;color:var(--text-3);font-weight:400;">@${(u.username||'').replace(/</g,'&lt;')}</span> ${u.is_active?'':'<span style="color:var(--danger);font-size:11px;">(ปิดใช้งาน)</span>'}</div>
+          <div class="pro-session-meta">${roleTh[u.role]||u.role} · 🕒 เข้าล่าสุด ${lastLogin} · 💻 ${device ? device.replace(/</g,'&lt;') : 'ยังไม่มีข้อมูลอุปกรณ์'}</div>
         </div>
       </div>`;
     }).join('');
   } catch(e) {
-    box.innerHTML = `<div style="color:#c0392b;font-size:13px;padding:14px;">❌ ${e.message}</div>`;
+    box.innerHTML = `<div style="color:var(--danger);font-size:13px;padding:14px;">❌ ${e.message}</div>`;
   }
+}
+
+// ── 💼 ใครเข้าใช้งานแอปเซลบ้าง (proxy จากเวลาส่งพิกัด GPS ล่าสุด — ระบบยังไม่มี login timestamp ของบัญชีเซลโดยตรง) ──
+async function loadSalesSessionsLog() {
+  const box = document.getElementById('salesSessionsList');
+  if (!box) return;
+  box.innerHTML = '<div style="color:var(--text-3);font-size:13px;padding:14px;text-align:center;">กำลังโหลด...</div>';
+  try {
+    if (!allSalesStaff.length) {
+      const d = await gasCallAdmin({ action:'getSalesStaffList' });
+      allSalesStaff = d.ok ? (d.staff||[]) : [];
+    }
+    if (!allSalesStaff.length) { box.innerHTML = '<div style="color:var(--text-3);font-size:13px;padding:14px;text-align:center;">ยังไม่มีบัญชีเซล</div>'; return; }
+    const locRes = await fetch(`${SB_URL_SALES}/rest/v1/sales_locations?select=*`, {
+      headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES }
+    });
+    const locations = await locRes.json();
+    const rows = allSalesStaff.map((s, idx) => {
+      const sid = s.salesId || s.id || '';
+      const loc = Array.isArray(locations) ? locations.find(l => l.sales_id === sid) : null;
+      const isOnline = loc && (Date.now() - new Date(loc.updated_at).getTime()) < 3 * 60 * 1000;
+      const lastSeen = loc && loc.updated_at ? new Date(loc.updated_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'short' }) : 'ยังไม่มีข้อมูลการใช้งาน';
+      return { s, isOnline, lastSeen, sortKey: loc && loc.updated_at ? new Date(loc.updated_at).getTime() : 0 };
+    }).sort((a,b) => b.sortKey - a.sortKey);
+    box.innerHTML = rows.map(({s, isOnline, lastSeen}) => `<div class="pro-session-row${isOnline?'':' offline'}">
+        <span class="pro-session-dot" style="background:${isOnline?'#15803D':'#B0A9A1'};${isOnline?'box-shadow:0 0 6px #15803D':''}"></span>
+        <div style="flex:1;min-width:0;">
+          <div class="pro-session-name">💼 ${(s.name||'ไม่ทราบชื่อ').replace(/</g,'&lt;')} ${isOnline?'<span style="color:#15803D;font-size:11px;">● ออนไลน์</span>':''}</div>
+          <div class="pro-session-meta">🕒 ใช้งานล่าสุด ${lastSeen}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    box.innerHTML = `<div style="color:var(--danger);font-size:13px;padding:14px;">❌ ${e.message}</div>`;
+  }
+}
+
+// ── 📝 Activity Log — บันทึกการทำงาน (เปลี่ยนสถานะ/แก้ไข/ลบออเดอร์) ไว้ในเครื่องนี้ (localStorage) ──
+const ACTIVITY_LOG_KEY = 'monshin_admin_activity_log';
+const ACTIVITY_LOG_MAX = 300;
+
+function statusLabelTh(st) {
+  const M = { pending:'รอดำเนินการ', sent:'ส่ง LINE แล้ว', confirmed:'ยืนยันแล้ว', shipped:'กำลังจัดส่ง', done:'เสร็จสิ้น', cancelled:'ยกเลิก' };
+  return M[st] || st || '-';
+}
+
+function logActivity(icon, title, detail) {
+  try {
+    const list = JSON.parse(localStorage.getItem(ACTIVITY_LOG_KEY) || '[]');
+    list.unshift({ t: Date.now(), icon, title, detail: detail || '' });
+    if (list.length > ACTIVITY_LOG_MAX) list.length = ACTIVITY_LOG_MAX;
+    localStorage.setItem(ACTIVITY_LOG_KEY, JSON.stringify(list));
+  } catch(_) {}
+  const p8 = document.getElementById('page-8');
+  if (p8 && p8.style.display !== 'none') renderActivityLog();
+}
+
+function clearActivityLog() {
+  if (!confirm('ล้างประวัติการทำงานทั้งหมดในเครื่องนี้?')) return;
+  try { localStorage.removeItem(ACTIVITY_LOG_KEY); } catch(_) {}
+  renderActivityLog();
+}
+
+function renderActivityLog() {
+  const box = document.getElementById('activityLogList');
+  if (!box) return;
+  let list = [];
+  try { list = JSON.parse(localStorage.getItem(ACTIVITY_LOG_KEY) || '[]'); } catch(_) {}
+  if (!list.length) {
+    box.innerHTML = '<div style="color:var(--text-3);font-size:13px;padding:14px;text-align:center;">ยังไม่มีการทำงานที่บันทึกไว้ในเครื่องนี้</div>';
+    return;
+  }
+  box.innerHTML = list.map(a => `<div class="pro-log-entry" style="border-left-color:var(--blue);">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <span class="pro-log-badge" style="background:var(--blue);">${a.icon||'•'} กิจกรรม</span>
+        <span class="pro-log-scope">${(a.title||'').replace(/</g,'&lt;')}</span>
+        <span class="pro-log-time">🕒 ${new Date(a.t).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'medium' })}</span>
+      </div>
+      ${a.detail ? `<div class="pro-log-msg">${String(a.detail).replace(/</g,'&lt;')}</div>` : ''}
+    </div>`).join('');
 }
 
 async function loadErrorLogPage() {
@@ -8435,7 +8809,7 @@ async function loadErrorLogPage() {
     if (!r.ok) throw new Error(d.error || 'โหลดไม่สำเร็จ');
     const logs = d.logs || [];
     if (!logs.length) {
-      box.innerHTML = '<div style="background:#e8f7ee;color:#1a6b3c;border-radius:12px;padding:22px;text-align:center;font-size:14px;font-weight:700;">✅ ไม่พบ Error ในช่วงเวลานี้ — ระบบทำงานเรียบร้อยดี</div>';
+      box.innerHTML = '<div class="pro-log-empty-ok">✅ ไม่พบ Error ในช่วงเวลานี้ — ระบบทำงานเรียบร้อยดี</div>';
       return;
     }
     const srcBadge = {
@@ -8447,18 +8821,18 @@ async function loadErrorLogPage() {
     box.innerHTML = logs.map(l => {
       const [label, color] = srcBadge[l.source] || [l.source || 'backend', '#666'];
       const t = new Date(l.created_at).toLocaleString('th-TH', { dateStyle:'short', timeStyle:'medium' });
-      return `<div style="background:#fff;border-radius:12px;padding:12px 14px;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:4px solid ${color};">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px;">
-          <span style="background:${color};color:#fff;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px;">${label}</span>
-          <span style="font-size:12px;font-weight:700;color:#333;">${(l.scope||'').replace(/</g,'&lt;')}</span>
-          <span style="font-size:11px;color:#999;margin-left:auto;">🕒 ${t}</span>
+      return `<div class="pro-log-entry" style="border-left-color:${color};">
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <span class="pro-log-badge" style="background:${color};">${label}</span>
+          <span class="pro-log-scope">${(l.scope||'').replace(/</g,'&lt;')}</span>
+          <span class="pro-log-time">🕒 ${t}</span>
         </div>
-        <div style="font-size:13px;color:#444;word-break:break-word;">${(l.message||'').replace(/</g,'&lt;')}</div>
-        ${l.extra ? `<div style="font-size:11px;color:#888;margin-top:4px;word-break:break-all;">${String(l.extra).replace(/</g,'&lt;').slice(0,300)}</div>` : ''}
+        <div class="pro-log-msg">${(l.message||'').replace(/</g,'&lt;')}</div>
+        ${l.extra ? `<div class="pro-log-extra">${String(l.extra).replace(/</g,'&lt;').slice(0,300)}</div>` : ''}
       </div>`;
     }).join('');
   } catch(e) {
-    box.innerHTML = `<div style="color:#c0392b;font-size:13px;padding:16px;">❌ ${e.message}</div>`;
+    box.innerHTML = `<div style="color:var(--danger);font-size:13px;padding:16px;">❌ ${e.message}</div>`;
   }
 }
 
@@ -8494,11 +8868,28 @@ async function saveErrNotifyCfg() {
 }
 
 // ── 🩺 System Status page ──
+// SVG semicircle gauge — ใช้กับ % การใช้งาน RAM / ฐานข้อมูล ในหน้าสถานะระบบ
+function _proGaugeSvg(pct, color) {
+  const p = Math.max(0, Math.min(100, pct));
+  const total = 40, active = Math.round(p / 100 * total);
+  let ticks = '';
+  for (let i = 0; i < total; i++) {
+    const ang = Math.PI + (i / (total - 1)) * Math.PI;
+    const x1 = 100 + 70 * Math.cos(ang),  y1 = 100 + 70 * Math.sin(ang);
+    const x2 = 100 + 80 * Math.cos(ang),  y2 = 100 + 80 * Math.sin(ang);
+    ticks += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" stroke="${i < active ? color : '#E7E5E4'}" stroke-width="4" stroke-linecap="round"/>`;
+  }
+  return `<div class="pro-gauge-wrap">
+    <svg viewBox="0 0 200 115">${ticks}<text x="100" y="98" text-anchor="middle" class="pro-gauge-num" style="fill:${color};font-size:26px;">${p}%</text></svg>
+    <div class="pro-gauge-labels"><span>0%</span><span>100%</span></div>
+  </div>`;
+}
+
 async function loadSystemStatusPage() {
   const box = document.getElementById('sysStatusBody');
   const bu = getBackendUrl();
-  if (!bu) { box.innerHTML = '<div style="color:#c0392b;font-size:13px;padding:16px;">กรอก Backend URL ในแถบตั้งค่าก่อน</div>'; return; }
-  box.innerHTML = '<div style="color:#888;font-size:13px;padding:20px;text-align:center;">⏳ กำลังตรวจสุขภาพระบบ...</div>';
+  if (!bu) { box.innerHTML = '<div style="color:var(--danger);font-size:13px;padding:16px;">กรอก Backend URL ในแถบตั้งค่าก่อน</div>'; return; }
+  box.innerHTML = '<div style="color:var(--text-3);font-size:13px;padding:20px;text-align:center;">⏳ กำลังตรวจสุขภาพระบบ...</div>';
   try {
     const r = await fetchWithRetry(bu + '/admin/system-status', {}, { retries: 3, baseDelay: 3000 });
     const s = await _jsonOrExplain(r);
@@ -8513,77 +8904,75 @@ async function loadSystemStatusPage() {
     const upStr = upMin >= 1440 ? Math.floor(upMin/1440)+' วัน '+Math.floor((upMin%1440)/60)+' ชม.' : upMin >= 60 ? Math.floor(upMin/60)+' ชม. '+(upMin%60)+' นาที' : upMin+' นาที';
     const memPct = Math.round((be.memoryMB || 0) / 512 * 100);
     const dbPct = m.dbEstimatedMB != null ? Math.round(m.dbEstimatedMB / 500 * 100) : null;
-    const bar = (pct, warnAt, dangerAt) => {
-      const color = pct >= dangerAt ? '#c0392b' : pct >= warnAt ? '#e67e22' : '#27ae60';
-      return `<div style="background:#eee;border-radius:6px;height:8px;overflow:hidden;margin-top:6px;"><div style="width:${Math.min(pct,100)}%;height:100%;background:${color};"></div></div>`;
-    };
-    const okBadge = ok => ok ? '<span style="color:#27ae60;font-weight:700;">✅ ปกติ</span>' : '<span style="color:#c0392b;font-weight:700;">❌ มีปัญหา</span>';
+    const pctColor = (pct, warnAt, dangerAt) => pct >= dangerAt ? '#C0362C' : pct >= warnAt ? '#B45309' : '#15803D';
+    const bar = (pct, warnAt, dangerAt) => `<div class="pro-bar-track"><div class="pro-bar-fill" style="width:${Math.min(pct,100)}%;background:${pctColor(pct,warnAt,dangerAt)};"></div></div>`;
+    const okBadge = ok => ok ? '<span class="pro-svc-badge-ok">✅ ปกติ</span>' : '<span class="pro-svc-badge-bad">❌ มีปัญหา</span>';
 
-    // การ์ดบริการ
-    let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px;margin-bottom:16px;">
-      <div style="background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
-        <div style="font-weight:800;font-size:14px;margin-bottom:8px;">🖥️ Backend (Render) ${okBadge(be.ok)}</div>
-        <div style="font-size:12px;color:#666;line-height:1.9;">
-          ⏱️ ทำงานต่อเนื่อง: <b>${upStr}</b><br>
-          🧠 RAM: <b>${be.memoryMB || '?'} / 512 MB (${memPct}%)</b>${bar(memPct, 60, 80)}
-          <span style="font-size:11px;color:#999;">Node ${be.node || '-'}</span>
-        </div>
+    // ── แถว KPI สรุปด่วน ──
+    let html = `<div class="pro-kpi-row">
+      <div class="pro-kpi"><div class="pro-kpi-icon">⏱️</div><div class="pro-kpi-body"><div class="pro-kpi-num">${upStr}</div><div class="pro-kpi-lbl">ทำงานต่อเนื่อง</div></div></div>
+      <div class="pro-kpi"><div class="pro-kpi-icon blue">⚡</div><div class="pro-kpi-body"><div class="pro-kpi-num">${db.latencyMs != null ? db.latencyMs + ' ms' : '-'}</div><div class="pro-kpi-lbl">ความเร็วตอบฐานข้อมูล</div></div></div>
+      <div class="pro-kpi"><div class="pro-kpi-icon gold">📦</div><div class="pro-kpi-body"><div class="pro-kpi-num">${(db.totalOrders||0).toLocaleString()}</div><div class="pro-kpi-lbl">ออเดอร์ทั้งหมด (วันนี้ ${db.todayOrders||0})</div></div></div>
+      <div class="pro-kpi"><div class="pro-kpi-icon ${ (db.errors24h||0) > 0 ? 'amber':'green'}">${(db.errors24h||0) > 0 ? '⚠️':'✅'}</div><div class="pro-kpi-body"><div class="pro-kpi-num">${db.errors24h ?? '-'}</div><div class="pro-kpi-lbl">Error ใน 24 ชม.</div></div></div>
+    </div>`;
+
+    // ── การ์ดบริการ พร้อม gauge ──
+    html += `<div class="pro-svc-grid">
+      <div class="pro-svc-card">
+        <div class="pro-svc-title">🖥️ Backend (Render) ${okBadge(be.ok)}</div>
+        ${_proGaugeSvg(memPct, pctColor(memPct,60,80))}
+        <div class="pro-svc-line" style="text-align:center;margin-top:4px;">🧠 RAM ${be.memoryMB || '?'} / 512 MB<br><span style="font-size:11px;color:var(--text-4);">Node ${be.node || '-'}</span></div>
       </div>
-      <div style="background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
-        <div style="font-weight:800;font-size:14px;margin-bottom:8px;">🗄️ ฐานข้อมูล (Supabase) ${okBadge(db.ok)}</div>
-        <div style="font-size:12px;color:#666;line-height:1.9;">
-          ⚡ ความเร็วตอบ: <b>${db.latencyMs != null ? db.latencyMs + ' ms' : '-'}</b><br>
-          💾 ขนาด${m.dbSizeIsEstimate ? ' (ประมาณ)' : ' (จริง)'}: <b>${m.dbEstimatedMB != null ? m.dbEstimatedMB + ' / 500 MB' : 'วัดไม่ได้'}</b>
-          ${dbPct != null ? bar(dbPct, 60, 80) : ''}
-          📦 ออเดอร์ทั้งหมด: <b>${(db.totalOrders||0).toLocaleString()}</b> (วันนี้ ${db.todayOrders||0})<br>
-          💬 ข้อความแชท: <b>${(db.messages||0).toLocaleString()}</b>
-        </div>
+      <div class="pro-svc-card">
+        <div class="pro-svc-title">🗄️ ฐานข้อมูล (Supabase) ${okBadge(db.ok)}</div>
+        ${dbPct != null ? _proGaugeSvg(dbPct, pctColor(dbPct,60,80)) : '<div class="pro-svc-line" style="text-align:center;padding:20px 0;">วัดขนาดไม่ได้</div>'}
+        <div class="pro-svc-line" style="text-align:center;margin-top:4px;">💾 ${m.dbEstimatedMB != null ? m.dbEstimatedMB + ' / 500 MB' : '-'}${m.dbSizeIsEstimate ? ' (ประมาณ)' : ' (จริง)'}<br><span style="font-size:11px;color:var(--text-4);">💬 ข้อความแชท ${(db.messages||0).toLocaleString()}</span></div>
       </div>
-      <div style="background:#fff;border-radius:12px;padding:14px;box-shadow:0 1px 4px rgba(0,0,0,.06);">
-        <div style="font-weight:800;font-size:14px;margin-bottom:8px;">🔐 ความปลอดภัย & LINE</div>
-        <div style="font-size:12px;color:#666;line-height:1.9;">
+      <div class="pro-svc-card">
+        <div class="pro-svc-title">🔐 ความปลอดภัย &amp; LINE</div>
+        <div class="pro-svc-line">
           LINE Token: ${ln.ok ? '✅' : '❌ ไม่ได้ตั้ง'}<br>
           Webhook ตรวจลายเซ็น: ${ln.webhookSecured ? '✅' : '⚠️ ยังไม่ตั้ง'}<br>
           Admin API Key: ${sec.adminKeySet ? '✅ ล็อกแล้ว' : '🚨 ยังไม่ได้ตั้ง!'}<br>
           Error 24 ชม.: <b>${db.errors24h ?? '-'}</b> รายการ
-          ${m.errorsBySource ? '<br><span style="font-size:11px;color:#999;">' + Object.entries(m.errorsBySource).map(([k,v])=>k+': '+v).join(' · ') + '</span>' : ''}
+          ${m.errorsBySource ? '<br><span style="font-size:11px;color:var(--text-4);">' + Object.entries(m.errorsBySource).map(([k,v])=>k+': '+v).join(' · ') + '</span>' : ''}
         </div>
       </div>
     </div>`;
 
     // คำแนะนำ
     const sevConf = {
-      crit:  { bg:'#fdeeee', bd:'#c0392b', icon:'🚨', label:'ด่วน' },
-      danger:{ bg:'#fdeeee', bd:'#c0392b', icon:'🚨', label:'ด่วน' },
-      warn:  { bg:'#fff8e6', bd:'#e67e22', icon:'⚠️', label:'เฝ้าระวัง' },
-      ok:    { bg:'#e8f7ee', bd:'#27ae60', icon:'✅', label:'ปกติ' },
-      info:  { bg:'#eef4fb', bd:'#2980b9', icon:'💡', label:'ความรู้' },
+      crit:  { bg:'var(--red-50)', bd:'var(--danger)', icon:'🚨', label:'ด่วน' },
+      danger:{ bg:'var(--red-50)', bd:'var(--danger)', icon:'🚨', label:'ด่วน' },
+      warn:  { bg:'var(--amber-bg)', bd:'var(--amber)', icon:'⚠️', label:'เฝ้าระวัง' },
+      ok:    { bg:'var(--green-bg)', bd:'var(--green)', icon:'✅', label:'ปกติ' },
+      info:  { bg:'var(--blue-bg)', bd:'var(--blue)', icon:'💡', label:'ความรู้' },
     };
     const recs = s.recommendations || [];
-    html += `<div style="font-weight:800;font-size:14px;margin-bottom:8px;">📋 คำแนะนำจากระบบ (${recs.length})</div>`;
+    html += `<div class="pro-log-section-title" style="margin-bottom:10px;"><svg width="15" height="15"><use href="#ic-info"/></svg>คำแนะนำจากระบบ (${recs.length})</div>`;
     html += recs.map(rc => {
       const c = sevConf[rc.level || rc.sev] || sevConf.info;
-      return `<div style="background:${c.bg};border-left:4px solid ${c.bd};border-radius:10px;padding:11px 14px;margin-bottom:8px;">
-        <div style="font-size:13px;font-weight:800;color:#333;">${c.icon} ${rc.title}</div>
-        <div style="font-size:12px;color:#555;margin-top:3px;line-height:1.6;">${rc.detail || ''}</div>
+      return `<div class="pro-rec-card" style="background:${c.bg};border-left-color:${c.bd};">
+        <div class="pro-rec-title">${c.icon} ${rc.title}</div>
+        <div style="font-size:12px;color:var(--text-2);margin-top:3px;line-height:1.6;">${rc.detail || ''}</div>
       </div>`;
-    }).join('') || '<div style="color:#888;font-size:13px;">ไม่มีคำแนะนำ</div>';
+    }).join('') || '<div style="color:var(--text-3);font-size:13px;">ไม่มีคำแนะนำ</div>';
 
     // คู่มืออัพเกรด
     const ug = s.upgradeGuide || [];
     if (ug.length) {
-      html += `<div style="font-weight:800;font-size:14px;margin:16px 0 8px;">💳 ตารางช่วยตัดสินใจ: เมื่อไหร่ควรจ่ายเพิ่ม/อัพเกรด</div>`;
-      html += ug.map(u => `<div style="background:#fff;border-radius:10px;padding:12px 14px;margin-bottom:8px;box-shadow:0 1px 4px rgba(0,0,0,.06);font-size:12px;line-height:1.8;">
-        <b style="font-size:13px;">${u.service}</b><br>
+      html += `<div class="pro-log-section-title" style="margin:18px 0 10px;"><svg width="15" height="15"><use href="#ic-package"/></svg>ตารางช่วยตัดสินใจ: เมื่อไหร่ควรจ่ายเพิ่ม/อัพเกรด</div>`;
+      html += ug.map(u => `<div class="pro-upgrade-card">
+        <b style="font-size:13px;color:var(--text);">${u.service}</b><br>
         🆓 ตอนนี้ (ฟรี): ${u.free}<br>
         💳 แบบเสียเงิน: ${u.paid}<br>
-        ⏰ <b style="color:#7E1610;">ควรอัพเกรดเมื่อ:</b> ${u.when}
+        ⏰ <b style="color:var(--red-700);">ควรอัพเกรดเมื่อ:</b> ${u.when}
       </div>`).join('');
     }
-    html += `<div style="font-size:11px;color:#aaa;margin-top:10px;">ตรวจเมื่อ: ${new Date(s.checkedAt).toLocaleString('th-TH')} · ใช้เวลา ${s.responseMs || '-'} ms</div>`;
+    html += `<div style="font-size:11px;color:var(--text-4);margin-top:10px;">ตรวจเมื่อ: ${new Date(s.checkedAt).toLocaleString('th-TH')} · ใช้เวลา ${s.responseMs || '-'} ms</div>`;
     box.innerHTML = html;
   } catch(e) {
-    box.innerHTML = `<div style="color:#c0392b;font-size:13px;padding:16px;">❌ ${e.message}</div>`;
+    box.innerHTML = `<div style="color:var(--danger);font-size:13px;padding:16px;">❌ ${e.message}</div>`;
   }
 }
 
