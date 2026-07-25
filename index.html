@@ -2697,7 +2697,13 @@ function subscribeProductsRealtime() {
   productsRealtimeChannel = sb.channel('products-realtime')
     .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, handleProductsRealtimeChange)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, handleProductsRealtimeChange)
-    .subscribe();
+    .subscribe(status => {
+      // ถ้า Supabase ยังไม่ได้เปิด Realtime replication ให้ตาราง products/menu_items ไว้
+      // ช่องนี้จะไม่มีทาง fire เลยแบบเงียบๆ — log ไว้ให้เห็นตอนดีบัก
+      if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+        console.warn('⚠️ products-realtime subscribe status:', status, '— ตรวจสอบว่าเปิด Realtime ให้ตาราง products/menu_items ใน Supabase แล้วหรือยัง');
+      }
+    });
 }
 
 function handleProductsRealtimeChange() {
@@ -2728,11 +2734,14 @@ async function silentReloadProductsAndSyncOpenModal() {
     // ถ้ากำลังเปิดหน้าต่างแก้ไขออเดอร์อยู่ → รีเฟรชราคา/โปรโมชั่น/สต็อกในแถวทันที โดยคงค่าที่ผู้ใช้กำลังแก้ไว้
     const eeModal = document.getElementById('enhancedEditModal');
     if (eeModal && eeModal.classList.contains('show')) {
-      // ถ้าผู้ใช้กำลังเปิด dropdown ค้นหา/เลือกสินค้าอยู่ ให้เลื่อนการ re-render ออกไปก่อน
-      // (กันไม่ให้แย่ง focus / ปิด dropdown ระหว่างที่กำลังเลือกสินค้าอยู่พอดี)
+      // ถ้าผู้ใช้กำลังเปิด dropdown ค้นหาสินค้า หรือกำลังโฟกัส/พิมพ์อยู่ในช่องใดช่องหนึ่งของแถวสินค้า
+      // (ชื่อ/จำนวน/ราคา) ให้เลื่อนการ re-render ออกไปก่อน กันแย่ง focus / ปิด dropdown / ขัดจังหวะการพิมพ์
+      const itemsListEl = document.getElementById('eeItemsList');
       const dropdownOpen = [...document.querySelectorAll('#eeItemsList .product-suggestions')]
         .some(el => el.style.display === 'block');
-      if (dropdownOpen) {
+      const userTyping = !!(itemsListEl && document.activeElement && itemsListEl.contains(document.activeElement)
+        && ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName));
+      if (dropdownOpen || userTyping) {
         clearTimeout(_productsRTDebounce);
         _productsRTDebounce = setTimeout(silentReloadProductsAndSyncOpenModal, 1000);
       } else {
@@ -3886,7 +3895,7 @@ async function adjustStock(originalItems, newItems) {
     const newStock = Math.max(0, currentStock + d.change);
 
     try {
-      const { error } = await sb.from('products').update({ [stockField]: newStock }).eq('id', prod.id);
+      const { error } = await sb.from(currentProductsTable || 'products').update({ [stockField]: newStock }).eq('id', prod.id);
       if (!error) {
         prod[stockField] = newStock; // update local cache
       }
