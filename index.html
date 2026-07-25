@@ -2491,6 +2491,9 @@ let chartPeriod = 7;
 let chartBar = null, chartLine = null, chartPie = null;
 let eeOriginalItems = []; // snapshot when enhanced edit opens
 let eeEditingOrderId = null;
+let productsRealtimeChannel = null; // เรียลไทม์ราคา/โปรโมชั่นสินค้าจากหน้าร้าน
+let currentProductsTable = 'products';
+let _productsRTDebounce = null;
 
 // ═══════════════════════════════════════════
 //  PAGE NAVIGATION
@@ -2594,6 +2597,7 @@ async function connectAndLoad() {
 
   await loadOrders();
   setupRealtime();
+  subscribeProductsRealtime();
 }
 
 // ═══════════════════════════════════════════
@@ -2680,6 +2684,87 @@ function handleRealtimeChange(payload) {
   renderOrders(allOrders);
   renderStats(allOrders);
   document.getElementById('last-updated').textContent = 'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
+}
+
+// ═══════════════════════════════════════════
+//  REALTIME: ราคา/โปรโมชั่นสินค้าจากหน้าร้าน (products)
+//  → อัปเดตแคตตาล็อกในแอดมินอัตโนมัติ ไม่ต้องกด "โหลดสินค้าหน้าร้าน" เอง
+// ═══════════════════════════════════════════
+function subscribeProductsRealtime() {
+  if (!sb) return;
+  if (productsRealtimeChannel) { sb.removeChannel(productsRealtimeChannel); productsRealtimeChannel = null; }
+  // ฟังทั้ง products และ menu_items เพราะไม่รู้ล่วงหน้าว่าร้านใช้ตารางไหน (ดู loadProductsForPage3)
+  productsRealtimeChannel = sb.channel('products-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, handleProductsRealtimeChange)
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'menu_items' }, handleProductsRealtimeChange)
+    .subscribe();
+}
+
+function handleProductsRealtimeChange() {
+  // debounce กันยิงซ้ำถี่ๆ เวลามีการแก้ไขหลายแถวติดกัน (เช่น แก้ราคาทีละไซซ์)
+  clearTimeout(_productsRTDebounce);
+  _productsRTDebounce = setTimeout(silentReloadProductsAndSyncOpenModal, 450);
+}
+
+async function silentReloadProductsAndSyncOpenModal() {
+  if (!sb) return;
+  try {
+    const { raw, tableName } = await fetchProductsRaw();
+    currentProductsTable = tableName;
+    allProducts = normalizeProducts(raw);
+    const countEl = document.getElementById('p3ProductCount');
+    if (countEl) countEl.textContent = allProducts.length;
+
+    // อัปเดต cache ไซซ์/ตัวเลือก ให้ตรงกับข้อมูลล่าสุด
+    raw.forEach(p => {
+      const name = p.name || p.product_name || p.item_name || '';
+      if (!name) return;
+      const sizesVal = p.sizes ?? p.variants ?? p.size_options ?? p.options ?? p.product_sizes ?? null;
+      if (sizesVal && (Array.isArray(sizesVal) ? sizesVal.length > 0 : true)) {
+        _emSizesCache[name] = sizesVal;
+      }
+    });
+
+    // ถ้ากำลังเปิดหน้าต่างแก้ไขออเดอร์อยู่ → รีเฟรชราคา/โปรโมชั่น/สต็อกในแถวทันที โดยคงค่าที่ผู้ใช้กำลังแก้ไว้
+    const eeModal = document.getElementById('enhancedEditModal');
+    if (eeModal && eeModal.classList.contains('show')) {
+      // ถ้าผู้ใช้กำลังเปิด dropdown ค้นหา/เลือกสินค้าอยู่ ให้เลื่อนการ re-render ออกไปก่อน
+      // (กันไม่ให้แย่ง focus / ปิด dropdown ระหว่างที่กำลังเลือกสินค้าอยู่พอดี)
+      const dropdownOpen = [...document.querySelectorAll('#eeItemsList .product-suggestions')]
+        .some(el => el.style.display === 'block');
+      if (dropdownOpen) {
+        clearTimeout(_productsRTDebounce);
+        _productsRTDebounce = setTimeout(silentReloadProductsAndSyncOpenModal, 1000);
+      } else {
+        const rows = [...document.querySelectorAll('#eeItemsList .enhanced-item-row')];
+        if (rows.length) {
+          const items = rows.map(row => {
+            const nameInput = row.querySelector('[data-field="name"]');
+            const selChip = row.querySelector('.em-variant-chip.selected');
+            return {
+              name: nameInput ? nameInput.value.trim() : '',
+              qty: parseInt(row.querySelector('[data-field="qty"]').value) || 1,
+              price: parseFloat(row.querySelector('[data-field="price"]').value) || 0,
+              _variant: selChip ? selChip.dataset.label : '',
+            };
+          });
+          renderEnhancedItems(items);
+          toast('💹 ราคา/โปรโมชั่นอัปเดตจากหน้าร้านแบบเรียลไทม์', 'info');
+        }
+      }
+    }
+    // เผื่อ modal แก้ไขแบบเดิม (legacy) เปิดอยู่ ก็รีเฟรชด้วยเช่นกัน
+    const emModal = document.getElementById('editModal');
+    if (emModal && emModal.classList.contains('show') && Array.isArray(_emOpenItems) && _emOpenItems.length) {
+      renderEditItems(_emOpenItems);
+    }
+
+    if (currentPage === 3 && document.getElementById('p3StockStatus')) {
+      document.getElementById('p3StockStatus').style.display = 'flex';
+    }
+  } catch (e) {
+    console.error('silentReloadProductsAndSyncOpenModal error:', e);
+  }
 }
 
 function playBeep() {
@@ -3267,24 +3352,42 @@ function normalizeProducts(raw) {
   });
 }
 
-async function loadProductsForPage3() {
-  if (!sb) { toast('เชื่อมต่อ Supabase ก่อน', 'error'); return; }
+// โหลดสินค้าดิบจากตารางที่ถูกต้อง (products → fallback menu_items) — ใช้ร่วมกันทั้งโหลดเอง/เรียลไทม์
+// เพื่อกันบั๊ค: ถ้าร้านใช้ menu_items แต่ currentProductsTable ยังไม่เคยถูกตั้งค่า (ยังไม่เคยกดโหลดเอง)
+// เรียลไทม์จะได้ไม่ query ผิดตารางจนอัปเดตราคาไม่ได้
+async function fetchProductsRaw() {
   const tryLoad = async (table) => {
     const { data, error } = await sb.from(table).select('*').order('name');
     if (error) throw error;
     return data || [];
   };
-
-  let raw = [];
-  let tableName = '';
-  try {
-    raw = await tryLoad('products'); tableName = 'products';
-  } catch(e) {
-    try { raw = await tryLoad('menu_items'); tableName = 'menu_items'; }
-    catch(e2) {
-      toast('โหลดสินค้าไม่ได้: ' + e.message, 'error'); return;
-    }
+  // ลองตารางที่รู้อยู่แล้วก่อน (เร็วกว่า, กันคำขอซ้ำซ้อนเวลามีคนแก้สินค้าถี่ๆ)
+  if (currentProductsTable) {
+    try { return { raw: await tryLoad(currentProductsTable), tableName: currentProductsTable }; }
+    catch (e) { /* ตารางที่เคยใช้อาจใช้ไม่ได้แล้ว → ลองหาใหม่ด้านล่าง */ }
   }
+  const candidates = ['products', 'menu_items'].filter(t => t !== currentProductsTable);
+  let lastErr = null;
+  for (const table of candidates) {
+    try { return { raw: await tryLoad(table), tableName: table }; }
+    catch (e) { lastErr = e; }
+  }
+  throw lastErr || new Error('ไม่พบตารางสินค้า');
+}
+
+async function loadProductsForPage3() {
+  if (!sb) { toast('เชื่อมต่อ Supabase ก่อน', 'error'); return; }
+
+  let raw = [], tableName = '';
+  try {
+    ({ raw, tableName } = await fetchProductsRaw());
+  } catch (e) {
+    toast('โหลดสินค้าไม่ได้: ' + e.message, 'error'); return;
+  }
+
+  currentProductsTable = tableName;
+  // ตั้งค่าเรียลไทม์ (ถ้ายังไม่ได้ subscribe) เพื่อให้ราคา/โปรโมชั่นจากหน้าร้านซิงค์อัตโนมัติต่อจากนี้
+  if (!productsRealtimeChannel) subscribeProductsRealtime();
 
   allProducts = normalizeProducts(raw);
   document.getElementById('p3StockStatus').style.display = 'flex';
@@ -3408,8 +3511,21 @@ function renderEnhancedItems(items) {
     }
     const baseName = emStripPromoTag(it.name||'').replace(/\s*\([^)]*\)\s*$/, '').trim();
     const prod = findProduct(baseName) || findProduct(it.name||'');
-    // อัปราคาจาก catalog เฉพาะตอนที่ยังไม่ได้เลือกขนาด (ยกเว้นสินค้าที่มีโปรชุด — ห้ามทับราคาโปร)
-    if (prod && prod.price && !it._variant && !emGetBundleFor(it.name||'', '')) it.price = prod.price;
+    // variant chips — คำนวณก่อน เพื่อใช้ sync ราคาไซซ์ที่เลือกไว้แล้วให้ตรงกับแคตตาล็อกล่าสุด (เรียลไทม์)
+    let eeVariantSizes = [];
+    for (const k of [baseName, it.name||'']) {
+      if (_emSizesCache[k]) { try { const cv=_emSizesCache[k]; eeVariantSizes=emParseSizes(typeof cv==='string'?JSON.parse(cv):cv); } catch(e){} if(eeVariantSizes.length) break; }
+    }
+    if (!eeVariantSizes.length && prod) eeVariantSizes = emGetSizesFromProd(prod);
+    const selVariant = it._variant || '';
+    // อัปราคาจาก catalog แบบเรียลไทม์ (ยกเว้นสินค้าที่มีโปรชุด — ห้ามทับราคาโปร):
+    // - ยังไม่ได้เลือกไซซ์ → ใช้ราคาฐานของสินค้า
+    // - เลือกไซซ์ไว้แล้ว → ต้องดึงราคาไซซ์นั้นล่าสุดมาด้วย ไม่ใช่ค้างราคาตอนที่เลือกครั้งแรก
+    if (!emGetBundleFor(it.name||'', '')) {
+      const _selSize = selVariant ? eeVariantSizes.find(sv => sv.label === selVariant) : null;
+      if (selVariant && _selSize && _selSize.price) it.price = _selSize.price;
+      else if (!selVariant && prod && prod.price) it.price = prod.price;
+    }
     // ราคาโปรชุด: ครบจำนวน → ราคาโปร, ไม่ครบ → ราคาปกติ
     const _eeBu = emBundleUnitPrice(it.name||'', it._variant||'', it.qty||1, it.price||0);
     if (_eeBu !== null) it.price = _eeBu;
@@ -3417,13 +3533,6 @@ function renderEnhancedItems(items) {
     const stockBadge = stockNum !== null
       ? `<div class="stock-badge-inline" style="font-size:10px;color:${stockNum < 5 ? '#e53935' : '#2e7d32'};margin-top:2px;padding-left:2px;">📦 สต็อก: ${stockNum}</div>`
       : (it.name ? `<div class="stock-badge-inline" style="font-size:10px;color:#aaa;margin-top:2px;padding-left:2px;">ไม่พบในร้าน</div>` : '<div class="stock-badge-inline"></div>');
-    // variant chips
-    let eeVariantSizes = [];
-    for (const k of [baseName, it.name||'']) {
-      if (_emSizesCache[k]) { try { const cv=_emSizesCache[k]; eeVariantSizes=emParseSizes(typeof cv==='string'?JSON.parse(cv):cv); } catch(e){} if(eeVariantSizes.length) break; }
-    }
-    if (!eeVariantSizes.length && prod) eeVariantSizes = emGetSizesFromProd(prod);
-    const selVariant = it._variant || '';
     const variantHtml = eeVariantSizes.length
       ? `<div class="em-variant-row">${eeVariantSizes.map(sv => {
           const isSel = selVariant === sv.label;
