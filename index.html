@@ -2346,6 +2346,16 @@ th{letter-spacing:.4px}
               <option value="first_order">🆕 สั่งครั้งแรก</option>
             </select>
           </div>
+          <!-- 🐛 BUG FIX: เดิม dropdown "โหมด" มีตัวเลือก "แมนนวล" ให้เลือกได้ แต่ไม่มีช่องกรอก
+               รหัสโค้ดเลยทั้งฟอร์ม (ทั้งตอนสร้างและแก้ไข) ทำให้คูปองโหมดแมนนวลที่สร้างผ่าน
+               Admin panel นี้มี code เป็น null เสมอ — ลูกค้าไม่มีทางกรอกโค้ดมาใช้ได้เลยสักครั้ง
+               เพิ่มช่องนี้ให้ตรงกับฟอร์มเดียวกันในหน้าร้าน (sc_code) -->
+          <div id="cf_code_wrap" style="display:none;grid-column:1/-1;">
+            <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">🔑 รหัสโค้ด * <small style="color:#888;font-weight:400;">(ลูกค้าต้องกรอกโค้ดนี้เพื่อรับส่วนลด)</small></label>
+            <input id="cf_code" type="text" placeholder="เช่น SAVE20, VIP50, WELCOME"
+              style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:14px;font-weight:700;letter-spacing:1px;font-family:inherit;outline:none;text-transform:uppercase;"
+              oninput="this.value=this.value.toUpperCase().replace(/[^A-Z0-9]/g,'')">
+          </div>
           <div>
             <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">วันที่เริ่ม</label>
             <input id="cf_start" type="datetime-local" style="width:100%;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;outline:none;">
@@ -5959,13 +5969,14 @@ function updateCouponForm() {
   document.getElementById('cf_dval_lbl').textContent = dtype === 'percent' ? 'จำนวนส่วนลด (%) *' : 'จำนวนส่วนลด (บาท) *';
   document.getElementById('cf_maxdiscount_wrap').style.display = dtype === 'percent' ? 'block' : 'none';
   document.getElementById('cf_condition_wrap').style.display = atype === 'auto' ? 'block' : 'none';
+  document.getElementById('cf_code_wrap').style.display = atype === 'manual' ? 'block' : 'none';
 }
 
 function resetCouponForm() {
   _editingCouponId = null;
   document.getElementById('couponFormTitle').textContent = 'สร้างคูปองใหม่';
   document.getElementById('couponSaveBtn').textContent = 'บันทึกคูปอง';
-  ['cf_name','cf_desc','cf_dval','cf_maxdiscount','cf_minorder','cf_limit','cf_start','cf_end','cf_secret_code'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
+  ['cf_name','cf_desc','cf_dval','cf_maxdiscount','cf_minorder','cf_limit','cf_start','cf_end','cf_secret_code','cf_code'].forEach(id => { const el = document.getElementById(id); if(el) el.value = ''; });
   document.getElementById('cf_dtype').value = 'fixed';
   document.getElementById('cf_atype').value = 'auto';
   document.getElementById('cf_cond').value = 'always';
@@ -5987,6 +5998,7 @@ function editCouponFromBtn(btn) {
   document.getElementById('cf_maxdiscount').value = c.max_discount||'';
   document.getElementById('cf_minorder').value = c.min_order||'';
   document.getElementById('cf_atype').value = c.apply_type||'auto';
+  document.getElementById('cf_code').value = c.code||'';
   document.getElementById('cf_cond').value = c.condition_type||'always';
   document.getElementById('cf_limit').value = c.usage_limit||'';
   document.getElementById('cf_active').checked = c.is_active !== false;
@@ -6010,6 +6022,9 @@ async function saveCoupon() {
   const secretCode = document.getElementById('cf_secret_code').value.trim();
   if (isSecret && !secretCode) { alert('กรุณากรอกโค้ดลับ'); return; }
   const atype = document.getElementById('cf_atype').value;
+  if (atype === 'manual' && !document.getElementById('cf_code').value.trim()) {
+    alert('กรุณากรอกรหัสโค้ดสำหรับคูปองโหมดแมนนวล'); return;
+  }
   const cfstart = document.getElementById('cf_start').value;
   const cfend = document.getElementById('cf_end').value;
   const body = {
@@ -6017,7 +6032,8 @@ async function saveCoupon() {
     discount_type: document.getElementById('cf_dtype').value, discount_value: Number(dval),
     max_discount: document.getElementById('cf_maxdiscount').value ? Number(document.getElementById('cf_maxdiscount').value) : null,
     min_order: Number(document.getElementById('cf_minorder').value||0),
-    apply_type: atype, condition_type: atype === 'auto' ? document.getElementById('cf_cond').value : null,
+    apply_type: atype, code: atype === 'manual' ? (document.getElementById('cf_code').value.trim().toUpperCase() || null) : null,
+    condition_type: atype === 'auto' ? document.getElementById('cf_cond').value : null,
     usage_limit: document.getElementById('cf_limit').value ? Number(document.getElementById('cf_limit').value) : null,
     start_date: cfstart ? new Date(cfstart).toISOString() : null,
     end_date: cfend ? new Date(cfend).toISOString() : null,
