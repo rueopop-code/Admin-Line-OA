@@ -3548,10 +3548,13 @@ function renderEnhancedItems(items) {
     // ราคาโปรชุด: ครบจำนวน → ราคาโปร, ไม่ครบ → ราคาปกติ
     const _eeBu = emBundleUnitPrice(it.name||'', it._variant||'', it.qty||1, it.price||0);
     if (_eeBu !== null) it.price = _eeBu;
-    const stockNum = prod ? (prod.stock ?? prod.quantity ?? null) : null;
+    const stockNum = prod ? emGetVariantStock(prod, selVariant) : null;
+    const stockLabel = selVariant ? `📦 สต็อก (${selVariant}): ` : '📦 สต็อกรวมทุกไซซ์: ';
     const stockBadge = stockNum !== null
-      ? `<div class="stock-badge-inline" style="font-size:10px;color:${stockNum < 5 ? '#e53935' : '#2e7d32'};margin-top:2px;padding-left:2px;">📦 สต็อก: ${stockNum}</div>`
-      : (it.name ? `<div class="stock-badge-inline" style="font-size:10px;color:#aaa;margin-top:2px;padding-left:2px;">ไม่พบในร้าน</div>` : '<div class="stock-badge-inline"></div>');
+      ? `<div class="stock-badge-inline" style="font-size:10px;color:${stockNum < 5 ? '#e53935' : '#2e7d32'};margin-top:2px;padding-left:2px;">${stockLabel}${stockNum}</div>`
+      : !prod
+        ? (it.name ? `<div class="stock-badge-inline" style="font-size:10px;color:#aaa;margin-top:2px;padding-left:2px;">ไม่พบในร้าน</div>` : '<div class="stock-badge-inline"></div>')
+        : '<div class="stock-badge-inline" style="font-size:10px;color:#aaa;margin-top:2px;padding-left:2px;">📦 ไม่จำกัดสต็อก</div>';
     const variantHtml = eeVariantSizes.length
       ? `<div class="em-variant-row">${eeVariantSizes.map(sv => {
           const isSel = selVariant === sv.label;
@@ -3633,7 +3636,7 @@ function _buildSuggestions(suggEl, idx, filterVal, focusInner = true) {
 
   const itemsHtml = list.length
     ? list.slice(0, 50).map(p => {
-        const stock = p.stock ?? p.quantity ?? '—';
+        const stock = emGetVariantStock(p, '') ?? '—';
         const stockColor = typeof stock === 'number' && stock < 5 ? '#e53935' : '#2e7d32';
         return `<div class="product-suggestion-item" onmousedown="selectProduct(${idx}, '${escapeAttr(p.name)}', ${p.price||0})">
           <span>${p.emoji||'📦'}</span>
@@ -3672,7 +3675,7 @@ function onSuggSearch(searchInput, idx) {
   if (!listEl) return;
   listEl.innerHTML = list.length
     ? list.slice(0,50).map(p => {
-        const stock = p.stock ?? p.quantity ?? '—';
+        const stock = emGetVariantStock(p, '') ?? '—';
         const stockColor = typeof stock === 'number' && stock < 5 ? '#e53935' : '#2e7d32';
         return `<div class="product-suggestion-item" onmousedown="selectProduct(${idx}, '${escapeAttr(p.name)}', ${p.price||0})">
           <span>${p.emoji||'📦'}</span>
@@ -3815,8 +3818,11 @@ function updateStockPreview() {
 
   document.getElementById('eeStockPreview').style.display = 'block';
   document.getElementById('eeStockChanges').innerHTML = diff.map(d => {
-    const prod = findProduct(d.name);
-    const currentStock = prod ? (prod.stock ?? prod.quantity ?? '?') : '?';
+    const baseName = d.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    const vm = d.name.match(/\(([^)]+)\)\s*$/);
+    const variantLabel = vm ? vm[1] : '';
+    const prod = findProduct(baseName) || findProduct(d.name);
+    const currentStock = prod ? (emGetVariantStock(prod, variantLabel) ?? '∞') : '?';
     const arrow = d.change > 0 ? '↑' : '↓';
     const cls = d.change > 0 ? 'stock-change-up' : 'stock-change-down';
     const sign = d.change > 0 ? '+' : '';
@@ -3895,11 +3901,51 @@ async function adjustStock(originalItems, newItems) {
   if (!diff.length) return;
 
   for (const d of diff) {
-    const prod = findProduct(d.name);
-    if (!prod) continue;
+    // d.name คือชื่อหลังตัดหางโปรแล้ว อาจมีไซซ์ต่อท้าย เช่น "ถุงขยะดำ (25x28)" — แยกออกก่อน
+    // เพื่อไปปรับสต็อกที่ไซซ์ที่ถูกต้อง (สต็อกจริงเก็บแยกต่อไซซ์ใน sizes[] ไม่ใช่คอลัมน์ระดับสินค้า)
+    const baseName = d.name.replace(/\s*\([^)]*\)\s*$/, '').trim();
+    const vm = d.name.match(/\(([^)]+)\)\s*$/);
+    const variantLabel = vm ? vm[1] : '';
+    const prod = findProduct(baseName) || findProduct(d.name);
+    if (!prod) { console.warn(`Stock adjust: ไม่พบสินค้า "${d.name}" ในแคตตาล็อก — ข้าม`); continue; }
 
-    const stockField = 'stock' in prod ? 'stock' : ('quantity' in prod ? 'quantity' : null);
-    if (!stockField) continue;
+    // 1) เส้นทางหลัก: สต็อกแยกต่อไซซ์ใน sizes[].stock (ตรงกับหน้าร้าน)
+    const rawSizes = prod.sizes ?? prod.variants ?? prod.size_options ?? prod.options ?? prod.product_sizes ?? null;
+    let handledAtSizeLevel = false;
+    if (rawSizes) {
+      try {
+        const arr = typeof rawSizes === 'string' ? JSON.parse(rawSizes) : rawSizes;
+        if (Array.isArray(arr) && arr.length) {
+          let si = -1;
+          if (variantLabel) {
+            si = arr.findIndex(v => typeof v === 'object' && v &&
+              String(v.label ?? v.name ?? v.n ?? v.size ?? v.ขนาด ?? '') === String(variantLabel));
+          }
+          if (si === -1 && arr.length === 1) si = 0; // สินค้าไซซ์เดียว ไม่ต้องมีชื่อไซซ์ตรงกันเป๊ะ
+          if (si !== -1 && arr[si] && arr[si].stock !== undefined && arr[si].stock !== null) {
+            const currentStock = parseInt(arr[si].stock) || 0;
+            const newStock = Math.max(0, currentStock + d.change);
+            arr[si] = { ...arr[si], stock: newStock };
+            const { error } = await sb.from(currentProductsTable || 'products').update({ sizes: arr }).eq('id', prod.id);
+            if (!error) {
+              prod.sizes = arr; // sync cache ในหน่วยความจำ กันหน้าต่างที่เปิดค้างอ่านค่าเก่าก่อน reload เสร็จ
+              _emSizesCache[prod.name] = arr;
+              handledAtSizeLevel = true;
+            } else {
+              console.warn(`Stock adjust (ต่อไซซ์) ไม่สำเร็จสำหรับ "${d.name}":`, error.message || error);
+            }
+          }
+        }
+      } catch (e) { console.warn(`Stock adjust: parse sizes ไม่สำเร็จสำหรับ "${d.name}":`, e); }
+    }
+    if (handledAtSizeLevel) continue;
+
+    // 2) fallback: สินค้าเก่าที่อาจมีคอลัมน์ stock/quantity ระดับสินค้าจริงๆ (ไม่ใช่ null จาก normalizeProducts)
+    const stockField = (('stock' in prod) && prod.stock !== null) ? 'stock' : ((('quantity' in prod) && prod.quantity !== null) ? 'quantity' : null);
+    if (!stockField) {
+      console.warn(`Stock adjust: "${d.name}" ไม่มีสต็อกให้ปรับ (ไม่มีทั้ง sizes[].stock และคอลัมน์ระดับสินค้า) — ข้าม`);
+      continue;
+    }
 
     const currentStock = prod[stockField] || 0;
     const newStock = Math.max(0, currentStock + d.change);
@@ -3908,6 +3954,8 @@ async function adjustStock(originalItems, newItems) {
       const { error } = await sb.from(currentProductsTable || 'products').update({ [stockField]: newStock }).eq('id', prod.id);
       if (!error) {
         prod[stockField] = newStock; // update local cache
+      } else {
+        console.warn(`Stock adjust (ระดับสินค้า) ไม่สำเร็จสำหรับ "${d.name}":`, error.message || error);
       }
     } catch(e) {
       console.warn(`Stock adjust failed for ${d.name}:`, e);
@@ -4554,8 +4602,9 @@ function emStripPromoTag(name) {
   // ตัดหางโปรที่ระบบหน้าร้านต่อท้ายชื่อ เช่น " 🎁 โปรชุด 2 ชิ้น"
   return (name || '').replace(/\s*🎁.*$/, '').trim();
 }
-function emGetBundleFor(name, variantLabel) {
-  // คืน { q, price, normal } ถ้าสินค้า/ขนาดนั้นมีโปรชุด, ไม่มี → null
+// หาแถวขนาด (size object) ที่ตรงกับชื่อ/ตัวเลือกที่กำลังแก้ในออเดอร์ — ใช้ร่วมกันทั้งโปรชุดและราคาส่ง
+// เพื่อกันบั๊ค: ถ้าแก้ logic การจับคู่ไซซ์ที่หนึ่ง แล้วอีกที่ลืมแก้ตาม จะกลับมาไม่สัมพันธ์กันอีกแบบเดิม
+function emFindSizeHit(name, variantLabel) {
   const clean = emStripPromoTag(name);
   const baseName = clean.replace(/\s*\([^)]*\)\s*$/, '').trim();
   let sizesVal = null;
@@ -4567,28 +4616,33 @@ function emGetBundleFor(name, variantLabel) {
   if (!sizesVal && prod) {
     sizesVal = prod.sizes ?? prod.variants ?? prod.size_options ?? prod.options ?? prod.product_sizes ?? null;
   }
-  // 1) bundle ระดับขนาด (sizes)
+  let hit = null;
   if (sizesVal) {
     try {
       const s = typeof sizesVal === 'string' ? JSON.parse(sizesVal) : sizesVal;
       const arr = Array.isArray(s)
         ? s
         : Object.entries(s).map(([k, v]) => (typeof v === 'object' && v !== null) ? { ...v, n: k } : { n: k, p: parseFloat(v) || 0 });
-      let hit = null;
       if (variantLabel) {
         hit = arr.find(v => typeof v === 'object' && v &&
           String(v.label ?? v.name ?? v.n ?? v.size ?? v.ขนาด ?? '') === String(variantLabel));
       }
       if (!hit && arr.length === 1) hit = arr[0];
-      if (hit && typeof hit === 'object' && hit.bundle) {
-        const bq = parseInt(hit.bundle.q ?? hit.bundle.qty ?? 0);
-        const bp = parseFloat(hit.bundle.price ?? hit.bundle.p ?? 0);
-        if (bq >= 2 && bp > 0) {
-          const normal = parseFloat(hit.price ?? hit.p ?? hit.ราคา ?? 0) || (prod ? prod.price : 0) || 0;
-          return { q: bq, price: bp, normal };
-        }
-      }
     } catch (e) {}
+  }
+  return { hit, prod };
+}
+function emGetBundleFor(name, variantLabel) {
+  // คืน { q, price, normal } ถ้าสินค้า/ขนาดนั้นมีโปรชุด, ไม่มี → null
+  const { hit, prod } = emFindSizeHit(name, variantLabel);
+  // 1) bundle ระดับขนาด (sizes)
+  if (hit && typeof hit === 'object' && hit.bundle) {
+    const bq = parseInt(hit.bundle.q ?? hit.bundle.qty ?? 0);
+    const bp = parseFloat(hit.bundle.price ?? hit.bundle.p ?? 0);
+    if (bq >= 2 && bp > 0) {
+      const normal = parseFloat(hit.price ?? hit.p ?? hit.ราคา ?? 0) || (prod ? prod.price : 0) || 0;
+      return { q: bq, price: bp, normal };
+    }
   }
   // 2) bundle ระดับสินค้า
   if (prod && prod.bundle) {
@@ -4598,11 +4652,40 @@ function emGetBundleFor(name, variantLabel) {
   }
   return null;
 }
+// ── ราคาส่ง (Wholesale/Tier) helpers: อ่าน tiers:[{minQty,price}] จาก sizes หน้าร้าน ──
+// โครงสร้างตรงกับหน้าร้าน (LINEOA-main → toRow/getPriceForQty): sizeObj.tiers = [{minQty, price}, ...]
+// หมายเหตุ: หน้าร้านรวม qty ข้ามไซซ์ราคาเดียวกันของสินค้าเดียวกัน "ในตะกร้า" ก่อนเทียบขั้นราคา (getEffectiveQty)
+// ในแอดมินคำนวณจาก qty ของบรรทัดออเดอร์นั้นบรรทัดเดียว ไม่ได้รวมข้ามบรรทัด — เพียงพอสำหรับกรณีทั่วไป
+// (ออเดอร์ 1 บรรทัดต่อ 1 ไซซ์) แต่ถ้าออเดอร์เดียวมีหลายบรรทัดไซซ์ราคาเดียวกันของสินค้าเดียวกัน อาจได้ราคาส่ง
+// ไม่ตรง 100% กับที่ลูกค้าเห็นตอนสั่ง — ปรับ manual ได้ที่ช่องราคาเอง
+function emGetTierFor(name, variantLabel) {
+  const { hit } = emFindSizeHit(name, variantLabel);
+  if (hit && typeof hit === 'object' && Array.isArray(hit.tiers) && hit.tiers.length) {
+    const basePrice = parseFloat(hit.price ?? hit.p ?? hit.ราคา ?? 0) || 0;
+    return { tiers: hit.tiers, basePrice };
+  }
+  return null;
+}
+function emTierUnitPrice(name, variantLabel, qty, basePrice) {
+  // คืนราคา/ชิ้นตามราคาส่ง (ขั้นบันไดตาม qty): qty ถึงขั้นไหน → ราคาขั้นนั้น, ไม่ถึงขั้นไหนเลย → ราคาปกติ
+  // | null = สินค้า/ขนาดนี้ไม่มีราคาส่ง (ไม่แตะราคา) — ตรงกับ getPriceForQty() ในหน้าร้าน
+  const t = emGetTierFor(name, variantLabel);
+  if (!t) return null;
+  const sorted = [...t.tiers].sort((a, b) => (parseInt(b.minQty ?? b.qty ?? b.q ?? 0)) - (parseInt(a.minQty ?? a.qty ?? a.q ?? 0)));
+  for (const tier of sorted) {
+    const minQty = parseInt(tier.minQty ?? tier.qty ?? tier.q ?? 0);
+    const price = parseFloat(tier.price ?? tier.p ?? 0);
+    if (minQty > 0 && price > 0 && qty >= minQty) return price;
+  }
+  return t.basePrice || basePrice;
+}
 function emBundleUnitPrice(name, variantLabel, qty, basePrice) {
-  // คืนราคา/ชิ้นตามโปรชุด: ครบจำนวน → ราคาโปร, ไม่ครบ → ราคาปกติ | null = ไม่มีโปร (ไม่แตะราคา)
+  // คืนราคา/ชิ้นตามโปรชุดหรือราคาส่ง | null = ไม่มีทั้งคู่ (ไม่แตะราคา)
+  // ลำดับความสำคัญ: โปรชุด (bundle) มาก่อนราคาส่ง (tiers) เสมอถ้าตั้งค่าไว้ — ตรงกับกติกาหน้าร้าน
+  // (ดูโน้ตหน้าร้าน "ใส่แล้วโปรชุดจะใช้แทนราคาส่งของขนาดนี้")
   const b = emGetBundleFor(name, variantLabel);
-  if (!b) return null;
-  return (qty >= b.q) ? b.price : (b.normal || basePrice);
+  if (b) return (qty >= b.q) ? b.price : (b.normal || basePrice);
+  return emTierUnitPrice(name, variantLabel, qty, basePrice);
 }
 function emQtyBundleSync(inputEl) {
   // เรียกตอนแก้จำนวน: ถ้าสินค้ามีโปรชุด ปรับราคา/ชิ้นในช่องให้อัตโนมัติ
@@ -4634,6 +4717,21 @@ function emGetSizesFromProd(prod) {
     }
   } catch(e) {}
   return [];
+}
+
+// สต็อกจริงเก็บแยกต่อไซซ์ใน prod.sizes[].stock (เหมือนหน้าร้าน) ไม่ใช่คอลัมน์ระดับสินค้า
+// (prod.stock/prod.quantity จาก normalizeProducts() จะเป็น null เสมอในสคีมานี้ — ห้ามใช้ตรงๆ)
+// คืนค่า: ถ้าเลือกไซซ์แล้ว → สต็อกไซซ์นั้น, ถ้ายังไม่เลือก → รวมสต็อกทุกไซซ์ที่มีการติดตาม, null = ไม่ติดตามสต็อก (ขายไม่จำกัด)
+function emGetVariantStock(prod, variantLabel) {
+  const sizes = emGetSizesFromProd(prod);
+  if (!sizes.length) return prod ? (prod.stock ?? prod.quantity ?? null) : null; // fallback เผื่อสินค้าเก่าไม่มี sizes
+  if (variantLabel) {
+    const sv = sizes.find(s => s.label === variantLabel);
+    return sv ? sv.stock : null;
+  }
+  const tracked = sizes.filter(s => s.stock !== null && s.stock !== undefined);
+  if (!tracked.length) return null;
+  return tracked.reduce((sum, s) => sum + (parseInt(s.stock) || 0), 0);
 }
 
 function renderEditItems(items) {
@@ -4711,7 +4809,7 @@ function emBuildSugg(suggEl, idx, filterVal, focusInner = true) {
     : allProducts;
   const itemsHtml = list.length
     ? list.slice(0, 50).map(p => {
-        const stock = p.stock ?? p.quantity ?? '—';
+        const stock = emGetVariantStock(p, '') ?? '—';
         const stockColor = typeof stock === 'number' && stock < 5 ? '#e53935' : '#2e7d32';
         // cache sizes ใน _emSizesCache เพื่อให้ emSelectProduct ดึงได้โดยตรง
         if (p.sizes) _emSizesCache[p.name] = p.sizes;
@@ -4742,7 +4840,7 @@ function emOnSuggSearch(searchInput, idx) {
   if (!listEl) return;
   listEl.innerHTML = list.length
     ? list.slice(0,50).map(p => {
-        const stock = p.stock ?? p.quantity ?? '—';
+        const stock = emGetVariantStock(p, '') ?? '—';
         const stockColor = typeof stock === 'number' && stock < 5 ? '#e53935' : '#2e7d32';
         if (p.sizes) _emSizesCache[p.name] = p.sizes;
         return `<div class="product-suggestion-item" onmousedown="event.preventDefault();emSelectProduct(${idx},'${escapeAttr(p.name)}',${p.price||0})">
