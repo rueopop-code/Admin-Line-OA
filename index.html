@@ -3568,8 +3568,9 @@ function renderEnhancedItems(items) {
     return `
       <div class="enhanced-item-row" data-idx="${idx}">
         <div style="display:flex;flex-direction:column;min-width:0;">
-          <div class="product-search-wrap">
-            <div class="product-input-inner">
+          <div class="product-search-wrap" style="display:flex;align-items:center;gap:6px;">
+            ${prod && prod.img ? `<img src="${escapeAttr(prod.img)}" alt="" style="width:30px;height:30px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#f5f5f7;" onerror="this.remove();">` : ''}
+            <div class="product-input-inner" style="flex:1;min-width:0;">
               <input type="text" placeholder="พิมพ์หรือเลือกสินค้า..." value="${escapeAttr(it.name||'')}"
                 data-field="name" data-variant="${escapeAttr(it._variant||'')}"
                 oninput="onProductSearch(this, ${idx})"
@@ -3628,6 +3629,16 @@ function eeSelectVariant(idx, label, price) {
   renderEnhancedItems(items);
 }
 
+// รูปสินค้าจริง (จาก p.img ที่หน้าร้านอัปโหลดไว้) แทน emoji เดิม — ถ้าไม่มีรูปหรือโหลดรูปไม่ขึ้น ค่อย fallback เป็น emoji
+function emProductThumb(p, size) {
+  size = size || 22;
+  const emoji = escapeHtml(p.emoji || '📦');
+  if (p.img) {
+    return `<img src="${escapeAttr(p.img)}" alt="" style="width:${size}px;height:${size}px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#f5f5f7;" onerror="this.outerHTML='<span>${escapeAttr(emoji)}</span>';">`;
+  }
+  return `<span>${emoji}</span>`;
+}
+
 function _buildSuggestions(suggEl, idx, filterVal, focusInner = true) {
   const val = (filterVal||'').toLowerCase().trim();
   const list = val
@@ -3639,7 +3650,7 @@ function _buildSuggestions(suggEl, idx, filterVal, focusInner = true) {
         const stock = emGetVariantStock(p, '') ?? '—';
         const stockColor = typeof stock === 'number' && stock < 5 ? '#e53935' : '#2e7d32';
         return `<div class="product-suggestion-item" onmousedown="selectProduct(${idx}, '${escapeAttr(p.name)}', ${p.price||0})">
-          <span>${p.emoji||'📦'}</span>
+          ${emProductThumb(p)}
           <span style="flex:1;">${escapeHtml(p.name)}</span>
           <span style="font-size:11px;color:#888;">฿${(p.price||0).toLocaleString()}</span>
           <span style="font-size:11px;color:${stockColor};margin-left:6px;">สต็อก:${stock}</span>
@@ -3678,7 +3689,7 @@ function onSuggSearch(searchInput, idx) {
         const stock = emGetVariantStock(p, '') ?? '—';
         const stockColor = typeof stock === 'number' && stock < 5 ? '#e53935' : '#2e7d32';
         return `<div class="product-suggestion-item" onmousedown="selectProduct(${idx}, '${escapeAttr(p.name)}', ${p.price||0})">
-          <span>${p.emoji||'📦'}</span>
+          ${emProductThumb(p)}
           <span style="flex:1;">${escapeHtml(p.name)}</span>
           <span style="font-size:11px;color:#888;">฿${(p.price||0).toLocaleString()}</span>
           <span style="font-size:11px;color:${stockColor};margin-left:6px;">สต็อก:${stock}</span>
@@ -4409,20 +4420,25 @@ function openItemsPopup(orderId) {
     ['สถานะ', statusTh],
   ].filter(Boolean).map(([l,v]) => `<span class="ml">${l}</span><span class="mv">${v}</span>`).join('');
 
-  const rows = items.map(i => {
-    const unitPrice = i.price ?? i.p ?? 0;
-    const qty = i.qty ?? i.quantity ?? 1;
-    const lineTotal = unitPrice * qty;
-    const thumbHtml = i.img
-      ? `<div class="item-thumb"><img src="${escapeAttr(i.img)}" alt="" loading="lazy"></div>`
-      : `<div class="item-thumb">${i.emoji || '📦'}</div>`;
-    return `<tr>
-      <td style="width:48px;padding-right:6px;">${thumbHtml}</td>
-      <td><div class="item-name">${escapeHtml(i.name||'—')}</div>${i.size ? `<div class="item-size">${escapeHtml(i.size)}</div>` : ''}</td>
-      <td style="text-align:center;"><span class="item-qty">×${qty}</span></td>
-      <td class="item-price">${unitPrice ? `฿${unitPrice.toLocaleString()}` : '—'}${lineTotal && qty>1 ? `<br><small style="color:var(--sub);">= ฿${lineTotal.toLocaleString()}</small>` : ''}</td>
-    </tr>`;
-  }).join('');
+  function renderIpRows() {
+    return items.map(i => {
+      const unitPrice = i.price ?? i.p ?? 0;
+      const qty = i.qty ?? i.quantity ?? 1;
+      const lineTotal = unitPrice * qty;
+      // ออเดอร์เก็บแค่ name/qty/price ไม่มี img ติดมาด้วย — ต้องย้อนไปหารูปจากแคตตาล็อกปัจจุบัน
+      const prod = i.img ? null : (allProducts.length ? findProduct(i.name || '') : null);
+      const imgUrl = i.img || (prod && prod.img) || '';
+      const thumbHtml = imgUrl
+        ? `<div class="item-thumb"><img src="${escapeAttr(imgUrl)}" alt="" loading="lazy" onerror="this.outerHTML='${escapeAttr(i.emoji || '📦')}';"></div>`
+        : `<div class="item-thumb">${i.emoji || '📦'}</div>`;
+      return `<tr>
+        <td style="width:48px;padding-right:6px;">${thumbHtml}</td>
+        <td><div class="item-name">${escapeHtml(i.name||'—')}</div>${i.size ? `<div class="item-size">${escapeHtml(i.size)}</div>` : ''}</td>
+        <td style="text-align:center;"><span class="item-qty">×${qty}</span></td>
+        <td class="item-price">${unitPrice ? `฿${unitPrice.toLocaleString()}` : '—'}${lineTotal && qty>1 ? `<br><small style="color:var(--sub);">= ฿${lineTotal.toLocaleString()}</small>` : ''}</td>
+      </tr>`;
+    }).join('');
+  }
 
   const hasDiscount = o.discount_amount > 0 || o.coupon_code;
   const subtotal = hasDiscount ? (o.total + (o.discount_amount||0)) : null;
@@ -4437,14 +4453,22 @@ function openItemsPopup(orderId) {
       <div class="amount">฿${(o.total||0).toLocaleString()}</div>
     </div>`;
 
-  document.getElementById('ipBody').innerHTML = `
-    ${metaRows ? `<div class="items-popup-meta">${metaRows}</div>` : ''}
-    <table class="items-popup-table">
-      <thead><tr><th colspan="2">สินค้า</th><th style="text-align:center;">จำนวน</th><th style="text-align:right;">ราคา</th></tr></thead>
-      <tbody>${rows || '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--sub);">ไม่มีรายการ</td></tr>'}</tbody>
-    </table>
-    ${totalHtml}`;
+  function renderIpBody() {
+    document.getElementById('ipBody').innerHTML = `
+      ${metaRows ? `<div class="items-popup-meta">${metaRows}</div>` : ''}
+      <table class="items-popup-table">
+        <thead><tr><th colspan="2">สินค้า</th><th style="text-align:center;">จำนวน</th><th style="text-align:right;">ราคา</th></tr></thead>
+        <tbody>${renderIpRows() || '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--sub);">ไม่มีรายการ</td></tr>'}</tbody>
+      </table>
+      ${totalHtml}`;
+  }
+
+  renderIpBody();
   document.getElementById('itemsPopup').classList.add('show');
+  // ถ้ายังไม่เคยโหลดแคตตาล็อกสินค้า → โหลดแล้ว re-render เพื่อให้รูปสินค้าขึ้น (ตอนแรกจะยังไม่มีรูปเพราะหาไม่เจอ)
+  if (sb && allProducts.length === 0) {
+    loadProductsForPage3().then(() => { if (document.getElementById('itemsPopup').classList.contains('show')) renderIpBody(); }).catch(() => {});
+  }
 }
 
 function closeItemsPopup() { document.getElementById('itemsPopup').classList.remove('show'); }
@@ -4752,8 +4776,9 @@ function renderEditItems(items) {
       }
     }
     // 2. allProducts
-    if (!sizes.length && allProducts.length) {
-      sizes = emGetSizesFromProd(findProduct(_baseName) || findProduct(_itName));
+    const _prod = allProducts.length ? (findProduct(_baseName) || findProduct(_itName)) : null;
+    if (!sizes.length && _prod) {
+      sizes = emGetSizesFromProd(_prod);
     }
     // 3. _sizes
     if (!sizes.length && it._sizes && it._sizes.length) sizes = it._sizes;
@@ -4778,6 +4803,7 @@ function renderEditItems(items) {
     <div class="em-item-row" data-idx="${idx}">
       <div style="display:flex;flex-direction:column;min-width:0;">
         <div class="product-search-wrap">
+          ${_prod && _prod.img ? `<img src="${escapeAttr(_prod.img)}" alt="" style="width:30px;height:30px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#f5f5f7;" onerror="this.remove();">` : ''}
           <div class="product-input-inner">
             <input type="text" placeholder="${hasSearch ? 'พิมพ์หรือเลือกสินค้า...' : 'ชื่อสินค้า'}" value="${escapeAttr(it.name||'')}"
               data-field="name" data-variant="${escapeAttr(it._variant||'')}"
@@ -4814,7 +4840,7 @@ function emBuildSugg(suggEl, idx, filterVal, focusInner = true) {
         // cache sizes ใน _emSizesCache เพื่อให้ emSelectProduct ดึงได้โดยตรง
         if (p.sizes) _emSizesCache[p.name] = p.sizes;
         return `<div class="product-suggestion-item" onmousedown="event.preventDefault();emSelectProduct(${idx},'${escapeAttr(p.name)}',${p.price||0})">
-          <span>${p.emoji||'📦'}</span>
+          ${emProductThumb(p)}
           <span style="flex:1;">${escapeHtml(p.name)}</span>
           <span style="font-size:11px;color:#888;">฿${(p.price||0).toLocaleString()}</span>
           <span style="font-size:11px;color:${stockColor};margin-left:6px;">สต็อก:${stock}</span>
@@ -4844,7 +4870,7 @@ function emOnSuggSearch(searchInput, idx) {
         const stockColor = typeof stock === 'number' && stock < 5 ? '#e53935' : '#2e7d32';
         if (p.sizes) _emSizesCache[p.name] = p.sizes;
         return `<div class="product-suggestion-item" onmousedown="event.preventDefault();emSelectProduct(${idx},'${escapeAttr(p.name)}',${p.price||0})">
-          <span>${p.emoji||'📦'}</span>
+          ${emProductThumb(p)}
           <span style="flex:1;">${escapeHtml(p.name)}</span>
           <span style="font-size:11px;color:#888;">฿${(p.price||0).toLocaleString()}</span>
           <span style="font-size:11px;color:${stockColor};margin-left:6px;">สต็อก:${stock}</span>
