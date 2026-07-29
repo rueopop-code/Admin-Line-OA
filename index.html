@@ -3059,11 +3059,48 @@ function renderCustomerDB() {
   const real = allOrders.filter(o => !isGhostOrder(o));
   const normPhone = p => String(p || '').replace(/\D/g, '');
 
-  // Group by customer
+  // 🔒 DATA-INTEGRITY FIX: เดิม group ด้วย key เดียว "customer_id || phone || name" — แต่ออเดอร์
+  // จริงทุกใบมี customer_id เสมอ (บังคับกรอกตอน /send-order ฝั่ง backend) ทำให้ fallback ไป
+  // phone/name แทบไม่เคยได้ทำงานจริงเลย ผลคือถ้าลูกค้าคนเดิมเคลียร์ localStorage / เปลี่ยนเครื่อง /
+  // สลับ LIFF↔LINE Login แล้วได้ customer_id ใหม่ หน้านี้จะนับเป็น "ลูกค้าใหม่" แยกคนละคนทันที
+  // ทั้งที่จริงเป็นคนเดิม (ประวัติซื้อ/ยอดใช้จ่ายกระจายคนละแถว สถิติ "ลูกค้าใหม่เดือนนี้"/"ลูกค้า
+  // ซื้อซ้ำ" ผิดเพี้ยนตาม) — เปลี่ยนมาใช้ union-find รวมออเดอร์ที่มี customer_id เดียวกัน "หรือ"
+  // เบอร์เดียวกัน "หรือ" line_user_id เดียวกัน ให้เป็นลูกค้าคนเดียวกัน (ตั้งใจไม่ใช้ "ชื่อ" เป็น
+  // เงื่อนไขรวมกลุ่ม เพราะชื่อ/ชื่อเล่นซ้ำกันได้ง่ายมาก — เบอร์กับ LINE user คือสัญญาณหลักที่เชื่อ
+  // ถือได้ ใช้ชื่อเป็นแค่ทางเลือกสุดท้ายกรณีออเดอร์นั้นไม่มีทั้ง customer_id/เบอร์/LINE เลยจริงๆ)
+  const parent = new Map();
+  function find(x) {
+    if (!parent.has(x)) parent.set(x, x);
+    let root = x;
+    while (parent.get(root) !== root) root = parent.get(root);
+    let cur = x;
+    while (parent.get(cur) !== root) { const next = parent.get(cur); parent.set(cur, root); cur = next; }
+    return root;
+  }
+  function union(a, b) {
+    const ra = find(a), rb = find(b);
+    if (ra !== rb) parent.set(ra, rb);
+  }
+
+  const ordersWithKeys = real.map(o => {
+    const keys = [];
+    if (o.customer_id)    keys.push('cid:'   + o.customer_id);
+    const p = normPhone(o.phone);
+    if (p)                keys.push('phone:' + p);
+    if (o.line_user_id)   keys.push('line:'  + o.line_user_id);
+    if (!keys.length && o.customer_name) keys.push('name:' + o.customer_name.toLowerCase().trim());
+    return { o, keys };
+  });
+
+  ordersWithKeys.forEach(({ keys }) => {
+    for (let i = 1; i < keys.length; i++) union(keys[0], keys[i]);
+  });
+
+  // Group by customer (root identity หลัง union-find)
   const custMap = {};
-  real.forEach(o => {
-    const key = (o.customer_id || '') || normPhone(o.phone) || (o.customer_name || '').toLowerCase().trim();
-    if (!key) return;
+  ordersWithKeys.forEach(({ o, keys }) => {
+    if (!keys.length) return; // ไม่มีข้อมูลระบุตัวตนอะไรเลย (ไม่ควรเกิดขึ้นจริง) ข้ามไป
+    const key = find(keys[0]);
     if (!custMap[key]) {
       custMap[key] = {
         key,
@@ -5269,7 +5306,15 @@ async function autoLinkAllOrders() {
   if (!ghosts.length) { toast('ไม่พบบัญชี LINE OA ที่ผูกไว้', 'warn'); return; }
   if (!reals.length)  { toast('✅ ออเดอร์ทั้งหมดมี LINE แล้ว', 'success'); return; }
 
-  // จับคู่: real ↔ ghost ที่ชื่อ หรือ เบอร์ตรงกัน
+  // จับคู่: real ↔ ghost — เบอร์เป็นเงื่อนไขหลักเสมอเมื่อมีเบอร์ให้เทียบทั้งสองฝั่ง
+  // 🔒 SECURITY FIX: เดิม nameMatch ใช้ .includes() ทั้งสองทิศทาง (substring match แบบหลวมมาก) และ
+  // ยอมให้ "ชื่อตรง/คล้ายกัน" ผูกบัญชีได้แม้เบอร์ไม่ตรงกัน (phoneMatch || nameMatch) — อันตรายมาก
+  // เพราะชื่อ/ชื่อเล่นสั้นๆ ซ้ำหรือเป็นส่วนหนึ่งของกันได้ง่ายมาก (เช่น "เอ" จะไป match ชื่อที่มี "เอ"
+  // ปนอยู่แทบทุกชื่อ) จะผูก LINE UID ผิดคน ทำให้ข้อมูลออเดอร์/ยอดเงินของลูกค้าคนนึงไปโชว์ใน LINE
+  // ของอีกคน — เปลี่ยนกติกาเป็น: มีเบอร์ทั้งสองฝั่ง ต้อง "ตรงกันเป๊ะ" เท่านั้นถึงจะ match (เบอร์ไม่
+  // ตรง = ไม่ match ทันที ต่อให้ชื่อจะตรง/คล้ายแค่ไหนก็ตาม ไม่ให้ชื่อ override เบอร์ได้) มีเบอร์แค่
+  // ฝั่งเดียวถือว่าเทียบไม่ได้แน่ชัด → ไม่ match (เข้มงวดไว้ก่อน) ใช้ชื่อ fallback ได้เฉพาะกรณีไม่มี
+  // เบอร์ให้เทียบทั้งสองฝั่งจริงๆ เท่านั้น และต้องตรงกันทั้งชื่อ (ตัด partial/substring match ออก)
   const pairs = []; // [ { real, ghost } ]
 
   for (const real of reals) {
@@ -5280,12 +5325,15 @@ async function autoLinkAllOrders() {
       const gPhone = _normP(ghost.phone);
       const gName  = _normN(ghost.customer_name || ghost.line_name || '');
 
-      const phoneMatch = rPhone && gPhone && rPhone === gPhone;
-      const nameMatch  = rName.length >= 2 && gName.length >= 2 && (rName === gName || rName.includes(gName) || gName.includes(rName));
-
-      // "ผูกบัญชี" = ghost เพิ่งผูกใหม่ ไม่มีชื่อจริง → จับคู่ด้วยเบอร์เท่านั้น
-      const isJustLinked = !gName || gName === 'ผูกบัญชี';
-      const matched = isJustLinked ? phoneMatch : (phoneMatch || nameMatch);
+      let matched;
+      if (rPhone && gPhone) {
+        matched = rPhone === gPhone;
+      } else if (rPhone || gPhone) {
+        matched = false; // มีเบอร์แค่ฝั่งเดียว เทียบไม่ได้แน่ชัด
+      } else {
+        // ไม่มีเบอร์ให้เทียบทั้งสองฝั่งเลย → fallback เป็นชื่อตรงกันทั้งชื่อเท่านั้น (ไม่ใช้ partial)
+        matched = rName.length >= 2 && gName.length >= 2 && rName === gName;
+      }
 
       if (matched) {
         // ไม่ซ้ำ real เดิม
