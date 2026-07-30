@@ -759,11 +759,19 @@ tbody tr td[onclick]{cursor:pointer}
   .em-item-row{grid-template-columns:1fr 60px 80px 28px !important;gap:6px !important;padding:6px 8px !important}
 }
 
-/* -- Spinner -- */
+/* -- Spinner: จุดโคจรรอบศูนย์กลาง (4 จุดสีวนรอบจุดกึ่งกลาง) -- */
 .spinner-sm{
-  width:20px;height:20px;border:2px solid var(--gray-200);
-  border-top-color:var(--red-500);border-radius:50%;
-  animation:spin .7s linear infinite;display:inline-block;vertical-align:middle;
+  width:20px;height:20px;display:inline-block;vertical-align:middle;
+  background-repeat:no-repeat;
+  background-size:5px 5px,5px 5px,5px 5px,5px 5px;
+  background-position:8px 2px,14px 8px,8px 14px,2px 8px;
+  background-image:
+    radial-gradient(circle, var(--red-600) 100%, transparent 100%),
+    radial-gradient(circle, var(--gold) 100%, transparent 100%),
+    radial-gradient(circle, var(--red-400) 100%, transparent 100%),
+    radial-gradient(circle, var(--gold-soft) 100%, transparent 100%);
+  animation:spin 1.1s linear infinite;
+  transform-origin:center;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 
@@ -1154,7 +1162,7 @@ th{letter-spacing:.4px}
       <input id="su-name" placeholder="ชื่อที่แสดง เช่น เจ้าของร้าน" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;font-family:'Sarabun',sans-serif;margin-bottom:8px;outline:none;">
       <input id="su-pass" type="password" placeholder="ตั้งรหัสผ่าน (อย่างน้อย 6 ตัว)" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1.5px solid #ddd;border-radius:10px;font-size:14px;font-family:'Sarabun',sans-serif;margin-bottom:8px;outline:none;">
       <div id="su-err" style="font-size:12px;color:#c0392b;min-height:16px;margin-bottom:6px;"></div>
-      <button onclick="authSetup()" style="width:100%;padding:12px;background:#1a6b3c;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;font-family:'Sarabun',sans-serif;cursor:pointer;">✨ สร้างบัญชีเจ้าของร้าน</button>
+      <button onclick="authSetup()" id="su-btn" style="width:100%;padding:12px;background:#1a6b3c;color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:800;font-family:'Sarabun',sans-serif;cursor:pointer;">✨ สร้างบัญชีเจ้าของร้าน</button>
       <div style="text-align:center;margin-top:10px;">
         <button onclick="showLoginForm()" style="background:none;border:none;color:#888;font-size:12px;cursor:pointer;font-family:'Sarabun',sans-serif;">← กลับไปเข้าสู่ระบบ</button>
       </div>
@@ -2042,7 +2050,7 @@ th{letter-spacing:.4px}
     <div class="modal-ftr">
       <button class="btn btn-danger" onclick="deleteCurrentOrder()">🗑️ ลบออเดอร์</button>
       <button class="btn" onclick="closeEditModal()">ยกเลิก</button>
-      <button class="btn btn-primary" onclick="saveOrderEdit()">💾 บันทึก</button>
+      <button class="btn btn-primary" id="saveOrderEditBtn" onclick="saveOrderEdit()">💾 บันทึก</button>
     </div>
   </div>
 </div>
@@ -5184,16 +5192,22 @@ async function saveOrderEdit() {
     payment_label  : _emPaymentMethod === 'cod' ? '🏍️ ปลายทาง' : _emPaymentMethod === 'transfer' ? '📲 โอน/QR' : null,
   };
   try {
-    const { error } = await sb.from('orders').update(update).eq('order_id', editingOrderId);
-    if (error) throw error;
-    const savedOrderId = editingOrderId;
-    const o = allOrders.find(x => x.order_id === editingOrderId);
-    if (o) Object.assign(o, update);
-    renderOrders(allOrders);
-    renderStats(allOrders);
-    closeEditModal();
-    toast('บันทึกการแก้ไขแล้ว ✓', 'success');
-    logActivity('✏️', `แก้ไขออเดอร์ #${savedOrderId}`, `ยอดใหม่ ฿${total.toLocaleString()}`);
+    const btn = document.getElementById('saveOrderEditBtn');
+    setBtnBusy(btn, true, 'กำลังบันทึก...');
+    try {
+      const { error } = await sb.from('orders').update(update).eq('order_id', editingOrderId);
+      if (error) throw error;
+      const savedOrderId = editingOrderId;
+      const o = allOrders.find(x => x.order_id === editingOrderId);
+      if (o) Object.assign(o, update);
+      renderOrders(allOrders);
+      renderStats(allOrders);
+      closeEditModal();
+      toast('บันทึกการแก้ไขแล้ว', 'success');
+      logActivity('✏️', `แก้ไขออเดอร์ #${savedOrderId}`, `ยอดใหม่ ฿${total.toLocaleString()}`);
+    } finally {
+      setBtnBusy(btn, false);
+    }
   } catch (e) {
     toast('บันทึกไม่สำเร็จ: ' + e.message, 'error');
   }
@@ -6365,10 +6379,25 @@ async function resetOrderSalesCode(orderId) {
 let toastTimer = null;
 function toast(msg, type = '', duration = 3000) {
   const el = document.getElementById('toast');
-  el.textContent = msg;
+  const icons = { success: '✅', error: '❌', warn: '⚠️', cancel: '🚫' };
+  const alreadyIconed = /^[\u2600-\u27BF\u2B00-\u2BFF\uD83C-\uDBFF][\uDC00-\uDFFF]?/.test(msg.trim());
+  el.textContent = (icons[type] && !alreadyIconed ? icons[type] + ' ' : '') + msg;
   el.className = 'toast show' + (type ? ' '+type : '');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ── ปุ่มกำลังประมวลผล: โชว์ไอคอนหมุน (จุดโคจรรอบศูนย์กลาง) แทนข้อความเดิม แล้วคืนค่าทีหลัง ──
+function setBtnBusy(btn, busy, busyLabel) {
+  if (!btn) return;
+  if (busy) {
+    if (btn.dataset.origHtml === undefined) btn.dataset.origHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-sm" style="width:14px;height:14px;margin-right:6px;vertical-align:-2px"></span>' + (busyLabel || 'กำลังดำเนินการ...');
+  } else {
+    btn.disabled = false;
+    if (btn.dataset.origHtml !== undefined) { btn.innerHTML = btn.dataset.origHtml; delete btn.dataset.origHtml; }
+  }
 }
 
 // Keyboard shortcuts
@@ -8694,7 +8723,7 @@ async function authLogin() {
   const err = document.getElementById('lg-err');
   if (!bu) { err.textContent = 'ยังไม่ได้ตั้ง Backend URL — เชื่อมต่อครั้งแรกด้วย Master Key ก่อน'; return; }
   const btn = document.getElementById('lg-btn');
-  btn.disabled = true; btn.textContent = '⏳ กำลังตรวจสอบ...';
+  setBtnBusy(btn, true, 'กำลังตรวจสอบ...');
   err.textContent = '';
   try {
     const r = await fetchWithRetry(bu + '/auth/login', {
@@ -8705,7 +8734,7 @@ async function authLogin() {
         device: getClientDeviceLabel()
       })
     }, {
-      onRetry: (attempt) => { btn.textContent = '⏳ เซิร์ฟเวอร์กำลังเริ่มทำงาน กรุณารอสักครู่ (' + attempt + '/4)...'; }
+      onRetry: (attempt) => { setBtnBusy(btn, true, 'เซิร์ฟเวอร์กำลังเริ่มทำงาน (' + attempt + '/4)...'); }
     });
     const d = await r.json().catch(()=>({}));
     if (r.status === 404 && d.error === 'no_users') { showSetupForm(); return; }
@@ -8716,19 +8745,21 @@ async function authLogin() {
     authUser = d.user;
     hideLoginOverlay();
     applyPerms();
-    toast('👋 สวัสดี ' + (d.user.display_name || d.user.username));
+    toast('👋 สวัสดี ' + (d.user.display_name || d.user.username), 'success');
   } catch(e) {
     const isNetErr = e.name === 'TypeError' || e.name === 'TimeoutError' || /fetch/i.test(e.message || '');
     err.textContent = isNetErr
       ? '❌ เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ (เซิร์ฟเวอร์อาจกำลังพักการทำงานหลังไม่มีคนใช้งาน) — ลองกดเข้าสู่ระบบอีกครั้งใน 30 วินาที'
       : '❌ ' + e.message;
-  } finally { btn.disabled = false; btn.textContent = 'เข้าสู่ระบบ'; }
+  } finally { setBtnBusy(btn, false); }
 }
 
 async function authSetup() {
   const bu = getBackendUrl() || localStorage.getItem('admin_backend_url') || '';
   const err = document.getElementById('su-err');
   if (!bu) { err.textContent = 'กรอก Backend URL ในแถบตั้งค่าก่อน'; return; }
+  const btn = document.getElementById('su-btn');
+  setBtnBusy(btn, true, 'กำลังสร้างบัญชี...');
   err.textContent = '';
   try {
     const r = await fetchWithRetry(bu + '/auth/setup', {
@@ -8741,7 +8772,7 @@ async function authSetup() {
         device: getClientDeviceLabel()
       })
     }, {
-      onRetry: (attempt) => { err.textContent = '⏳ เซิร์ฟเวอร์กำลังเริ่มทำงาน กรุณารอสักครู่ (' + attempt + '/4)...'; }
+      onRetry: (attempt) => { setBtnBusy(btn, true, 'เซิร์ฟเวอร์กำลังเริ่มทำงาน (' + attempt + '/4)...'); }
     });
     const d = await r.json().catch(()=>({}));
     if (!r.ok) throw new Error(d.error || 'สร้างไม่สำเร็จ');
@@ -8751,8 +8782,9 @@ async function authSetup() {
     authUser = d.user;
     hideLoginOverlay();
     applyPerms();
-    toast('✨ สร้างบัญชีเจ้าของร้านแล้ว ยินดีต้อนรับ!');
+    toast('✨ สร้างบัญชีเจ้าของร้านแล้ว ยินดีต้อนรับ!', 'success');
   } catch(e) { err.textContent = '❌ ' + e.message; }
+  finally { setBtnBusy(btn, false); }
 }
 
 function authLogout() {
