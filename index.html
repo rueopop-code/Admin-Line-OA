@@ -7,8 +7,8 @@
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="manifest" href="admin-manifest.json">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js" crossorigin="anonymous"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Prompt:wght@600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <meta name="mobile-web-app-capable" content="yes">
@@ -6784,6 +6784,7 @@ function loadLeafletThenMap() {
   if (!document.querySelector('script[src*="leaflet"]')) {
     const s = document.createElement('script');
     s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.crossOrigin = 'anonymous';
     s.onload = renderAdminSalesMap;
     document.head.appendChild(s);
   } else { setTimeout(renderAdminSalesMap, 500); }
@@ -7186,6 +7187,7 @@ function loadLeafletThenGps() {
   if (!document.querySelector('script[src*="leaflet"]')) {
     const s = document.createElement('script');
     s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.crossOrigin = 'anonymous';
     s.onload = () => { initGpsAdminMap(); refreshGpsData(); };
     document.head.appendChild(s);
   } else { setTimeout(() => { initGpsAdminMap(); refreshGpsData(); }, 500); }
@@ -7772,6 +7774,7 @@ function loadLeafletForRoute() {
   if (!document.querySelector('script[src*="leaflet"]')) {
     const s = document.createElement('script');
     s.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.crossOrigin = 'anonymous';
     s.onload = () => loadRoutePage();
     document.head.appendChild(s);
   } else { setTimeout(loadRoutePage, 500); }
