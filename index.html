@@ -2099,10 +2099,10 @@ thead tr th{position:relative}
     <div class="pm-table-wrap">
       <table>
         <thead>
-          <tr><th></th><th>สินค้า</th><th>ราคา (฿)</th><th>สต็อก</th><th>สถานะ</th><th>จัดการ</th></tr>
+          <tr><th></th><th>สินค้า</th><th>ราคา (฿)</th><th>ราคาส่ง/โปร</th><th>สต็อก</th><th>สถานะ</th><th>จัดการ</th></tr>
         </thead>
         <tbody id="pm-tbody">
-          <tr class="empty-row"><td colspan="6">กดปุ่ม "โหลด/รีเฟรชสินค้า" เพื่อเริ่มต้น</td></tr>
+          <tr class="empty-row"><td colspan="7">กดปุ่ม "โหลด/รีเฟรชสินค้า" เพื่อเริ่มต้น</td></tr>
         </tbody>
       </table>
     </div>
@@ -3543,7 +3543,7 @@ function pmFilterClick(btn, val) {
 async function loadProductsForPM() {
   if (!sb) { toast('เชื่อมต่อ Supabase ก่อน', 'error'); return; }
   const tbody = document.getElementById('pm-tbody');
-  tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:32px;"><span class="spinner-sm"></span></td></tr>';
+  tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:32px;"><span class="spinner-sm"></span></td></tr>';
   try {
     const { raw, tableName } = await fetchProductsRaw();
     currentProductsTable = tableName;
@@ -3560,9 +3560,53 @@ async function loadProductsForPM() {
     updateLowStockKpi();
     toast(`📦 โหลดสินค้าแล้ว ${allProducts.length} รายการ`, 'success');
   } catch (e) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">⚠️ โหลดไม่ได้: ${e.message}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">⚠️ โหลดไม่ได้: ${e.message}</td></tr>`;
     toast('โหลดสินค้าไม่ได้: ' + e.message, 'error');
   }
+}
+
+// ── ราคาส่ง (tiers) / โปรชุด (bundle) — อ่านจาก sizes[] ของสินค้า เพื่อโชว์ในตาราง "จัดการสินค้า" ──
+// เดิมตารางนี้โหลดแค่ price/stock แบบ flat เลยไม่เคยรู้ว่าสินค้าไหนตั้งราคาส่ง/โปรชุดไว้บ้าง
+// (ต้องเปิดแก้ทีละชิ้นถึงจะเห็น) ฟังก์ชันนี้สรุปให้เห็นตรงตารางเลยว่าสินค้าไหนมีราคาส่ง/โปรชุด กี่ไซซ์ ตัวเลขเท่าไหร่
+function pmWholesaleInfo(p) {
+  let sizes = p.sizes;
+  if (typeof sizes === 'string') { try { sizes = JSON.parse(sizes); } catch (e) { sizes = []; } }
+  if (!Array.isArray(sizes)) sizes = [];
+  let tierSizes = 0, hasBundle = false;
+  const tierSamples = [], bundleSamples = [];
+  sizes.forEach(s => {
+    if (s && Array.isArray(s.tiers) && s.tiers.length) {
+      tierSizes++;
+      const label = s.n || s.name || s.label || '';
+      s.tiers.forEach(t => {
+        const mq = t.minQty ?? t.qty ?? t.q;
+        const tp = t.price ?? t.p;
+        if (mq && tp) tierSamples.push(`${label ? label + ': ' : ''}${mq}+ ฿${tp}`);
+      });
+    }
+    if (s && s.bundle) {
+      const bq = parseInt(s.bundle.q ?? s.bundle.qty ?? 0);
+      const bp = parseFloat(s.bundle.price ?? s.bundle.p ?? 0);
+      if (bq >= 2 && bp > 0) {
+        hasBundle = true;
+        const label = s.n || s.name || s.label || '';
+        bundleSamples.push(`${label ? label + ': ' : ''}ครบ ${bq} ชิ้น ฿${bp}/ชิ้น`);
+      }
+    }
+  });
+  return { tierSizes, hasBundle, tierSamples, bundleSamples };
+}
+function pmWholesaleBadgeHtml(p) {
+  const wi = pmWholesaleInfo(p);
+  if (!wi.tierSizes && !wi.hasBundle) return '<span style="color:var(--text-3);">—</span>';
+  let html = '';
+  if (wi.tierSizes) {
+    html += `<span class="pm-stock-badge" style="background:#e8f5e9;color:#2e7d32;cursor:default;" title="${escapeAttr(wi.tierSamples.join(' | '))}">📊 ราคาส่ง (${wi.tierSizes})</span>`;
+  }
+  if (wi.hasBundle) {
+    html += `<span class="pm-stock-badge" style="background:#fff3e0;color:#e65100;margin-left:4px;cursor:default;" title="${escapeAttr(wi.bundleSamples.join(' | '))}">🎁 โปรชุด</span>`;
+  }
+  return html;
 }
 
 function pmStockInfo(p) {
@@ -3586,7 +3630,7 @@ function renderProductManagement() {
   const pill = document.getElementById('pmCountPill');
   if (!tbody) return;
   if (!allProducts.length) {
-    tbody.innerHTML = '<tr class="empty-row"><td colspan="6">กดปุ่ม "โหลด/รีเฟรชสินค้า" เพื่อเริ่มต้น</td></tr>';
+    tbody.innerHTML = '<tr class="empty-row"><td colspan="7">กดปุ่ม "โหลด/รีเฟรชสินค้า" เพื่อเริ่มต้น</td></tr>';
     if (pill) pill.textContent = '— รายการ';
     return;
   }
@@ -3602,7 +3646,7 @@ function renderProductManagement() {
   });
 
   if (pill) pill.textContent = `${list.length.toLocaleString()} รายการ`;
-  if (!list.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="6">ไม่พบสินค้าที่ตรงเงื่อนไข</td></tr>'; return; }
+  if (!list.length) { tbody.innerHTML = '<tr class="empty-row"><td colspan="7">ไม่พบสินค้าที่ตรงเงื่อนไข</td></tr>'; return; }
 
   tbody.innerHTML = list.map(p => {
     const st = pmStockInfo(p);
@@ -3610,6 +3654,7 @@ function renderProductManagement() {
       <td>${pmThumbHtml(p)}</td>
       <td><b>${escapeHtml(p.name || '—')}</b>${p.sku ? `<div style="font-size:11px;color:var(--text-3);">SKU: ${escapeHtml(String(p.sku))}</div>` : ''}</td>
       <td>฿${(p.price || 0).toLocaleString()}</td>
+      <td>${pmWholesaleBadgeHtml(p)}</td>
       <td><span class="pm-stock-badge ${st.cls}">${st.label}</span></td>
       <td>${p.active === false ? '<span style="color:var(--text-3);">ปิดการขาย</span>' : '<span style="color:var(--green);">ขายอยู่</span>'}</td>
       <td><button class="pro-mini-btn" onclick="openPmEditModal('${String(p.id).replace(/'/g, "\\'")}')">✏️ แก้ไข</button></td>
@@ -4274,9 +4319,11 @@ function renderEnhancedItems(items) {
       if (selVariant && _selSize && _selSize.price) it.price = _selSize.price;
       else if (!selVariant && prod && prod.price) it.price = prod.price;
     }
-    // ราคาโปรชุด: ครบจำนวน → ราคาโปร, ไม่ครบ → ราคาปกติ
-    const _eeBu = emBundleUnitPrice(it.name||'', it._variant||'', it.qty||1, it.price||0);
-    if (_eeBu !== null) it.price = _eeBu;
+    // 🔄 ราคาส่ง/โปรชุด: เดิมจุดนี้ "ทับราคาเงียบๆ" ทุกครั้งที่ re-render (เช่นตอนเพิ่ม/ลบแถวอื่น) — เสี่ยงทับราคา
+    // ที่แอดมินตั้งเองไว้แบบไม่รู้ตัว เปลี่ยนเป็น: คำนวณราคาที่ "ควรจะเป็น" ไว้เฉยๆ ไม่ทับ ถ้าไม่ตรงกับราคาปัจจุบัน
+    // ในแถว → โชว์เตือน + ปุ่มให้แอดมินกดยืนยันเองว่าจะอัปเดตหรือไม่
+    const _eeExpected = emBundleUnitPrice(it.name||'', it._variant||'', it.qty||1, it.price||0);
+    const _eeMismatch = _eeExpected !== null && Math.abs(_eeExpected - (it.price||0)) > 0.5;
     const stockNum = prod ? emGetVariantStock(prod, selVariant) : null;
     const stockLabel = selVariant ? `📦 สต็อก (${selVariant}): ` : '📦 สต็อกรวมทุกไซซ์: ';
     const stockBadge = stockNum !== null
@@ -4316,12 +4363,32 @@ function renderEnhancedItems(items) {
           ${stockBadge}
         </div>
         <input type="number" min="1" value="${it.qty||1}" data-field="qty" oninput="emQtyBundleSync(this);recalcEETotal();updateStockPreview();" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;width:100%;outline:none;">
-        <input type="number" min="0" step="0.01" value="${it.price||0}" data-field="price" oninput="recalcEETotal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;width:100%;outline:none;">
+        <div style="display:flex;flex-direction:column;min-width:0;">
+          <input type="number" min="0" step="0.01" value="${it.price||0}" data-field="price" oninput="recalcEETotal()" style="padding:5px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit;width:100%;outline:none;">
+          ${_eeMismatch ? `<div class="ee-tier-mismatch" style="font-size:10px;color:#e65100;margin-top:2px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;">
+            <span>⚠️ ราคาส่งล่าสุดคือ ฿${_eeExpected}</span>
+            <button type="button" onclick="emApplyRecalcPrice(${idx},${_eeExpected})" style="padding:1px 6px;border-radius:5px;border:1px solid #e65100;background:#fff3e0;color:#e65100;font-size:10px;font-weight:700;cursor:pointer;">🔄 คำนวณราคาส่งใหม่</button>
+          </div>` : ''}
+        </div>
         <button onclick="removeEnhancedItem(${idx})" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:#fff;cursor:pointer;color:var(--sub);font-size:14px;" onmouseover="this.style.borderColor='var(--danger)';this.style.color='var(--danger)';" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--sub)';">×</button>
       </div>`;
   }).join('');
   recalcEETotal();
   updateStockPreview();
+}
+
+// เรียกตอนกดปุ่ม "🔄 คำนวณราคาส่งใหม่" ต่อแถว — อัปเดตแค่ราคาของแถวนั้น ไม่แตะแถวอื่น/ไม่ re-render ทั้งหมด
+// (กัน re-render ทับ input ที่แอดมินอาจกำลังพิมพ์อยู่ในแถวอื่น)
+function emApplyRecalcPrice(idx, newPrice) {
+  const row = document.querySelector(`#eeItemsList .enhanced-item-row[data-idx="${idx}"]`);
+  if (!row) return;
+  const priceInput = row.querySelector('[data-field="price"]');
+  if (!priceInput) return;
+  priceInput.value = newPrice;
+  // ซ่อน warning ของแถวนี้ทันที (ไม่ต้องรอ re-render ทั้งชุด)
+  const warn = row.querySelector('.ee-tier-mismatch');
+  if (warn) warn.remove();
+  recalcEETotal();
 }
 
 function eeSelectVariant(idx, label, price) {
@@ -4491,10 +4558,20 @@ function selectProduct(idx, name, price) {
 
 function getCurrentEEItems() {
   return [...document.querySelectorAll('#eeItemsList .enhanced-item-row')].map(row => {
-    const name  = row.querySelector('[data-field="name"]').value.trim();
+    const nameInput = row.querySelector('[data-field="name"]');
+    const name  = nameInput.value.trim();
     const qty   = parseInt(row.querySelector('[data-field="qty"]').value) || 0;
     const price = parseFloat(row.querySelector('[data-field="price"]').value) || 0;
-    return { name, qty, price };
+    const item = { name, qty, price };
+    // 🔒 สำคัญมาก: แนบ productId/sizeName กลับเข้าไปด้วยเสมอถ้าหาสินค้า/ไซซ์เจอ — เดิมฟังก์ชันนี้เก็บแค่
+    // {name,qty,price} ทำให้ทุกครั้งที่แอดมินกด "บันทึก" ในหน้าแก้ไขออเดอร์ (ต่อให้ไม่ได้แก้อะไรจริงจัง)
+    // ออเดอร์นั้นจะเสีย productId/sizeName ไปถาวร — ผลคือออเดอร์นั้นจะไม่มีทางถูกตรวจราคาส่งซ้ำหรือตัดสต็อก
+    // อัตโนมัติได้อีกในทุกจุดที่ต้องพึ่ง productId (เช่นปุ่ม "ซื้อซ้ำ" จากประวัติออเดอร์ฝั่งลูกค้า)
+    const variant = nameInput.dataset.variant || '';
+    const { hit, prod } = emFindSizeHit(name, variant);
+    if (prod && prod.id !== undefined) item.productId = prod.id;
+    if (hit) item.sizeName = hit.n || hit.name || hit.label || variant || '';
+    return item;
   }).filter(i => i.name);
 }
 
