@@ -2133,14 +2133,17 @@ thead tr th{position:relative}
         </div>
       </div>
       <div style="margin-bottom:12px;">
-        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">ลิงก์รูปสินค้า (URL — ใช้รูปเดียวกับหน้าร้าน)</label>
-        <div style="display:flex;gap:10px;align-items:center;">
+        <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">รูปสินค้า (ลากไฟล์มาวาง, อัปโหลด, หรือวางลิงก์ URL)</label>
+        <div id="pmImgDropZone" ondragover="pmImgDragOver(event)" ondragleave="pmImgDragLeave(event)" ondrop="pmImgDrop(event)" style="display:flex;gap:10px;align-items:center;border:1.5px dashed transparent;border-radius:10px;padding:4px;transition:border-color .15s,background .15s;">
           <div id="pmImgPreviewWrap" style="width:52px;height:52px;border-radius:8px;background:var(--gray-100);display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;border:1.5px solid #ddd;">
             <img id="pmImgPreview" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:none;" onerror="this.style.display='none'" onload="this.style.display='block'">
             <span id="pmImgPreviewFallback" style="font-size:20px;">📦</span>
           </div>
-          <input id="pm_image" type="text" placeholder="https://... (วางลิงก์รูปจากหน้าร้าน)" oninput="pmUpdateImgPreview()" style="flex:1;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;outline:none;">
+          <input id="pm_image" type="text" placeholder="https://... (วางลิงก์รูปจากหน้าร้าน) หรือลากไฟล์มาวางตรงนี้" oninput="pmUpdateImgPreview()" style="flex:1;padding:9px 12px;border:1.5px solid #ddd;border-radius:8px;font-size:13px;font-family:inherit;outline:none;">
+          <button type="button" onclick="document.getElementById('pm-photo-input').click()" class="btn-ghost" style="white-space:nowrap;padding:9px 12px;">📤 อัปโหลด</button>
+          <input type="file" id="pm-photo-input" accept="image/*" style="display:none" onchange="uploadPmPhoto(this.files[0])">
         </div>
+        <div id="pm-photo-status" style="font-size:11px;color:var(--text-4);margin-top:4px;"></div>
       </div>
       <div style="margin-bottom:4px;">
         <label style="font-size:12px;font-weight:600;color:#555;display:block;margin-bottom:4px;">อีโมจิ/ไอคอน (ใช้เมื่อไม่มีรูป)</label>
@@ -3291,8 +3294,8 @@ async function updateLowStockKpi() {
     if (!sb) { el.textContent = '—'; return; }
     try { const { raw } = await fetchProductsRaw(); allProducts = normalizeProducts(raw); } catch (e) { el.textContent = '—'; return; }
   }
-  const withStock = allProducts.filter(p => p.stock !== null && p.stock !== undefined && p.stock !== '');
-  const lowOrOut = withStock.filter(p => Number(p.stock) <= 5).length;
+  const withStock = allProducts.filter(p => { const s = pmEffectiveStock(p); return s !== null && s !== undefined && s !== ''; });
+  const lowOrOut = withStock.filter(p => Number(pmEffectiveStock(p)) <= 5).length;
   el.textContent = withStock.length ? lowOrOut : '—';
 }
 
@@ -3527,9 +3530,17 @@ function pmWholesaleBadgeHtml(p) {
   return html;
 }
 
+// 🔧 FIX: เดิมอ่าน p.stock ตรงๆ ซึ่งจาก normalizeProducts() จะเป็น null เสมอสำหรับสินค้าที่มีไซซ์
+// (สต็อกจริงเก็บแยกต่อไซซ์ใน sizes[].stock — ดูคอมเมนต์ที่ emGetVariantStock) ผลคือสินค้าเกือบ
+// ทั้งหมดในตาราง "จัดการสินค้า" ขึ้น "ไม่ระบุ" ทั้งที่จริงมีการติดตามสต็อกอยู่ — ใช้ pmEffectiveStock()
+// รวมสต็อกจากทุกไซซ์แทน (fallback ไป p.stock เองถ้าสินค้านั้นไม่มี sizes เลย)
+function pmEffectiveStock(p) {
+  return emGetVariantStock(p, null);
+}
 function pmStockInfo(p) {
-  if (p.stock === null || p.stock === undefined || p.stock === '') return { cls: 'pm-stock-none', label: 'ไม่ระบุ' };
-  const n = Number(p.stock);
+  const eff = pmEffectiveStock(p);
+  if (eff === null || eff === undefined || eff === '') return { cls: 'pm-stock-none', label: 'ไม่ระบุ' };
+  const n = Number(eff);
   if (n <= 0) return { cls: 'pm-stock-out', label: 'หมดสต็อก' };
   if (n <= 5) return { cls: 'pm-stock-low', label: `เหลือ ${n}` };
   return { cls: 'pm-stock-ok', label: `เหลือ ${n}` };
@@ -3556,10 +3567,11 @@ function renderProductManagement() {
   let list = allProducts.filter(p => !q || (p.name || '').toLowerCase().includes(q) || String(p.sku || p.id || '').toLowerCase().includes(q));
   list = list.filter(p => {
     if (pmFilter === 'all') return true;
-    const n = Number(p.stock);
-    if (pmFilter === 'instock') return p.stock !== null && p.stock !== undefined && p.stock !== '' && n > 5;
-    if (pmFilter === 'low') return p.stock !== null && p.stock !== undefined && p.stock !== '' && n > 0 && n <= 5;
-    if (pmFilter === 'out') return p.stock !== null && p.stock !== undefined && p.stock !== '' && n <= 0;
+    const eff = pmEffectiveStock(p);
+    const n = Number(eff);
+    if (pmFilter === 'instock') return eff !== null && eff !== undefined && eff !== '' && n > 5;
+    if (pmFilter === 'low') return eff !== null && eff !== undefined && eff !== '' && n > 0 && n <= 5;
+    if (pmFilter === 'out') return eff !== null && eff !== undefined && eff !== '' && n <= 0;
     return true;
   });
 
@@ -3595,6 +3607,49 @@ function pmUpdateImgPreview() {
   }
 }
 
+// อัปโหลดรูปสินค้าไป Cloudinary (ใช้ preset เดียวกับ uploadAdminPhoto/uploadGapPhoto ที่มีอยู่แล้ว)
+// แล้วเติม URL ที่ได้ลงช่อง pm_image ให้อัตโนมัติ — ไม่ต้องหาลิงก์รูปจากหน้าร้านเอง
+// รับ File ตรงๆ เพื่อให้ใช้ร่วมกันได้ทั้งปุ่มเลือกไฟล์และลากไฟล์มาวาง (drag & drop)
+async function uploadPmPhoto(file) {
+  if (!file) return;
+  const statusEl = document.getElementById('pm-photo-status');
+  if (!file.type || !file.type.startsWith('image/')) { statusEl.textContent = '⚠️ กรุณาเลือกไฟล์รูปภาพ'; return; }
+  statusEl.textContent = '⏳ กำลังอัปโหลด...';
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    fd.append('upload_preset', 'monshin');
+    fd.append('folder', 'products');
+    const res = await fetch('https://api.cloudinary.com/v1_1/dwet6be8c/image/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!data.secure_url) throw new Error('อัปโหลดไม่สำเร็จ');
+    document.getElementById('pm_image').value = data.secure_url;
+    pmUpdateImgPreview();
+    statusEl.textContent = '✅ อัปโหลดรูปแล้ว';
+  } catch (e) {
+    statusEl.textContent = '⚠️ ' + e.message;
+  } finally {
+    document.getElementById('pm-photo-input').value = '';
+  }
+}
+
+function pmImgDragOver(ev) {
+  ev.preventDefault();
+  ev.currentTarget.style.borderColor = 'var(--red, #C0392B)';
+  ev.currentTarget.style.background = 'var(--gray-100)';
+}
+function pmImgDragLeave(ev) {
+  ev.currentTarget.style.borderColor = 'transparent';
+  ev.currentTarget.style.background = 'transparent';
+}
+function pmImgDrop(ev) {
+  ev.preventDefault();
+  ev.currentTarget.style.borderColor = 'transparent';
+  ev.currentTarget.style.background = 'transparent';
+  const file = ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (file) uploadPmPhoto(file);
+}
+
 function openPmAddModal() {
   if (!sb) { toast('เชื่อมต่อ Supabase ก่อน', 'error'); return; }
   if (!currentProductsTable) currentProductsTable = 'products';
@@ -3609,6 +3664,7 @@ function openPmAddModal() {
   document.getElementById('pmEditModalTitle').textContent = '➕ เพิ่มสินค้าใหม่';
   document.getElementById('pmDeleteBtn').style.display = 'none';
   document.getElementById('pmFieldHint').textContent = `จะบันทึกลงตาราง "${currentProductsTable}" · field ราคา: ${pmPriceField || 'price'} · field สต็อก: ${pmStockField || 'stock'} · field รูป: ${pmImageField || 'img'}`;
+  document.getElementById('pm-photo-status').textContent = '';
   pmUpdateImgPreview();
   document.getElementById('pmEditModal').classList.add('show');
 }
@@ -3627,6 +3683,7 @@ function openPmEditModal(id) {
   document.getElementById('pmEditModalTitle').textContent = '✏️ แก้ไขสินค้า';
   document.getElementById('pmDeleteBtn').style.display = 'inline-block';
   document.getElementById('pmFieldHint').textContent = `field ราคา: ${pmPriceField || 'price'} · field สต็อก: ${pmStockField || 'stock'} · field รูป: ${pmImageField || 'img'}`;
+  document.getElementById('pm-photo-status').textContent = '';
   pmUpdateImgPreview();
   document.getElementById('pmEditModal').classList.add('show');
 }
