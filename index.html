@@ -148,6 +148,20 @@ header::after{
 .nav-tab.active{color:#F6D9DF;border-bottom-color:var(--gold);background:rgba(196,30,58,.12)}
 .nav-tab.active svg{opacity:1}
 
+.nav-group{position:relative;flex-shrink:0}
+.nav-group-toggle{display:flex}
+.nav-group-chev{font-size:10px;margin-left:1px;transition:transform .18s;opacity:.7}
+.nav-group.open .nav-group-chev{transform:rotate(180deg)}
+.nav-group.has-active .nav-group-toggle{color:#F6D9DF;border-bottom-color:var(--gold);background:rgba(196,30,58,.12)}
+.nav-group-menu{
+  display:none;position:absolute;top:100%;left:0;min-width:170px;
+  background:#4A0E1D;border:1px solid rgba(255,255,255,.12);border-radius:0 0 10px 10px;
+  box-shadow:0 10px 24px rgba(0,0,0,.35);z-index:60;flex-direction:column;overflow:hidden;
+}
+.nav-group.open .nav-group-menu{display:flex}
+.nav-group-menu .nav-tab{border-bottom:none;border-left:2.5px solid transparent;width:100%}
+.nav-group-menu .nav-tab.active{border-left-color:var(--gold);border-bottom-color:transparent}
+
 /* ════════ PAGE CONTAINER ════════ */
 .admin-page{max-width:1400px;margin:0 auto;padding:24px 20px 72px}
 @media(max-width:768px){.admin-page{padding:14px 10px 64px}}
@@ -1142,6 +1156,8 @@ thead tr th{position:relative}
     border-left:3px solid transparent;font-size:13.5px;flex-shrink:0;
   }
   .nav-tab.active{border-left-color:var(--gold-soft);border-bottom-color:transparent}
+  .nav-group-menu{position:static;border-radius:0;box-shadow:none;background:rgba(0,0,0,.15);border:none}
+  .nav-group-menu .nav-tab{padding-left:38px}
   .admin-nav > span[style*="flex:1"]{order:5;min-height:8px}
   #auth-user-chip{margin:8px 16px 2px !important;justify-content:center;order:6}
   header .admin-logo{display:none}
@@ -1219,12 +1235,32 @@ thead tr th{position:relative}
   <button class="nav-tab" data-page="2" onclick="showPage(2)"><svg width="16" height="16"><use href="#ic-users"/></svg><span>ฐานข้อมูลลูกค้า</span></button>
   <button class="nav-tab" data-page="3" onclick="showPage(3)"><svg width="16" height="16"><use href="#ic-package"/></svg><span>แก้ไขออเดอร์</span></button>
   <button class="nav-tab" data-page="4" onclick="showPage(4)"><svg width="16" height="16"><use href="#ic-chart"/></svg><span>สรุปยอดขาย</span></button>
-  <button class="nav-tab" data-page="5" onclick="showPage(5)"><svg width="16" height="16"><use href="#ic-briefcase"/></svg><span>จัดการเซล</span></button>
-  <button class="nav-tab" data-page="6" onclick="showPage(6)"><svg width="16" height="16"><use href="#ic-gps"/></svg><span>GPS เซล</span></button>
-  <button class="nav-tab" data-page="7" onclick="showPage(7)"><svg width="16" height="16"><use href="#ic-map"/></svg><span>เส้นทางเซล</span></button>
+
+  <div class="nav-group" id="navGroupSales">
+    <button class="nav-tab nav-group-toggle" type="button" onclick="toggleNavGroup('navGroupSales', event)">
+      <svg width="16" height="16"><use href="#ic-briefcase"/></svg><span>เซลมนชิน</span><span class="nav-group-chev">▾</span>
+    </button>
+    <div class="nav-group-menu">
+      <button class="nav-tab" data-page="5" onclick="showPage(5)"><svg width="16" height="16"><use href="#ic-briefcase"/></svg><span>จัดการเซล</span></button>
+      <button class="nav-tab" data-page="6" onclick="showPage(6)"><svg width="16" height="16"><use href="#ic-gps"/></svg><span>GPS เซล</span></button>
+      <button class="nav-tab" data-page="7" onclick="showPage(7)"><svg width="16" height="16"><use href="#ic-map"/></svg><span>เส้นทางเซล</span></button>
+    </div>
+  </div>
+
   <button class="nav-tab" data-page="8" onclick="showPage(8)"><svg width="16" height="16"><use href="#ic-search"/></svg><span>Log ระบบ</span></button>
   <button class="nav-tab" data-page="9" onclick="showPage(9)"><svg width="16" height="16"><use href="#ic-info"/></svg><span>สถานะระบบ</span></button>
   <button class="nav-tab" data-page="10" onclick="showPage(10)"><svg width="16" height="16"><use href="#ic-package"/></svg><span>จัดการสินค้า</span></button>
+
+  <div class="nav-group" id="navGroupRider">
+    <button class="nav-tab nav-group-toggle" type="button" onclick="toggleNavGroup('navGroupRider', event)">
+      <svg width="16" height="16"><use href="#ic-gps"/></svg><span>ไรเดอร์</span><span class="nav-group-chev">▾</span>
+    </button>
+    <div class="nav-group-menu">
+      <button class="nav-tab" data-page="12" onclick="showPage(12)"><svg width="16" height="16"><use href="#ic-gps"/></svg><span>GPS ไรเดอร์</span></button>
+      <button class="nav-tab" data-page="11" onclick="showPage(11)"><svg width="16" height="16"><use href="#ic-briefcase"/></svg><span>งานปัจจุบัน</span></button>
+    </div>
+  </div>
+
   <span style="flex:1"></span>
   <span id="auth-user-chip" style="display:none;align-items:center;gap:8px;padding:4px 10px;background:rgba(255,255,255,.12);border-radius:20px;font-size:12px;color:#fff;">
     <span id="auth-user-name" style="font-weight:700;"></span>
@@ -2601,6 +2637,63 @@ thead tr th{position:relative}
   </div>
 </div>
 
+<div id="page-11" class="admin-page" style="display:none;">
+  <div class="pro-page-head">
+    <div class="pro-head-text">
+      <div class="page-title"><svg width="20" height="20"><use href="#ic-gps"/></svg>ไรเดอร์ — งานที่กำลังดำเนินการ</div>
+      <div class="pro-head-sub">รีเฟรชอัตโนมัติทุก 10 วินาที — สถานะ ลูกค้า ไรเดอร์ที่รับงาน และยอดเก็บเงินปลายทาง</div>
+    </div>
+    <div class="pro-head-actions">
+      <button onclick="loadRiderDashboard()" class="btn-primary">
+        <svg width="14" height="14"><use href="#ic-refresh"/></svg>รีเฟรชตอนนี้
+      </button>
+    </div>
+  </div>
+
+  <div class="orders-card">
+    <div class="pm-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ออเดอร์</th>
+            <th>สถานะ</th>
+            <th>ลูกค้า</th>
+            <th>ที่อยู่</th>
+            <th>ไรเดอร์</th>
+            <th>COD</th>
+            <th>อัปเดตล่าสุด</th>
+          </tr>
+        </thead>
+        <tbody id="riderDashboardBody">
+          <tr><td colspan="7" style="text-align:center;color:#aaa;padding:20px;">⏳ กำลังโหลด...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div id="page-12" class="admin-page" style="display:none;">
+  <div class="pro-page-head">
+    <div class="pro-head-text">
+      <div class="page-title"><svg width="20" height="20"><use href="#ic-gps"/></svg>GPS ไรเดอร์</div>
+      <div class="pro-head-sub">ติดตามตำแหน่งไรเดอร์แบบเรียลไทม์</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div id="rider-gps-status" style="display:flex;align-items:center;gap:6px;font-size:13px;">
+        <div id="rider-gps-dot" style="width:10px;height:10px;border-radius:50%;background:#ccc;"></div>
+        <span id="rider-gps-text" style="color:#888;">กำลังโหลด...</span>
+      </div>
+      <button onclick="loadRiderGps()" class="btn-primary">🔄 รีเฟรช</button>
+    </div>
+  </div>
+
+  <div style="background:#fff;border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:16px;">
+    <div id="rider-gps-map" style="height:500px;"></div>
+  </div>
+
+  <div id="rider-gps-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;"></div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -2696,6 +2789,9 @@ let sb = null;
 let allOrders = [];
 let currentFilter = 'all';
 let realtimeChannel = null;
+
+// Monshin Rider (GAS backend) — same exec URL the rider app itself calls
+const RIDER_GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyevPmMs9FV72XrEOep5cshnQUBZ0vWZFqr0DW4N7XKJNC47PIQuF6XefX2FICCa6ig/exec';
 let recentlyAddedIds = new Set();
 
 // New state
@@ -2719,6 +2815,11 @@ function showPage(n) {
   document.getElementById('page-' + n).style.display = 'block';
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`.nav-tab[data-page="${n}"]`).classList.add('active');
+  document.querySelectorAll('.nav-group').forEach(g => {
+    const hasActive = !!g.querySelector('.nav-tab.active');
+    g.classList.toggle('has-active', hasActive);
+    g.classList.remove('open');
+  });
 
   // Trigger page-specific updates
   if (n === 2) renderCustomerDB();
@@ -2727,10 +2828,21 @@ function showPage(n) {
   if (n === 5) loadSalesPage();
   if (n === 6) loadGpsPage();
   if (n === 10) renderProductManagement();
+  if (n === 11) startRiderDashboardAutoRefresh();
+  if (n === 12) startRiderGpsAutoRefresh();
   // ออกจากหน้า GPS แล้วหยุด auto-refresh (ประหยัดทรัพยากร) — กลับเข้ามาจะเริ่มใหม่เอง
   if (n !== 6 && typeof gpsInterval !== 'undefined' && gpsInterval) {
     clearInterval(gpsInterval);
     gpsInterval = null;
+  }
+  // ออกจากหน้าไรเดอร์แล้วหยุด auto-refresh เช่นกัน
+  if (n !== 11 && riderDashboardInterval) {
+    clearInterval(riderDashboardInterval);
+    riderDashboardInterval = null;
+  }
+  if (n !== 12 && riderGpsInterval) {
+    clearInterval(riderGpsInterval);
+    riderGpsInterval = null;
   }
   // แผนที่ที่ถูกสร้างตอนหน้าถูกซ่อน จะ render เพี้ยน — สั่งคำนวณขนาดใหม่หลังหน้าปรากฏ
   setTimeout(() => {
@@ -2740,6 +2852,213 @@ function showPage(n) {
       if (n === 7 && typeof routeMainMap  !== 'undefined' && routeMainMap)  routeMainMap.invalidateSize();
     } catch(_){}
   }, 200);
+}
+
+function toggleNavGroup(groupId, evt) {
+  if (evt) evt.stopPropagation();
+  const group = document.getElementById(groupId);
+  const wasOpen = group.classList.contains('open');
+  document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
+  if (!wasOpen) group.classList.add('open');
+}
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.nav-group')) {
+    document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
+  }
+});
+
+// ═══════════════════════════════════════════
+//  RIDER LIVE DASHBOARD (page 11)
+// ═══════════════════════════════════════════
+let riderDashboardInterval = null;
+const RIDER_STATUS_TH = {
+  offered:  { label: '🟠 รอไรเดอร์รับงาน', color: '#B45309' },
+  accepted: { label: '✅ ไรเดอร์รับงานแล้ว', color: '#15803D' },
+  departed: { label: '🛵 กำลังเดินทาง',      color: '#1D4ED8' },
+  arrived:  { label: '📍 ถึงที่หมายแล้ว',    color: '#6D28D9' }
+};
+
+function startRiderDashboardAutoRefresh() {
+  loadRiderDashboard();
+  if (riderDashboardInterval) clearInterval(riderDashboardInterval);
+  riderDashboardInterval = setInterval(loadRiderDashboard, 10000);
+}
+
+async function loadRiderDashboard() {
+  const body = document.getElementById('riderDashboardBody');
+  try {
+    const res = await fetch(RIDER_GAS_ENDPOINT, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'liveDashboard' })
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'unknown_error');
+    renderRiderDashboard(json.data || []);
+  } catch (e) {
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#c00;padding:20px;">โหลดไม่สำเร็จ: ${e.message}</td></tr>`;
+  }
+}
+
+function renderRiderDashboard(jobs) {
+  const body = document.getElementById('riderDashboardBody');
+  if (!jobs.length) {
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center;color:#aaa;padding:20px;">ไม่มีงานที่กำลังดำเนินการตอนนี้</td></tr>`;
+    return;
+  }
+  body.innerHTML = jobs.map(j => {
+    const st = RIDER_STATUS_TH[j.status] || { label: j.status, color: '#555' };
+    const riderLabel = j.rider_name ? `${j.rider_name}${j.rider_code ? ' (' + j.rider_code + ')' : ''}` : '— ยังไม่มีคนรับ —';
+    const lastTime = j.arrived_at || j.departed_at || j.accepted_at || j.created_at;
+    const lastTimeLabel = lastTime ? new Date(lastTime).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' }) : '-';
+    const cod = j.cod_amount ? Number(j.cod_amount).toLocaleString('th-TH') + ' บาท' : '-';
+    return `<tr>
+      <td>${escapeAdminHtml(j.order_id)}</td>
+      <td style="color:${st.color};font-weight:600;">${st.label}</td>
+      <td>${escapeAdminHtml(j.cust_name || '-')}</td>
+      <td style="max-width:220px;">${escapeAdminHtml(j.cust_address || '-')}</td>
+      <td>${escapeAdminHtml(riderLabel)}</td>
+      <td>${cod}</td>
+      <td>${lastTimeLabel}</td>
+    </tr>`;
+  }).join('');
+}
+
+function escapeAdminHtml(str) {
+  return String(str == null ? '' : str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// ═══════════════════════════════════════════
+//  RIDER GPS MAP (page 12)
+// ═══════════════════════════════════════════
+let riderGpsInterval = null;
+let riderGpsMap = null;
+let riderGpsMarkers = {};
+const RIDER_GPS_REFRESH_MS = 15000;
+const RIDER_ONLINE_MS = 3 * 60 * 1000; // ถือว่า online ถ้าอัปเดตภายใน 3 นาที
+
+function startRiderGpsAutoRefresh() {
+  loadRiderGps();
+  if (riderGpsInterval) clearInterval(riderGpsInterval);
+  riderGpsInterval = setInterval(loadRiderGps, RIDER_GPS_REFRESH_MS);
+}
+
+function initRiderGpsMap() {
+  const el = document.getElementById('rider-gps-map');
+  if (!el || !window.L || riderGpsMap) return;
+  riderGpsMap = L.map('rider-gps-map', { attributionControl: false }).setView([18.145, 100.14], 12);
+  L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(riderGpsMap);
+  if (typeof addSatelliteToggle === 'function') addSatelliteToggle(riderGpsMap);
+}
+
+function setRiderGpsStatus(state, text) {
+  const dot = document.getElementById('rider-gps-dot');
+  const label = document.getElementById('rider-gps-text');
+  if (!dot || !label) return;
+  const colors = { loading: '#ccc', ok: '#27ae60', err: '#e74c3c' };
+  dot.style.background = colors[state] || '#ccc';
+  label.textContent = text || (state === 'loading' ? 'กำลังโหลด...' : '');
+}
+
+async function loadRiderGps() {
+  setRiderGpsStatus('loading');
+  if (!window.L) { loadLeafletThenRiderGps(); return; }
+  initRiderGpsMap();
+  try {
+    const res = await fetch(RIDER_GAS_ENDPOINT, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ action: 'riderLocations' })
+    });
+    const json = await res.json();
+    if (!json.ok) throw new Error(json.error || 'unknown_error');
+    renderRiderGpsMap(json.data || []);
+    renderRiderGpsList(json.data || []);
+    setRiderGpsStatus('ok', 'อัปเดต ' + new Date().toLocaleTimeString('th-TH'));
+  } catch (e) {
+    setRiderGpsStatus('err', 'โหลดไม่สำเร็จ: ' + e.message);
+  }
+}
+
+function loadLeafletThenRiderGps() {
+  if (!document.querySelector('link[href*="leaflet"]')) {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet'; l.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(l);
+  }
+  if (!document.querySelector('script[src*="leaflet"]')) {
+    const s = document.createElement('script');
+    s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    s.crossOrigin = 'anonymous';
+    s.onload = () => { initRiderGpsMap(); loadRiderGps(); };
+    document.head.appendChild(s);
+  } else {
+    setTimeout(() => { initRiderGpsMap(); loadRiderGps(); }, 500);
+  }
+}
+
+function renderRiderGpsMap(riders) {
+  if (!riderGpsMap) return;
+  const seenIds = new Set();
+  const bounds = [];
+
+  riders.forEach(r => {
+    if (r.lat == null || r.lng == null) return;
+    seenIds.add(r.rider_id);
+    const isOnline = r.updated_at && (Date.now() - new Date(r.updated_at).getTime()) < RIDER_ONLINE_MS;
+    const color = isOnline ? '#27ae60' : '#9CA3AF';
+    const icon = L.divIcon({
+      className: '',
+      html: `<div style="width:30px;height:30px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:14px;">🛵</div>`,
+      iconSize: [30, 30], iconAnchor: [15, 15]
+    });
+
+    let marker = riderGpsMarkers[r.rider_id];
+    const popupHtml = `<b>${escapeAdminHtml(r.name || r.rider_id)}</b>${r.code ? ' (' + escapeAdminHtml(r.code) + ')' : ''}<br>` +
+      (isOnline ? '🟢 ออนไลน์' : '⚪ ออฟไลน์') +
+      (r.updated_at ? '<br>อัปเดต: ' + new Date(r.updated_at).toLocaleTimeString('th-TH') : '');
+
+    if (marker) {
+      marker.setLatLng([r.lat, r.lng]).setIcon(icon).setPopupContent(popupHtml);
+    } else {
+      marker = L.marker([r.lat, r.lng], { icon }).addTo(riderGpsMap).bindPopup(popupHtml);
+      riderGpsMarkers[r.rider_id] = marker;
+    }
+    bounds.push([r.lat, r.lng]);
+  });
+
+  // remove markers for riders no longer in the response
+  Object.keys(riderGpsMarkers).forEach(id => {
+    if (!seenIds.has(id)) {
+      riderGpsMap.removeLayer(riderGpsMarkers[id]);
+      delete riderGpsMarkers[id];
+    }
+  });
+
+  if (bounds.length && !renderRiderGpsMap._fitted) {
+    riderGpsMap.fitBounds(bounds, { padding: [40, 40] });
+    renderRiderGpsMap._fitted = true;
+  }
+}
+
+function renderRiderGpsList(riders) {
+  const wrap = document.getElementById('rider-gps-list');
+  if (!wrap) return;
+  if (!riders.length) {
+    wrap.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#aaa;padding:16px;">ยังไม่มีข้อมูลตำแหน่งไรเดอร์</div>`;
+    return;
+  }
+  wrap.innerHTML = riders.map(r => {
+    const isOnline = r.updated_at && (Date.now() - new Date(r.updated_at).getTime()) < RIDER_ONLINE_MS;
+    const ago = r.updated_at ? new Date(r.updated_at).toLocaleTimeString('th-TH') : '-';
+    return `<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+      <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;">
+        <div style="width:10px;height:10px;border-radius:50%;background:${isOnline ? '#27ae60' : '#9CA3AF'};"></div>
+        ${escapeAdminHtml(r.name || r.rider_id)}${r.code ? ' <span style="color:#999;font-weight:400;">(' + escapeAdminHtml(r.code) + ')</span>' : ''}
+      </div>
+      <div style="font-size:12px;color:#888;margin-top:4px;">${isOnline ? '🟢 ออนไลน์' : '⚪ ออฟไลน์'} · อัปเดต ${ago}</div>
+    </div>`;
+  }).join('');
 }
 
 // ═══════════════════════════════════════════
@@ -5349,6 +5668,13 @@ async function updateStatus(orderId, status, btnEl) {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
       }).catch(() => {});
+    }
+
+    if (status === 'shipped' && oldStatus !== 'shipped') {
+      fetch(RIDER_GAS_ENDPOINT, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'dispatchOrder', orderId })
+      }).catch(() => {}); // fire-and-forget — the 1-min poller is the safety net if this fails
     }
 
     const autoNotify = document.getElementById('autoNotifyToggle').checked;
