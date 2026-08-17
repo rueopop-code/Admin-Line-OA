@@ -159,6 +159,7 @@ header::after{
   box-shadow:0 10px 24px rgba(0,0,0,.35);z-index:60;flex-direction:column;overflow:hidden;
 }
 .nav-group.open .nav-group-menu{display:flex}
+.nav-group-menu.force-open{display:flex !important}
 .nav-group-menu .nav-tab{border-bottom:none;border-left:2.5px solid transparent;width:100%}
 .nav-group-menu .nav-tab.active{border-left-color:var(--gold);border-bottom-color:transparent}
 
@@ -1183,9 +1184,12 @@ thead tr th{position:relative}
   .pro-page-head .pro-head-sub{font-size:11.5px}
 
   /* tables: smaller text/padding, keep the horizontal-scroll pattern
-     that already exists — just make the scrolled content readable */
-  .orders-card, .pm-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
-  table{min-width:520px}
+     that already exists — just make the scrolled content readable.
+     !important because a same-specificity `table{...}` rule elsewhere
+     in this large file was winning by source order and squeezing
+     columns instead of letting them scroll. */
+  .orders-card, .pm-table-wrap, .pro-table-wrap{overflow-x:auto !important;-webkit-overflow-scrolling:touch}
+  table{min-width:520px !important}
   th, td{padding:7px 8px !important;font-size:12px !important}
 
   /* buttons/inputs inside cards go full-width and stack, easier to tap */
@@ -2863,10 +2867,12 @@ function showPage(n) {
   document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
   document.querySelector(`.nav-tab[data-page="${n}"]`).classList.add('active');
   document.querySelectorAll('.nav-group').forEach(g => {
-    const hasActive = !!g.querySelector('.nav-tab.active');
+    const menu = document.getElementById(g.id + 'Menu') || g.querySelector('.nav-group-menu');
+    const hasActive = !!(menu && menu.querySelector('.nav-tab.active'));
     g.classList.toggle('has-active', hasActive);
     g.classList.remove('open');
   });
+  document.querySelectorAll('.nav-group-menu.force-open').forEach(m => m.classList.remove('force-open'));
 
   // Trigger page-specific updates
   if (n === 2) renderCustomerDB();
@@ -2906,25 +2912,57 @@ function toggleNavGroup(groupId, evt) {
   const group = document.getElementById(groupId);
   const wasOpen = group.classList.contains('open');
   document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
+  document.querySelectorAll('.nav-group-menu.force-open').forEach(m => m.classList.remove('force-open'));
   if (!wasOpen) {
     group.classList.add('open');
-    positionNavGroupMenu(group);
+    const menu = ensureMenuPortal(group);
+    if (menu && window.innerWidth <= 900) {
+      menu.classList.add('force-open');
+      positionNavGroupMenu(group, menu);
+    }
   }
 }
-function positionNavGroupMenu(group) {
+function ensureMenuPortal(group) {
+  // .admin-nav is position:sticky, which creates its own stacking context —
+  // even position:fixed descendants stay trapped inside it and can render
+  // BEHIND later page content regardless of z-index. Moving the menu to be
+  // a direct child of <body> while open escapes that entirely. A comment
+  // node placeholder marks where to put it back for the desktop sidebar layout.
+  const menu = group.querySelector('.nav-group-menu') || document.getElementById(group.id + 'Menu');
+  if (!menu) return null;
+  if (window.innerWidth <= 900) {
+    if (!menu._navPlaceholder) {
+      const ph = document.createComment('nav-group-menu-slot');
+      menu.parentNode.insertBefore(ph, menu);
+      menu._navPlaceholder = ph;
+      menu.id = menu.id || (group.id + 'Menu');
+      document.body.appendChild(menu);
+    }
+  } else if (menu._navPlaceholder) {
+    menu._navPlaceholder.parentNode.insertBefore(menu, menu._navPlaceholder);
+    menu._navPlaceholder.remove();
+    menu._navPlaceholder = null;
+    menu.style.position = '';
+    menu.style.top = '';
+    menu.style.left = '';
+  }
+  return menu;
+}
+function positionNavGroupMenu(group, menu) {
   // fixed positioning (computed here, not via CSS top:100%) so the dropdown
   // escapes .admin-nav's overflow-x:auto clipping on narrow/mobile screens —
   // without this it was opening but invisible, clipped by the scroll container.
   // Only applies on the narrow top-bar layout; the wide sidebar layout (>900px)
   // already positions the submenu inline via CSS and must not be touched here.
   const toggle = group.querySelector('.nav-group-toggle');
-  const menu = group.querySelector('.nav-group-menu');
+  menu = menu || group.querySelector('.nav-group-menu');
   if (!toggle || !menu) return;
   if (window.innerWidth <= 900) {
     const rect = toggle.getBoundingClientRect();
     menu.style.position = 'fixed';
     menu.style.top = rect.bottom + 'px';
     menu.style.left = rect.left + 'px';
+    menu.style.zIndex = '9999';
   } else {
     menu.style.position = '';
     menu.style.top = '';
@@ -2933,13 +2971,16 @@ function positionNavGroupMenu(group) {
 }
 window.addEventListener('scroll', () => {
   document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
+  document.querySelectorAll('.nav-group-menu.force-open').forEach(m => m.classList.remove('force-open'));
 }, true);
 window.addEventListener('resize', () => {
   document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
+  document.querySelectorAll('.nav-group-menu.force-open').forEach(m => m.classList.remove('force-open'));
 });
 document.addEventListener('click', (e) => {
-  if (!e.target.closest('.nav-group')) {
+  if (!e.target.closest('.nav-group, .nav-group-menu')) {
     document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
+    document.querySelectorAll('.nav-group-menu.force-open').forEach(m => m.classList.remove('force-open'));
   }
 });
 
