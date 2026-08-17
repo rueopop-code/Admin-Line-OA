@@ -2859,8 +2859,37 @@ function toggleNavGroup(groupId, evt) {
   const group = document.getElementById(groupId);
   const wasOpen = group.classList.contains('open');
   document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
-  if (!wasOpen) group.classList.add('open');
+  if (!wasOpen) {
+    group.classList.add('open');
+    positionNavGroupMenu(group);
+  }
 }
+function positionNavGroupMenu(group) {
+  // fixed positioning (computed here, not via CSS top:100%) so the dropdown
+  // escapes .admin-nav's overflow-x:auto clipping on narrow/mobile screens —
+  // without this it was opening but invisible, clipped by the scroll container.
+  // Only applies on the narrow top-bar layout; the wide sidebar layout (>900px)
+  // already positions the submenu inline via CSS and must not be touched here.
+  const toggle = group.querySelector('.nav-group-toggle');
+  const menu = group.querySelector('.nav-group-menu');
+  if (!toggle || !menu) return;
+  if (window.innerWidth <= 900) {
+    const rect = toggle.getBoundingClientRect();
+    menu.style.position = 'fixed';
+    menu.style.top = rect.bottom + 'px';
+    menu.style.left = rect.left + 'px';
+  } else {
+    menu.style.position = '';
+    menu.style.top = '';
+    menu.style.left = '';
+  }
+}
+window.addEventListener('scroll', () => {
+  document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
+}, true);
+window.addEventListener('resize', () => {
+  document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
+});
 document.addEventListener('click', (e) => {
   if (!e.target.closest('.nav-group')) {
     document.querySelectorAll('.nav-group.open').forEach(g => g.classList.remove('open'));
