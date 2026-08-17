@@ -1163,6 +1163,53 @@ thead tr th{position:relative}
   header .admin-logo{display:none}
 }
 </style>
+
+<style id="mobile-fit-v1">
+/* ═══════════════════════════════════════════════════════════════
+   📱 MOBILE FIT v1 — additive-only pass for phone-width screens.
+   Doesn't touch desktop/tablet rules above; only kicks in ≤600px.
+   Covers: page headers, tables, forms/buttons, stat cards, the
+   new GPS map + rider dashboard table, and general spacing.
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 600px) {
+  /* page container: less side padding so more content fits */
+  .admin-page{padding:12px 8px 60px !important}
+
+  /* page headers: title/subtitle above, actions below, full width */
+  .pro-page-head{flex-direction:column;align-items:stretch;gap:10px;padding-bottom:12px;margin-bottom:14px}
+  .pro-head-actions{flex-direction:column;align-items:stretch}
+  .pro-head-actions > *{width:100%;justify-content:center}
+  .pro-page-head .page-title{font-size:17px}
+  .pro-page-head .pro-head-sub{font-size:11.5px}
+
+  /* tables: smaller text/padding, keep the horizontal-scroll pattern
+     that already exists — just make the scrolled content readable */
+  .orders-card, .pm-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:520px}
+  th, td{padding:7px 8px !important;font-size:12px !important}
+
+  /* buttons/inputs inside cards go full-width and stack, easier to tap */
+  .config-bar{flex-direction:column;align-items:stretch;gap:8px}
+  .config-field{width:100%}
+  .config-field input{width:100% !important;min-width:0 !important}
+  .load-btn, .btn-primary, .btn-secondary{width:100%;justify-content:center;padding:11px 14px}
+
+  /* stat cards: 2 per row, tighter padding so numbers don't crowd */
+  .stat-card{padding:12px 10px !important}
+  .stat-card .num, .stat-card .value{font-size:19px !important}
+
+  /* GPS ไรเดอร์ map: shorter on phones so the rider list isn't pushed
+     off-screen below the fold */
+  #rider-gps-map{height:280px !important}
+  #rider-gps-list{grid-template-columns:1fr !important}
+
+  /* งานปัจจุบัน (live jobs) table: same scroll treatment + smaller text */
+  #riderDashboardBody, #riderDashboardBody *{font-size:12px}
+
+  /* nav dropdown submenu items: bigger tap targets on touch screens */
+  .nav-group-menu .nav-tab{padding:13px 20px}
+}
+</style>
 </head>
 <body>
 
