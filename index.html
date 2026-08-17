@@ -3123,7 +3123,8 @@ function renderRiderGpsMap(riders) {
     if (r.lat == null || r.lng == null) return;
     seenIds.add(r.rider_id);
     const isOnline = r.updated_at && (Date.now() - new Date(r.updated_at).getTime()) < RIDER_ONLINE_MS;
-    const color = isOnline ? '#27ae60' : '#9CA3AF';
+    const isBusy = !!r.current_cust_name;
+    const color = !isOnline ? '#9CA3AF' : (isBusy ? '#e67e22' : '#27ae60');
     const icon = L.divIcon({
       className: '',
       html: `<div style="width:30px;height:30px;border-radius:50%;background:${color};border:3px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;font-size:14px;">🛵</div>`,
@@ -3131,9 +3132,13 @@ function renderRiderGpsMap(riders) {
     });
 
     let marker = riderGpsMarkers[r.rider_id];
+    const jobLine = r.current_cust_name
+      ? '<br>📦 กำลังนำส่ง: ' + escapeAdminHtml(r.current_cust_name) + ' (' + (riderJobStatusLabelTh(r.current_job_status)) + ')'
+      : '<br>🅿️ ว่าง ไม่มีงานตอนนี้';
     const popupHtml = `<b>${escapeAdminHtml(r.name || r.rider_id)}</b>${r.code ? ' (' + escapeAdminHtml(r.code) + ')' : ''}<br>` +
       (isOnline ? '🟢 ออนไลน์' : '⚪ ออฟไลน์') +
-      (r.updated_at ? '<br>อัปเดต: ' + new Date(r.updated_at).toLocaleTimeString('th-TH') : '');
+      (r.updated_at ? '<br>อัปเดต: ' + new Date(r.updated_at).toLocaleTimeString('th-TH') : '') +
+      jobLine;
 
     if (marker) {
       marker.setLatLng([r.lat, r.lng]).setIcon(icon).setPopupContent(popupHtml);
@@ -3167,15 +3172,26 @@ function renderRiderGpsList(riders) {
   }
   wrap.innerHTML = riders.map(r => {
     const isOnline = r.updated_at && (Date.now() - new Date(r.updated_at).getTime()) < RIDER_ONLINE_MS;
+    const isBusy = !!r.current_cust_name;
+    const dotColor = !isOnline ? '#9CA3AF' : (isBusy ? '#e67e22' : '#27ae60');
     const ago = r.updated_at ? new Date(r.updated_at).toLocaleTimeString('th-TH') : '-';
+    const jobLine = r.current_cust_name
+      ? `<div style="font-size:12px;color:#c0392b;margin-top:4px;">📦 กำลังนำส่ง: ${escapeAdminHtml(r.current_cust_name)} <span style="color:#999;">(${riderJobStatusLabelTh(r.current_job_status)})</span></div>`
+      : `<div style="font-size:12px;color:#999;margin-top:4px;">🅿️ ว่าง ไม่มีงานตอนนี้</div>`;
     return `<div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
       <div style="display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;">
-        <div style="width:10px;height:10px;border-radius:50%;background:${isOnline ? '#27ae60' : '#9CA3AF'};"></div>
+        <div style="width:10px;height:10px;border-radius:50%;background:${dotColor};"></div>
         ${escapeAdminHtml(r.name || r.rider_id)}${r.code ? ' <span style="color:#999;font-weight:400;">(' + escapeAdminHtml(r.code) + ')</span>' : ''}
       </div>
       <div style="font-size:12px;color:#888;margin-top:4px;">${isOnline ? '🟢 ออนไลน์' : '⚪ ออฟไลน์'} · อัปเดต ${ago}</div>
+      ${jobLine}
     </div>`;
   }).join('');
+}
+
+function riderJobStatusLabelTh(status) {
+  const map = { accepted: 'รับงานแล้ว', departed: 'กำลังเดินทาง', arrived: 'ถึงที่หมายแล้ว' };
+  return map[status] || status || '-';
 }
 
 // ═══════════════════════════════════════════
