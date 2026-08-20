@@ -6127,38 +6127,25 @@ async function updateStatus(orderId, status, btnEl) {
     const okRevert = confirm(`ออเดอร์นี้กำลังจัดส่งอยู่ — เปลี่ยนกลับเป็น "${STATUS_TH_CONFIRM2[status] || status}" จะยกเลิกงานที่ไรเดอร์ถืออยู่ทันที (ถ้าไรเดอร์ออกไปส่งแล้วจะถูกตัดงานกลางทาง)\n\nยืนยันหรือไม่?`);
     if (!okRevert) return;
   }
-  // Picking "กำลังจัดส่ง" now has two distinct meanings, both reached through
-  // this same dropdown option (no separate UI added) — a confirm() dialog
-  // is enough to tell them apart:
-  //   OK     → send to the rider queue. The order's status is deliberately
-  //            NOT set to "shipped" here — it only flips once a rider
-  //            actually accepts (Jobs.accept() does that on the backend),
-  //            so "shipped" genuinely means "a rider has it," not just
-  //            "sitting in an unclaimed queue."
-  //   Cancel → a manual/off-app delivery (overflow work, shop owner
-  //            delivering it themself, rider app down, etc.) — just a plain
-  //            status label change, same as any other status, no dispatch
-  //            and no rider-side notification.
-  if (status === 'shipped' && oldStatusForGuard !== 'shipped') {
-    const wantsRiderDispatch = confirm(
-      `ส่งออเดอร์นี้เข้าคิวไรเดอร์?\n\n` +
-      `OK = ส่งเข้าคิวไรเดอร์ (สถานะจะยังไม่ขึ้น "กำลังจัดส่ง" จนกว่าไรเดอร์จะกดรับงานเอง)\n` +
-      `ยกเลิก = ตั้งสถานะ "กำลังจัดส่ง" เอง ไม่ผ่านไรเดอร์ (เช่น ไปส่งเอง/มีงานซ้อน)`
+  // Picking "กำลังจัดส่ง" is now just a plain status label change, same as
+  // any other status — no confirm() dialog, no dispatch, no rider-side
+  // notification. Dispatch to the rider queue happens at the "ยืนยันแล้ว"
+  // (confirmed) step instead (see below) — "shipped" is only ever reached
+  // either by this manual picker OR automatically once a rider accepts the
+  // dispatched job (Jobs.accept() sets it on the backend).
+  //
+  // Asks intent up front, same UX pattern as the old "shipped" dialog: OK =
+  // dispatch to the rider queue, Cancel = just set the status, handle
+  // delivery outside the rider system. Only asked when actually transitioning
+  // INTO "confirmed" (not on a no-op re-save) — status itself still gets set
+  // to "confirmed" either way, this only controls the dispatch side-effect.
+  let wantsAutoDispatch = true;
+  if (status === 'confirmed' && oldStatusForGuard !== 'confirmed') {
+    wantsAutoDispatch = confirm(
+      `ยืนยันออเดอร์ #${orderId}?\n\n` +
+      `OK = ยืนยันออเดอร์ และส่งเข้าคิวไรเดอร์อัตโนมัติ (รอไรเดอร์กดรับงานเอง)\n` +
+      `ยกเลิก = ยืนยันออเดอร์เฉยๆ ไม่ส่งเข้าคิวไรเดอร์ตอนนี้ (เช่น ไปส่งเอง/มีงานซ้อน)`
     );
-    if (wantsRiderDispatch) {
-      fetch(RIDER_GAS_ENDPOINT, {
-        method: 'POST', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'dispatchOrder', orderId })
-      }).then(async r => {
-        const d = await r.json().catch(() => null);
-        if (d && d.ok) toast('📦 ส่งเข้าคิวไรเดอร์แล้ว รอไรเดอร์กดรับงาน', 'success');
-        else toast('ส่งเข้าคิวไรเดอร์ไม่สำเร็จ ลองใหม่อีกครั้ง', 'error');
-      }).catch(() => toast('ส่งเข้าคิวไรเดอร์ไม่สำเร็จ (เชื่อมต่อไม่ได้)', 'error'));
-      logActivity('🛵', `ส่งออเดอร์ #${orderId} เข้าคิวไรเดอร์`, 'รอไรเดอร์กดรับงาน — สถานะยังไม่เปลี่ยน');
-      return; // status intentionally left untouched — Jobs.accept() sets it to "shipped" once a rider actually takes it
-    }
-    // else: falls through to the normal manual status-update path below,
-    // same as any other status — no dispatch, no rider notification.
   }
   if (btnEl) btnEl.classList.add('sp-saving');
   try {
@@ -6180,26 +6167,54 @@ async function updateStatus(orderId, status, btnEl) {
       }).catch(() => {});
     }
 
-    // NOTE: dispatching to the rider queue no longer happens here — it's
-    // handled entirely by the confirm() branch earlier in this function
-    // (the "OK" choice on the shipped-intent dialog), which returns before
-    // ever reaching this point. Reaching this code with status === 'shipped'
-    // now always means the manual/off-app path (admin chose "Cancel" on
-    // that dialog) — deliberately does NOT dispatch, matching that path's
-    // whole purpose of bypassing the rider system entirely.
+    // Dispatching to the rider queue happens right after marking an order
+    // "confirmed" — gated on BOTH oldStatus !== 'confirmed' (so re-saving an
+    // already-"confirmed" order doesn't fire a duplicate rider job) AND
+    // wantsAutoDispatch (the admin's choice from the confirm() dialog above).
+    // The order's own status is set to "confirmed" regardless of that choice
+    // — "shipped" is reserved for once a rider actually accepts (Jobs.accept()
+    // sets that on the backend).
+    if (status === 'confirmed' && oldStatus !== 'confirmed' && wantsAutoDispatch) {
+      fetch(RIDER_GAS_ENDPOINT, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'dispatchOrder', orderId })
+      }).then(async r => {
+        const raw = await r.text();
+        let d = null;
+        try { d = JSON.parse(raw); } catch (parseErr) {
+          console.error('[dispatchOrder] non-JSON response', { httpStatus: r.status, raw });
+          toast(`ส่งเข้าคิวไรเดอร์ไม่สำเร็จ (เซิร์ฟเวอร์ตอบกลับไม่ใช่ JSON, HTTP ${r.status}) — ดู console`, 'error');
+          return;
+        }
+        if (d && d.ok) {
+          toast('📦 ส่งเข้าคิวไรเดอร์แล้ว รอไรเดอร์กดรับงาน', 'success');
+          logActivity('🛵', `ส่งออเดอร์ #${orderId} เข้าคิวไรเดอร์`, 'อัตโนมัติหลังยืนยันออเดอร์ — รอไรเดอร์กดรับงาน');
+        } else {
+          console.error('[dispatchOrder] backend returned failure', { httpStatus: r.status, body: d });
+          const reason = (d && (d.error || d.message)) || `ไม่ทราบสาเหตุ (HTTP ${r.status})`;
+          toast(`ส่งเข้าคิวไรเดอร์ไม่สำเร็จ: ${reason}`, 'error');
+        }
+      }).catch(err => {
+        console.error('[dispatchOrder] network/fetch error', err);
+        toast('ส่งเข้าคิวไรเดอร์ไม่สำเร็จ (เชื่อมต่อไม่ได้)', 'error');
+      });
+    }
 
     // Always fire this whenever status is set to anything OTHER than
-    // "shipped" — deliberately NOT gated on oldStatus === 'shipped' (unlike
-    // the warning popup above). Testing showed a rider job can exist for an
-    // order whose orders.status this browser never actually saw as
-    // "shipped" (e.g. the job was created/reset directly via SQL during
-    // testing, decoupled from the normal dispatch flow) — gating on that
-    // cached oldStatus meant the cleanup silently never fired for that
-    // order no matter how many times status was changed. cancelJobsForOrder
-    // is a safe no-op when there's nothing to cancel, so firing it
-    // unconditionally here costs nothing on the vast majority of ordinary
-    // status changes that never had a rider job at all.
-    if (status !== 'shipped' && oldStatus !== status) {
+    // "shipped" or "confirmed" — deliberately NOT gated on oldStatus being
+    // one of those (unlike the warning popup above). Testing showed a rider
+    // job can exist for an order whose orders.status this browser never
+    // actually saw as "shipped"/"confirmed" (e.g. the job was created/reset
+    // directly via SQL during testing, decoupled from the normal dispatch
+    // flow) — gating on that cached oldStatus meant the cleanup silently
+    // never fired for that order no matter how many times status was
+    // changed. cancelJobsForOrder is a safe no-op when there's nothing to
+    // cancel, so firing it unconditionally here costs nothing on the vast
+    // majority of ordinary status changes that never had a rider job at
+    // all. "confirmed" is excluded here too now, since that's the status
+    // that just triggered a brand-new dispatch above — cancelling it in the
+    // same breath would race the job we just created.
+    if (status !== 'shipped' && status !== 'confirmed' && oldStatus !== status) {
       fetch(RIDER_GAS_ENDPOINT, {
         method: 'POST', headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'cancelJobsForOrder', orderId, reason: 'order_status_set_to_' + status + '_from_admin' })
