@@ -1309,6 +1309,8 @@ thead tr th{position:relative}
     <div class="nav-group-menu">
       <button class="nav-tab" data-page="12" onclick="showPage(12)"><svg width="16" height="16"><use href="#ic-gps"/></svg><span>GPS ไรเดอร์</span></button>
       <button class="nav-tab" data-page="11" onclick="showPage(11)"><svg width="16" height="16"><use href="#ic-briefcase"/></svg><span>งานปัจจุบัน</span></button>
+      <button class="nav-tab" data-page="13" onclick="showPage(13)"><svg width="16" height="16"><use href="#ic-briefcase"/></svg><span>จัดการไรเดอร์</span></button>
+      <button class="nav-tab" data-page="14" onclick="showPage(14)"><svg width="16" height="16"><use href="#ic-package"/></svg><span>ประวัติการทำงาน</span></button>
     </div>
   </div>
 
@@ -2745,6 +2747,108 @@ thead tr th{position:relative}
   <div id="rider-gps-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;"></div>
 </div>
 
+<!-- PAGE 13: จัดการไรเดอร์ -->
+<div id="page-13" class="admin-page" style="display:none;">
+  <div class="pro-page-head">
+    <div class="pro-head-text">
+      <div class="page-title"><svg width="20" height="20"><use href="#ic-briefcase"/></svg>จัดการไรเดอร์</div>
+      <div class="pro-head-sub">รายชื่อไรเดอร์ทั้งหมด สถานะ และโควตางาน</div>
+    </div>
+    <div style="display:flex;gap:10px;">
+      <button onclick="openAddRiderModal()" class="btn-primary" style="background:#27ae60;">➕ เพิ่มไรเดอร์ใหม่</button>
+      <button onclick="loadRidersPage()" class="btn-primary">🔄 โหลดใหม่</button>
+    </div>
+  </div>
+
+  <div class="stats" id="rider-mgmt-stats" style="margin-bottom:16px;">
+    <div class="stat-card red"><div class="stat-num" id="rm-total">—</div><div class="stat-label">ไรเดอร์ทั้งหมด</div></div>
+    <div class="stat-card green"><div class="stat-num" id="rm-active">—</div><div class="stat-label">ใช้งานได้</div></div>
+    <div class="stat-card orange"><div class="stat-num" id="rm-suspended">—</div><div class="stat-label">ระงับ</div></div>
+  </div>
+
+  <div id="rider-mgmt-list" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+    <div style="text-align:center;padding:40px;color:var(--sub);grid-column:1/-1;">กด "โหลดใหม่" เพื่อดูรายชื่อไรเดอร์</div>
+  </div>
+
+  <!-- Add/Edit rider modal (shared) -->
+  <div id="edit-rider-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:4000;display:none;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:400px;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+        <h3 id="er-modal-title" style="font-size:15px;font-weight:700;">✏️ แก้ไขข้อมูลไรเดอร์</h3>
+        <button onclick="closeEditRider()" style="background:#f0f0f0;border:none;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer;">×</button>
+      </div>
+      <input type="hidden" id="er-id">
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">รหัสไรเดอร์</label>
+        <input type="text" id="er-code" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;font-weight:700;color:var(--red);">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">ชื่อ</label>
+        <input type="text" id="er-name" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">เบอร์โทร</label>
+        <input type="tel" id="er-phone" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;">
+      </div>
+      <div id="er-password-row" style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">รหัสผ่านชั่วคราว</label>
+        <input type="text" id="er-password" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;" placeholder="สำหรับไรเดอร์ใหม่เท่านั้น">
+      </div>
+      <div style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">โควตางาน (จำนวนออเดอร์รับพร้อมกันได้)</label>
+        <input type="number" id="er-maxjobs" min="1" value="1" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;">
+      </div>
+      <div id="er-status-row" style="margin-bottom:10px;">
+        <label style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:4px;">สถานะ</label>
+        <select id="er-status" style="width:100%;padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:14px;font-family:'Sarabun',sans-serif;outline:none;">
+          <option value="active">✅ ใช้งานได้</option>
+          <option value="suspended">❌ ระงับ</option>
+        </select>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:14px;">
+        <button onclick="closeEditRider()" style="flex:1;padding:10px;border-radius:8px;border:1px solid var(--border);background:#f5f5f5;font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;">ยกเลิก</button>
+        <button onclick="saveEditRider()" style="flex:1;padding:10px;border-radius:8px;border:none;background:var(--red);color:#fff;font-family:'Sarabun',sans-serif;font-size:13px;font-weight:700;cursor:pointer;">บันทึก</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 14: ประวัติการทำงานไรเดอร์ -->
+<div id="page-14" class="admin-page" style="display:none;">
+  <div class="pro-page-head">
+    <div class="pro-head-text">
+      <div class="page-title"><svg width="20" height="20"><use href="#ic-package"/></svg>ประวัติการทำงานไรเดอร์</div>
+      <div class="pro-head-sub">ประวัติออเดอร์ที่จัดส่งแล้ว พร้อมรูปพิสูจน์การส่งของ</div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <select id="rh-rider-filter" onchange="loadRiderHistoryPage()" style="padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;font-family:'Sarabun',sans-serif;">
+        <option value="">ไรเดอร์ทั้งหมด</option>
+      </select>
+      <select id="rh-status-filter" onchange="loadRiderHistoryPage()" style="padding:9px 12px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;font-family:'Sarabun',sans-serif;">
+        <option value="">ทุกสถานะ</option>
+        <option value="done">✅ สำเร็จ</option>
+        <option value="failed">⚠️ ไม่สำเร็จ</option>
+      </select>
+      <button onclick="loadRiderHistoryPage()" class="btn-primary">🔄 โหลดใหม่</button>
+    </div>
+  </div>
+
+  <div id="rider-history-list" style="display:flex;flex-direction:column;gap:10px;">
+    <div style="text-align:center;padding:40px;color:var(--sub);">กด "โหลดใหม่" เพื่อดูประวัติการทำงาน</div>
+  </div>
+
+  <!-- Detail modal — items + proof photo, same shape the rider app's own history detail shows -->
+  <div id="rh-detail-modal" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:4000;display:none;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:#fff;border-radius:16px;padding:24px;width:100%;max-width:460px;max-height:90vh;overflow-y:auto;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <h3 style="font-size:15px;font-weight:700;">รายละเอียดการจัดส่ง</h3>
+        <button onclick="closeRhDetail()" style="background:#f0f0f0;border:none;width:28px;height:28px;border-radius:50%;font-size:16px;cursor:pointer;">×</button>
+      </div>
+      <div id="rh-detail-body"></div>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -2883,6 +2987,8 @@ function showPage(n) {
   if (n === 10) renderProductManagement();
   if (n === 11) startRiderDashboardAutoRefresh();
   if (n === 12) startRiderGpsAutoRefresh();
+  if (n === 13) loadRidersPage();
+  if (n === 14) loadRiderHistoryPage();
   // ออกจากหน้า GPS แล้วหยุด auto-refresh (ประหยัดทรัพยากร) — กลับเข้ามาจะเริ่มใหม่เอง
   if (n !== 6 && typeof gpsInterval !== 'undefined' && gpsInterval) {
     clearInterval(gpsInterval);
@@ -3192,6 +3298,236 @@ function renderRiderGpsList(riders) {
 function riderJobStatusLabelTh(status) {
   const map = { accepted: 'รับงานแล้ว', departed: 'กำลังเดินทาง', arrived: 'ถึงที่หมายแล้ว' };
   return map[status] || status || '-';
+}
+
+// ═══════════════════════════════════════════
+//  PAGE 13: จัดการไรเดอร์
+// ═══════════════════════════════════════════
+let allRidersMgmt = [];
+
+async function gasCallRider(payload) {
+  const res = await fetch(RIDER_GAS_ENDPOINT, {
+    method: 'POST', headers: { 'Content-Type': 'text/plain' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+async function loadRidersPage() {
+  const wrap = document.getElementById('rider-mgmt-list');
+  wrap.innerHTML = '<div style="text-align:center;padding:40px;grid-column:1/-1;"><span class="spinner-sm"></span> กำลังโหลด...</div>';
+  try {
+    const data = await gasCallRider({ action: 'listRiders' });
+    allRidersMgmt = data.ok ? (data.data || []) : [];
+    renderRiderMgmtStats();
+    renderRiderMgmtList();
+  } catch (e) {
+    wrap.innerHTML = '<div style="text-align:center;padding:40px;color:#e74c3c;grid-column:1/-1;">โหลดไม่สำเร็จ: ' + e.message + '</div>';
+  }
+}
+
+function renderRiderMgmtStats() {
+  document.getElementById('rm-total').textContent = allRidersMgmt.length;
+  document.getElementById('rm-active').textContent = allRidersMgmt.filter(r => r.status === 'active').length;
+  document.getElementById('rm-suspended').textContent = allRidersMgmt.filter(r => r.status !== 'active').length;
+}
+
+function renderRiderMgmtList() {
+  const wrap = document.getElementById('rider-mgmt-list');
+  if (!allRidersMgmt.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--sub);grid-column:1/-1;">ยังไม่มีไรเดอร์ในระบบ</div>';
+    return;
+  }
+  wrap.innerHTML = allRidersMgmt.map(r => {
+    const isActive = r.status === 'active';
+    return `<div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:44px;height:44px;border-radius:50%;background:var(--red);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;overflow:hidden;flex-shrink:0;">
+          ${r.photo_url ? `<img src="${escapeAdminHtml(r.photo_url)}" style="width:100%;height:100%;object-fit:cover;">` : escapeAdminHtml((r.name || '?')[0])}
+        </div>
+        <div style="min-width:0;">
+          <div style="font-weight:700;font-size:14px;">${escapeAdminHtml(r.name || '-')} <span style="color:#999;font-weight:400;">(${escapeAdminHtml(r.code || '-')})</span></div>
+          <div style="font-size:12px;color:var(--sub);">${escapeAdminHtml(r.phone || 'ไม่ระบุเบอร์')}</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700;background:${isActive ? '#eafaf1' : '#fdecea'};color:${isActive ? '#1e8449' : '#c0392b'};">${isActive ? '✅ ใช้งานได้' : '❌ ระงับ'}</span>
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700;background:#f0f0f0;color:#555;">โควตา ${r.max_jobs || 1} งาน</span>
+      </div>
+      <button onclick='openEditRiderModal(${JSON.stringify(r).replace(/'/g, "&apos;")})' style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--border);background:#f8f8f8;font-family:'Sarabun',sans-serif;font-size:13px;cursor:pointer;">✏️ แก้ไข</button>
+    </div>`;
+  }).join('');
+}
+
+function openAddRiderModal() {
+  document.getElementById('er-modal-title').textContent = '➕ เพิ่มไรเดอร์ใหม่';
+  document.getElementById('er-id').value = '';
+  document.getElementById('er-code').value = '';
+  document.getElementById('er-name').value = '';
+  document.getElementById('er-phone').value = '';
+  document.getElementById('er-maxjobs').value = '1';
+  document.getElementById('er-password-row').style.display = '';
+  document.getElementById('er-password').value = '';
+  document.getElementById('er-status-row').style.display = 'none'; // new riders always start active
+  document.getElementById('edit-rider-modal').style.display = 'flex';
+}
+
+function openEditRiderModal(r) {
+  document.getElementById('er-modal-title').textContent = '✏️ แก้ไขข้อมูลไรเดอร์';
+  document.getElementById('er-id').value = r.id;
+  document.getElementById('er-code').value = r.code || '';
+  document.getElementById('er-name').value = r.name || '';
+  document.getElementById('er-phone').value = r.phone || '';
+  document.getElementById('er-maxjobs').value = r.max_jobs || 1;
+  document.getElementById('er-password-row').style.display = 'none'; // password changes aren't handled here
+  document.getElementById('er-status-row').style.display = '';
+  document.getElementById('er-status').value = r.status === 'active' ? 'active' : 'suspended';
+  document.getElementById('edit-rider-modal').style.display = 'flex';
+}
+
+function closeEditRider() {
+  document.getElementById('edit-rider-modal').style.display = 'none';
+}
+
+async function saveEditRider() {
+  const id = document.getElementById('er-id').value;
+  const code = document.getElementById('er-code').value.trim().toUpperCase();
+  const name = document.getElementById('er-name').value.trim();
+  const phone = document.getElementById('er-phone').value.trim();
+  const maxJobs = Number(document.getElementById('er-maxjobs').value) || 1;
+  if (!code || !name) { toast('กรุณากรอกรหัสไรเดอร์และชื่อ', 'error'); return; }
+
+  try {
+    let data;
+    if (id) {
+      const status = document.getElementById('er-status').value;
+      data = await gasCallRider({ action: 'updateRider', riderId: id, code, name, phone, maxJobs, status });
+    } else {
+      const tempPassword = document.getElementById('er-password').value.trim();
+      if (!tempPassword) { toast('กรุณาตั้งรหัสผ่านชั่วคราว', 'error'); return; }
+      data = await gasCallRider({ action: 'createRider', code, name, phone, maxJobs, tempPassword });
+    }
+    if (data.ok) {
+      toast('✅ บันทึกแล้ว');
+      closeEditRider();
+      loadRidersPage();
+    } else if (data.error === 'code_taken') {
+      toast('รหัสไรเดอร์นี้มีอยู่แล้ว ลองรหัสอื่น', 'error');
+    } else {
+      toast(data.error || 'บันทึกไม่สำเร็จ', 'error');
+    }
+  } catch (e) {
+    toast('Error: ' + e.message, 'error');
+  }
+}
+
+// ═══════════════════════════════════════════
+//  PAGE 14: ประวัติการทำงานไรเดอร์
+// ═══════════════════════════════════════════
+let riderHistoryRows = [];
+
+async function loadRiderHistoryPage() {
+  const wrap = document.getElementById('rider-history-list');
+  wrap.innerHTML = '<div style="text-align:center;padding:40px;"><span class="spinner-sm"></span> กำลังโหลด...</div>';
+  try {
+    // keep the rider filter dropdown populated from the same rider list used on page 13
+    if (!allRidersMgmt.length) {
+      const rdata = await gasCallRider({ action: 'listRiders' });
+      allRidersMgmt = rdata.ok ? (rdata.data || []) : [];
+    }
+    const sel = document.getElementById('rh-rider-filter');
+    if (sel.options.length <= 1) {
+      allRidersMgmt.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r.id; opt.textContent = `${r.name} (${r.code})`;
+        sel.appendChild(opt);
+      });
+    }
+
+    const riderId = document.getElementById('rh-rider-filter').value;
+    const status = document.getElementById('rh-status-filter').value;
+    const payload = { action: 'adminHistory', limit: 200 };
+    if (riderId) payload.riderId = riderId;
+    if (status) payload.status = status;
+
+    const data = await gasCallRider(payload);
+    riderHistoryRows = data.ok ? (data.data || []) : [];
+    renderRiderHistoryList();
+  } catch (e) {
+    wrap.innerHTML = '<div style="text-align:center;padding:40px;color:#e74c3c;">โหลดไม่สำเร็จ: ' + e.message + '</div>';
+  }
+}
+
+function renderRiderHistoryList() {
+  const wrap = document.getElementById('rider-history-list');
+  if (!riderHistoryRows.length) {
+    wrap.innerHTML = '<div style="text-align:center;padding:40px;color:var(--sub);">ไม่พบประวัติการทำงาน</div>';
+    return;
+  }
+  wrap.innerHTML = riderHistoryRows.map((r, i) => {
+    const isDone = r.status === 'done';
+    const dateStr = r.done_at ? new Date(r.done_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+    const thumb = r.proof_photo_url
+      ? `<img src="${escapeAdminHtml(r.proof_photo_url)}" style="width:56px;height:56px;border-radius:8px;object-fit:cover;flex-shrink:0;">`
+      : `<div style="width:56px;height:56px;border-radius:8px;background:#f0f0f0;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;">${isDone ? '📦' : '⚠️'}</div>`;
+    return `<div onclick="openRhDetail(${i})" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px;display:flex;gap:12px;align-items:center;cursor:pointer;">
+      ${thumb}
+      <div style="flex:1;min-width:0;">
+        <div style="font-weight:700;font-size:14px;">${escapeAdminHtml(r.cust_name || '-')} <span style="font-weight:400;color:#999;font-size:12px;">(${escapeAdminHtml(r.rider_code || '-')})</span></div>
+        <div style="font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeAdminHtml(r.cust_address || '')}</div>
+        <div style="font-size:11.5px;color:#999;margin-top:2px;">${dateStr}</div>
+      </div>
+      <div style="text-align:right;flex-shrink:0;">
+        <div style="font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700;background:${isDone ? '#eafaf1' : '#fdecea'};color:${isDone ? '#1e8449' : '#c0392b'};">${isDone ? '✅ สำเร็จ' : '⚠️ ไม่สำเร็จ'}</div>
+        ${r.cod_collected ? `<div style="font-size:13px;font-weight:700;margin-top:4px;">${Number(r.cod_collected).toLocaleString('th-TH')} บาท</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openRhDetail(i) {
+  const r = riderHistoryRows[i];
+  if (!r) return;
+  const isDone = r.status === 'done';
+  const dateStr = r.done_at ? new Date(r.done_at).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' }) : '-';
+  const itemsHtml = Array.isArray(r.items) && r.items.length
+    ? r.items.map(it => `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid #f0f0f0;">
+        ${it.img ? `<img src="${escapeAdminHtml(it.img)}" style="width:36px;height:36px;border-radius:6px;object-fit:cover;flex-shrink:0;">` : '<div style="width:36px;height:36px;border-radius:6px;background:#f0f0f0;flex-shrink:0;"></div>'}
+        <div style="flex:1;font-size:13px;">${escapeAdminHtml(it.name || '-')} <span style="color:#999;">x${it.qty || 1}</span></div>
+        <div style="font-size:13px;font-weight:700;">${Number(it.price || 0).toLocaleString('th-TH')} บาท</div>
+      </div>`).join('')
+    : '<div style="color:var(--sub);font-size:13px;padding:8px 0;">ไม่มีข้อมูลรายการสินค้า (ออเดอร์นี้ทำก่อนระบบเก็บรายการสินค้า)</div>';
+
+  document.getElementById('rh-detail-body').innerHTML = `
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;">ลูกค้า</div>
+      <div style="font-size:14px;font-weight:700;">${escapeAdminHtml(r.cust_name || '-')}</div>
+      <div style="font-size:12.5px;color:var(--sub);">${escapeAdminHtml(r.cust_address || '')}</div>
+      ${r.cust_phone ? `<a href="tel:${escapeAdminHtml(r.cust_phone)}" style="font-size:12.5px;color:var(--red);">📞 ${escapeAdminHtml(r.cust_phone)}</a>` : ''}
+    </div>
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;">ไรเดอร์ · วันเวลา</div>
+      <div style="font-size:13px;">${escapeAdminHtml(r.rider_code || '-')} · ${dateStr}</div>
+    </div>
+    ${!isDone ? `<div style="margin-bottom:12px;padding:10px;background:#fdecea;border-radius:8px;color:#c0392b;font-size:13px;">⚠️ ไม่สำเร็จ: ${escapeAdminHtml(r.fail_reason || 'ไม่ระบุเหตุผล')}</div>` : ''}
+    <div style="margin-bottom:12px;">
+      <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;margin-bottom:4px;">รายการสินค้า</div>
+      ${itemsHtml}
+    </div>
+    ${isDone ? `<div style="margin-bottom:12px;display:flex;gap:16px;">
+      <div><div style="font-size:11px;color:var(--sub);">ชำระโดย</div><div style="font-size:13px;font-weight:700;">${r.payment_method === 'transfer' ? 'โอน/สแกน' : 'เงินสด'}</div></div>
+      <div><div style="font-size:11px;color:var(--sub);">เก็บเงินได้</div><div style="font-size:13px;font-weight:700;">${Number(r.cod_collected || 0).toLocaleString('th-TH')} บาท</div></div>
+    </div>` : ''}
+    ${r.proof_photo_url ? `<div>
+      <div style="font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;margin-bottom:4px;">รูปพิสูจน์การส่งของ</div>
+      <img src="${escapeAdminHtml(r.proof_photo_url)}" style="width:100%;border-radius:10px;">
+    </div>` : ''}
+  `;
+  document.getElementById('rh-detail-modal').style.display = 'flex';
+}
+
+function closeRhDetail() {
+  document.getElementById('rh-detail-modal').style.display = 'none';
 }
 
 // ═══════════════════════════════════════════
