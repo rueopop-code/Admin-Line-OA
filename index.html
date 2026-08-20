@@ -6119,16 +6119,46 @@ async function updateStatus(orderId, status, btnEl) {
     const okCancel = confirm(`ยืนยันยกเลิกออเดอร์ #${orderId}?\n\nสถานะปัจจุบัน: ${STATUS_TH_CONFIRM[oldStatusForGuard] || oldStatusForGuard || '-'}`);
     if (!okCancel) return; // ปุ่มยังไม่ถูกเปลี่ยนหน้าตาเลย (ต่างจาก native select) จึงไม่ต้อง revert ค่าใดๆ
   }
-  // Catch the exact accidental-click scenario found in testing: reverting an
-  // order OFF "shipped" to an earlier status while a rider may already be
-  // holding the job for it. This doesn't block anything — updateStatus()
-  // already auto-cancels the rider job in this case — but a silent auto-
-  // cancel of a delivery someone may be mid-route on deserves a heads-up
-  // before it happens, not just cleanup after.
+  // Warn before reverting an order that was actually seen as "shipped" in
+  // this browser's own cache — a reasonable signal the rider is likely
+  // mid-delivery, worth a heads-up before silently pulling it back.
   if (oldStatusForGuard === 'shipped' && status !== 'shipped' && status !== 'cancelled') {
     const STATUS_TH_CONFIRM2 = { pending:'รอดำเนินการ', sent:'ส่ง LINE แล้ว', confirmed:'ยืนยันแล้ว', done:'เสร็จสิ้น' };
     const okRevert = confirm(`ออเดอร์นี้กำลังจัดส่งอยู่ — เปลี่ยนกลับเป็น "${STATUS_TH_CONFIRM2[status] || status}" จะยกเลิกงานที่ไรเดอร์ถืออยู่ทันที (ถ้าไรเดอร์ออกไปส่งแล้วจะถูกตัดงานกลางทาง)\n\nยืนยันหรือไม่?`);
     if (!okRevert) return;
+  }
+  // Picking "กำลังจัดส่ง" now has two distinct meanings, both reached through
+  // this same dropdown option (no separate UI added) — a confirm() dialog
+  // is enough to tell them apart:
+  //   OK     → send to the rider queue. The order's status is deliberately
+  //            NOT set to "shipped" here — it only flips once a rider
+  //            actually accepts (Jobs.accept() does that on the backend),
+  //            so "shipped" genuinely means "a rider has it," not just
+  //            "sitting in an unclaimed queue."
+  //   Cancel → a manual/off-app delivery (overflow work, shop owner
+  //            delivering it themself, rider app down, etc.) — just a plain
+  //            status label change, same as any other status, no dispatch
+  //            and no rider-side notification.
+  if (status === 'shipped' && oldStatusForGuard !== 'shipped') {
+    const wantsRiderDispatch = confirm(
+      `ส่งออเดอร์นี้เข้าคิวไรเดอร์?\n\n` +
+      `OK = ส่งเข้าคิวไรเดอร์ (สถานะจะยังไม่ขึ้น "กำลังจัดส่ง" จนกว่าไรเดอร์จะกดรับงานเอง)\n` +
+      `ยกเลิก = ตั้งสถานะ "กำลังจัดส่ง" เอง ไม่ผ่านไรเดอร์ (เช่น ไปส่งเอง/มีงานซ้อน)`
+    );
+    if (wantsRiderDispatch) {
+      fetch(RIDER_GAS_ENDPOINT, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'dispatchOrder', orderId })
+      }).then(async r => {
+        const d = await r.json().catch(() => null);
+        if (d && d.ok) toast('📦 ส่งเข้าคิวไรเดอร์แล้ว รอไรเดอร์กดรับงาน', 'success');
+        else toast('ส่งเข้าคิวไรเดอร์ไม่สำเร็จ ลองใหม่อีกครั้ง', 'error');
+      }).catch(() => toast('ส่งเข้าคิวไรเดอร์ไม่สำเร็จ (เชื่อมต่อไม่ได้)', 'error'));
+      logActivity('🛵', `ส่งออเดอร์ #${orderId} เข้าคิวไรเดอร์`, 'รอไรเดอร์กดรับงาน — สถานะยังไม่เปลี่ยน');
+      return; // status intentionally left untouched — Jobs.accept() sets it to "shipped" once a rider actually takes it
+    }
+    // else: falls through to the normal manual status-update path below,
+    // same as any other status — no dispatch, no rider notification.
   }
   if (btnEl) btnEl.classList.add('sp-saving');
   try {
@@ -6150,25 +6180,29 @@ async function updateStatus(orderId, status, btnEl) {
       }).catch(() => {});
     }
 
-    if (status === 'shipped' && oldStatus !== 'shipped') {
-      fetch(RIDER_GAS_ENDPOINT, {
-        method: 'POST', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'dispatchOrder', orderId })
-      }).catch(() => {}); // fire-and-forget — the 1-min poller is the safety net if this fails
-    }
+    // NOTE: dispatching to the rider queue no longer happens here — it's
+    // handled entirely by the confirm() branch earlier in this function
+    // (the "OK" choice on the shipped-intent dialog), which returns before
+    // ever reaching this point. Reaching this code with status === 'shipped'
+    // now always means the manual/off-app path (admin chose "Cancel" on
+    // that dialog) — deliberately does NOT dispatch, matching that path's
+    // whole purpose of bypassing the rider system entirely.
 
-    // If an order LEAVES "shipped" for any reason while a rider job is
-    // active — closing it out forward (done/cancelled) OR reverting it
-    // backward (confirmed/pending/sent, e.g. an accidental click) — any
-    // still-open rider_jobs row for it would otherwise orphan or keep
-    // sitting in the rider's active list showing stale/wrong information.
-    // Covering EVERY direction here, not just the forward-closing one,
-    // closes the exact gap found in testing: reverting shipped→confirmed
-    // left the rider still holding a job for an order admin had pulled back.
-    if (oldStatus === 'shipped' && status !== 'shipped') {
+    // Always fire this whenever status is set to anything OTHER than
+    // "shipped" — deliberately NOT gated on oldStatus === 'shipped' (unlike
+    // the warning popup above). Testing showed a rider job can exist for an
+    // order whose orders.status this browser never actually saw as
+    // "shipped" (e.g. the job was created/reset directly via SQL during
+    // testing, decoupled from the normal dispatch flow) — gating on that
+    // cached oldStatus meant the cleanup silently never fired for that
+    // order no matter how many times status was changed. cancelJobsForOrder
+    // is a safe no-op when there's nothing to cancel, so firing it
+    // unconditionally here costs nothing on the vast majority of ordinary
+    // status changes that never had a rider job at all.
+    if (status !== 'shipped' && oldStatus !== status) {
       fetch(RIDER_GAS_ENDPOINT, {
         method: 'POST', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'cancelJobsForOrder', orderId, reason: 'order_status_reverted_from_admin' })
+        body: JSON.stringify({ action: 'cancelJobsForOrder', orderId, reason: 'order_status_set_to_' + status + '_from_admin' })
       }).catch(() => {}); // fire-and-forget — poll()'s own cross-check is the backstop if this fails
     }
 
