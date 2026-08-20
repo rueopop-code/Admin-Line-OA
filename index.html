@@ -6146,6 +6146,18 @@ async function updateStatus(orderId, status, btnEl) {
       }).catch(() => {}); // fire-and-forget — the 1-min poller is the safety net if this fails
     }
 
+    // If admin closes the order out directly (done or cancelled) without
+    // going through the rider's own complete()/fail()/cancel() flow, any
+    // still-open rider_jobs row for it would otherwise orphan — the order
+    // says finished but the job keeps sitting in the rider's active list
+    // forever, needing a manual SQL cleanup every time. Close that loop here.
+    if ((status === 'done' || status === 'cancelled') && oldStatus !== status) {
+      fetch(RIDER_GAS_ENDPOINT, {
+        method: 'POST', headers: { 'Content-Type': 'text/plain' },
+        body: JSON.stringify({ action: 'cancelJobsForOrder', orderId, reason: 'order_closed_from_admin' })
+      }).catch(() => {}); // fire-and-forget — poll()'s own cross-check is the backstop if this fails
+    }
+
     const autoNotify = document.getElementById('autoNotifyToggle').checked;
     if (autoNotify && o && oldStatus !== status) {
       const tpls = getTemplates();
