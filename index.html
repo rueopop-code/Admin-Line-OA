@@ -2849,6 +2849,25 @@ thead tr th{position:relative}
   </div>
 </div>
 
+<!-- BRANDED CONFIRM MODAL — replaces native browser confirm() for the
+     rider-dispatch dialogs (and reusable anywhere else going forward) so
+     the popup actually matches the app's own red/gold styling instead of
+     the plain black OS-native confirm() box. -->
+<div id="brandConfirmOv" style="display:none;position:fixed;inset:0;background:rgba(40,10,8,0.55);z-index:20000;align-items:center;justify-content:center;backdrop-filter:blur(3px);padding:16px;">
+  <div style="background:var(--surface,#fff);border-radius:16px;width:100%;max-width:420px;box-shadow:0 20px 60px rgba(0,0,0,.35);overflow:hidden;font-family:'IBM Plex Sans Thai','Sarabun',sans-serif;">
+    <div id="bcHeader" style="background:linear-gradient(160deg,#3A0812,#6E1226 55%,#A81C34);padding:18px 22px;display:flex;align-items:center;gap:12px;">
+      <div id="bcIcon" style="width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0;">❓</div>
+      <div id="bcTitle" style="font-family:'Prompt',sans-serif;font-weight:700;font-size:15.5px;color:#fff;line-height:1.4;"></div>
+    </div>
+    <div id="bcMessage" style="padding:20px 22px;font-size:13.5px;line-height:1.85;color:var(--text,#201613);white-space:pre-line;"></div>
+    <div id="bcOptions" style="padding:0 22px 6px;display:flex;flex-direction:column;gap:8px;"></div>
+    <div style="padding:16px 22px 20px;display:flex;gap:10px;">
+      <button id="bcCancelBtn" onclick="_bcResolve(false)" style="flex:1;padding:11px;border-radius:10px;border:1.5px solid var(--border2,#ddd);background:var(--gray-50,#f7f7f7);color:var(--text-2,#3A3F47);font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;transition:background .15s;">ยกเลิก</button>
+      <button id="bcOkBtn" onclick="_bcResolve(true)" style="flex:1;padding:11px;border-radius:10px;border:none;background:linear-gradient(150deg,var(--red-700,#6E1226),var(--red-500,#C41E3A));color:#fff;font-family:inherit;font-size:13.5px;font-weight:700;cursor:pointer;box-shadow:0 6px 18px rgba(142,21,48,.28);transition:filter .15s;">ตกลง</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -6116,7 +6135,11 @@ async function updateStatus(orderId, status, btnEl) {
   const oldStatusForGuard = oForGuard ? oForGuard.status : null;
   if (status === 'cancelled' && oldStatusForGuard !== 'cancelled') {
     const STATUS_TH_CONFIRM = { pending:'รอดำเนินการ', sent:'ส่ง LINE แล้ว', confirmed:'ยืนยันแล้ว', shipped:'กำลังจัดส่ง', done:'เสร็จสิ้น' };
-    const okCancel = confirm(`ยืนยันยกเลิกออเดอร์ #${orderId}?\n\nสถานะปัจจุบัน: ${STATUS_TH_CONFIRM[oldStatusForGuard] || oldStatusForGuard || '-'}`);
+    const okCancel = await brandConfirm({
+      title: `ยืนยันยกเลิกออเดอร์ #${orderId}?`,
+      message: `สถานะปัจจุบัน: ${STATUS_TH_CONFIRM[oldStatusForGuard] || oldStatusForGuard || '-'}`,
+      icon: '🗑️', okText: 'ยืนยันยกเลิก', danger: true
+    });
     if (!okCancel) return; // ปุ่มยังไม่ถูกเปลี่ยนหน้าตาเลย (ต่างจาก native select) จึงไม่ต้อง revert ค่าใดๆ
   }
   // Warn before reverting an order that was actually seen as "shipped" in
@@ -6124,7 +6147,11 @@ async function updateStatus(orderId, status, btnEl) {
   // mid-delivery, worth a heads-up before silently pulling it back.
   if (oldStatusForGuard === 'shipped' && status !== 'shipped' && status !== 'cancelled') {
     const STATUS_TH_CONFIRM2 = { pending:'รอดำเนินการ', sent:'ส่ง LINE แล้ว', confirmed:'ยืนยันแล้ว', done:'เสร็จสิ้น' };
-    const okRevert = confirm(`ออเดอร์นี้กำลังจัดส่งอยู่ — เปลี่ยนกลับเป็น "${STATUS_TH_CONFIRM2[status] || status}" จะยกเลิกงานที่ไรเดอร์ถืออยู่ทันที (ถ้าไรเดอร์ออกไปส่งแล้วจะถูกตัดงานกลางทาง)\n\nยืนยันหรือไม่?`);
+    const okRevert = await brandConfirm({
+      title: 'ออเดอร์นี้กำลังจัดส่งอยู่',
+      message: `เปลี่ยนกลับเป็น "${STATUS_TH_CONFIRM2[status] || status}" จะยกเลิกงานที่ไรเดอร์ถืออยู่ทันที\n(ถ้าไรเดอร์ออกไปส่งแล้วจะถูกตัดงานกลางทาง)`,
+      icon: '⚠️', okText: 'ยืนยัน', danger: true
+    });
     if (!okRevert) return;
   }
   // Picking "ยืนยันแล้ว" can mean two things — a confirm() dialog is enough
@@ -6148,11 +6175,13 @@ async function updateStatus(orderId, status, btnEl) {
   //            change only, no dispatch.
   let alsoDispatchToRider = false;
   if (status === 'confirmed' && oldStatusForGuard !== 'confirmed') {
-    alsoDispatchToRider = confirm(
-      `ยืนยันออเดอร์ #${orderId} และส่งเข้าคิวไรเดอร์?\n\n` +
-      `OK = ยืนยันออเดอร์ปกติ + ส่งเข้าคิวไรเดอร์ให้ทันที\n` +
-      `ยกเลิก = ยืนยันออเดอร์ปกติเฉยๆ ไม่ผ่านไรเดอร์ (เช่น ไปส่งเอง/มีงานซ้อน)`
-    );
+    alsoDispatchToRider = await brandConfirm({
+      title: `ยืนยันออเดอร์ #${orderId}`,
+      message: 'ยืนยันออเดอร์นี้ตามปกติ พร้อมส่งเข้าคิวไรเดอร์ให้ไปส่งเลยไหม?',
+      icon: '🛵',
+      okText: '✅ ยืนยัน + ส่งไรเดอร์',
+      cancelText: 'ยืนยันเฉยๆ (ไม่ผ่านไรเดอร์)'
+    });
   }
   if (btnEl) btnEl.classList.add('sp-saving');
   try {
@@ -6232,9 +6261,11 @@ async function updateStatus(orderId, status, btnEl) {
         const STATUS_TH_NOTIFY = { pending:'รอดำเนินการ', sent:'ส่ง LINE แล้ว', confirmed:'ยืนยันแล้ว', shipped:'กำลังจัดส่ง', done:'เสร็จสิ้น', cancelled:'ยกเลิก' };
         const stLabel = STATUS_TH_NOTIFY[status] || status;
         const shouldSend = hasLine
-          ? confirm(`🔔 ส่งแจ้งเตือน "${stLabel}" ไปหาลูกค้าทาง LINE หรือไม่?
-
-👤 ${o.customer_name||'—'}`)
+          ? await brandConfirm({
+              title: `ส่งแจ้งเตือน "${stLabel}" ไปหาลูกค้าทาง LINE?`,
+              message: `👤 ${o.customer_name || '—'}`,
+              icon: '🔔', okText: 'ส่งเลย'
+            })
           : true; // ถ้าไม่มี LINE ก็บันทึก chat history ได้ตามปกติ (silent)
         if (shouldSend) {
           const text = fillTemplate(tpl, o);
@@ -7789,6 +7820,37 @@ function toast(msg, type = '', duration = 3000) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), duration);
 }
+
+// ── Branded confirm() replacement — matches the app's own red/gold
+// styling instead of the plain black OS-native confirm() box. Promise-
+// based so call sites just `await brandConfirm({...})` the same way
+// they used to call the synchronous native confirm(). ──
+let _bcResolveFn = null;
+function brandConfirm({ title, message, icon = '❓', okText = 'ตกลง', cancelText = 'ยกเลิก', danger = false }) {
+  return new Promise(resolve => {
+    document.getElementById('bcTitle').textContent = title || '';
+    document.getElementById('bcMessage').textContent = message || '';
+    document.getElementById('bcIcon').textContent = icon;
+    document.getElementById('bcOkBtn').textContent = okText;
+    document.getElementById('bcCancelBtn').textContent = cancelText;
+    document.getElementById('bcHeader').style.background = danger
+      ? 'linear-gradient(160deg,#5C0A0A,#8E1530 55%,#C0392B)'
+      : 'linear-gradient(160deg,#3A0812,#6E1226 55%,#A81C34)';
+    _bcResolveFn = resolve;
+    document.getElementById('brandConfirmOv').style.display = 'flex';
+  });
+}
+function _bcResolve(val) {
+  document.getElementById('brandConfirmOv').style.display = 'none';
+  if (_bcResolveFn) { _bcResolveFn(val); _bcResolveFn = null; }
+}
+// click-outside + Escape also count as "cancel", matching how native confirm() behaves
+document.getElementById('brandConfirmOv')?.addEventListener('click', e => {
+  if (e.target.id === 'brandConfirmOv') _bcResolve(false);
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('brandConfirmOv')?.style.display === 'flex') _bcResolve(false);
+});
 
 // ── ปุ่มกำลังประมวลผล: โชว์ไอคอนหมุน (จุดโคจรรอบศูนย์กลาง) แทนข้อความเดิม แล้วคืนค่าทีหลัง ──
 function setBtnBusy(btn, busy, busyLabel) {
