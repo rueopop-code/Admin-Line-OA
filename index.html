@@ -6127,26 +6127,58 @@ async function updateStatus(orderId, status, btnEl) {
     const okRevert = confirm(`ออเดอร์นี้กำลังจัดส่งอยู่ — เปลี่ยนกลับเป็น "${STATUS_TH_CONFIRM2[status] || status}" จะยกเลิกงานที่ไรเดอร์ถืออยู่ทันที (ถ้าไรเดอร์ออกไปส่งแล้วจะถูกตัดงานกลางทาง)\n\nยืนยันหรือไม่?`);
     if (!okRevert) return;
   }
-  // Picking "ยืนยันแล้ว" now has two distinct meanings, both reached through
-  // this same dropdown option (no separate UI added) — a confirm() dialog
-  // is enough to tell them apart (same UX pattern the old "shipped" picker
-  // used to use, before dispatch moved to this step):
-  //   OK     → send to the rider queue. The order's status is deliberately
-  //            NOT set to "confirmed" here — it stays whatever it already
-  //            was until a rider actually accepts (Jobs.accept() flips it
-  //            to "shipped" on the backend), so this stays consistent with
-  //            "shipped" always meaning "a rider has it."
+  // Picking "ยืนยันแล้ว" can mean two things — a confirm() dialog is enough
+  // to tell them apart without adding any new UI:
+  //   OK     → confirm the order AND send it to the rider queue. This now
+  //            goes through the exact same status-write path as any other
+  //            status change (see below) — so the customer still gets the
+  //            normal "ยืนยันแล้ว" notification exactly like before. The
+  //            only difference from a plain confirm is the extra dispatch
+  //            call fired alongside it. (Previously this branch skipped the
+  //            status write entirely to avoid showing "confirmed" before a
+  //            rider had it — that saved a state transition but silently
+  //            dropped the customer notification too, which wasn't wanted.
+  //            Simpler and more robust to just let status update normally:
+  //            Jobs.accept() already overwrites it to "shipped" the moment
+  //            a rider actually takes the job, so there's no real harm in
+  //            the order sitting at "confirmed" for the short gap between
+  //            dispatch and accept — if anything it's more accurate.)
   //   Cancel → a manual/off-app delivery (overflow work, shop owner
-  //            delivering it themself, rider app down, etc.) — just a plain
-  //            status label change, same as any other status, no dispatch
-  //            and no rider-side notification.
+  //            delivering it themself, rider app down, etc.) — plain status
+  //            change only, no dispatch.
+  let alsoDispatchToRider = false;
   if (status === 'confirmed' && oldStatusForGuard !== 'confirmed') {
-    const wantsRiderDispatch = confirm(
+    alsoDispatchToRider = confirm(
       `ยืนยันออเดอร์ #${orderId} และส่งเข้าคิวไรเดอร์?\n\n` +
-      `OK = ส่งเข้าคิวไรเดอร์ (สถานะจะยังไม่ขึ้น "ยืนยันแล้ว" จนกว่าไรเดอร์จะกดรับงานเอง)\n` +
-      `ยกเลิก = ตั้งสถานะ "ยืนยันแล้ว" เอง ไม่ผ่านไรเดอร์ (เช่น ไปส่งเอง/มีงานซ้อน)`
+      `OK = ยืนยันออเดอร์ปกติ + ส่งเข้าคิวไรเดอร์ให้ทันที\n` +
+      `ยกเลิก = ยืนยันออเดอร์ปกติเฉยๆ ไม่ผ่านไรเดอร์ (เช่น ไปส่งเอง/มีงานซ้อน)`
     );
-    if (wantsRiderDispatch) {
+  }
+  if (btnEl) btnEl.classList.add('sp-saving');
+  try {
+    const o = allOrders.find(x => x.order_id === orderId);
+    const oldStatus = o ? o.status : null;
+    const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
+    if (error) throw error;
+    if (o) o.status = status;
+    if (btnEl) paintStatusBtn(btnEl, status);
+    renderStats(allOrders);
+    toast('อัปเดตสถานะแล้ว ✓', 'success');
+    logActivity('🔄', `เปลี่ยนสถานะออเดอร์ #${orderId}`, `${statusLabelTh(oldStatus)} → ${statusLabelTh(status)}`);
+
+    const bu = getBackendUrl();
+    if (bu && oldStatus !== status) {
+      fetch(`${bu}/orders/${orderId}/status`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      }).catch(() => {});
+    }
+
+    // Dispatch to the rider queue if that was the chosen intent on the
+    // confirm() dialog above — fires alongside (not instead of) the normal
+    // status write/notification that just happened, so the customer still
+    // gets the standard "ยืนยันแล้ว" message either way.
+    if (alsoDispatchToRider) {
       fetch(RIDER_GAS_ENDPOINT, {
         method: 'POST', headers: { 'Content-Type': 'text/plain' },
         body: JSON.stringify({ action: 'dispatchOrder', orderId })
@@ -6169,39 +6201,8 @@ async function updateStatus(orderId, status, btnEl) {
         console.error('[dispatchOrder] network/fetch error', err);
         toast('ส่งเข้าคิวไรเดอร์ไม่สำเร็จ (เชื่อมต่อไม่ได้)', 'error');
       });
-      logActivity('🛵', `ส่งออเดอร์ #${orderId} เข้าคิวไรเดอร์`, 'รอไรเดอร์กดรับงาน — สถานะยังไม่เปลี่ยน');
-      return; // status intentionally left untouched — Jobs.accept() sets it to "shipped" once a rider actually takes it
+      logActivity('🛵', `ส่งออเดอร์ #${orderId} เข้าคิวไรเดอร์`, 'พร้อมยืนยันออเดอร์ตามปกติ');
     }
-    // else: falls through to the normal manual status-update path below,
-    // same as any other status — no dispatch, no rider notification.
-  }
-  if (btnEl) btnEl.classList.add('sp-saving');
-  try {
-    const o = allOrders.find(x => x.order_id === orderId);
-    const oldStatus = o ? o.status : null;
-    const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
-    if (error) throw error;
-    if (o) o.status = status;
-    if (btnEl) paintStatusBtn(btnEl, status);
-    renderStats(allOrders);
-    toast('อัปเดตสถานะแล้ว ✓', 'success');
-    logActivity('🔄', `เปลี่ยนสถานะออเดอร์ #${orderId}`, `${statusLabelTh(oldStatus)} → ${statusLabelTh(status)}`);
-
-    const bu = getBackendUrl();
-    if (bu && oldStatus !== status) {
-      fetch(`${bu}/orders/${orderId}/status`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      }).catch(() => {});
-    }
-
-    // NOTE: dispatching to the rider queue no longer happens here — it's
-    // handled entirely by the confirm() branch earlier in this function
-    // (the "OK" choice on the confirmed-intent dialog), which returns before
-    // ever reaching this point. Reaching this code with status === 'confirmed'
-    // now always means the manual/off-app path (admin chose "Cancel" on
-    // that dialog) — deliberately does NOT dispatch, matching that path's
-    // whole purpose of bypassing the rider system entirely.
 
     // Always fire this whenever status is set to anything OTHER than
     // "confirmed" — deliberately NOT gated on oldStatus === 'confirmed'
