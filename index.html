@@ -2966,6 +2966,22 @@ let realtimeChannel = null;
 
 // Monshin Rider (GAS backend) — same exec URL the rider app itself calls
 const RIDER_GAS_ENDPOINT = 'https://script.google.com/macros/s/AKfycbyevPmMs9FV72XrEOep5cshnQUBZ0vWZFqr0DW4N7XKJNC47PIQuF6XefX2FICCa6ig/exec';
+// 🔒 SECURITY: this GAS Web App has NO auth of its own on admin-tier actions
+// (listRiders/createRider/updateRider/adminHistory/liveDashboard/riderLocations/
+// dispatchOrder/cancelJobsForOrder/codSummary/etc.) — anyone who finds this exec
+// URL (it's plainly visible in this page's source, same as it is in the rider
+// app's own source) could call any of them directly with curl/Postman: read COD
+// revenue and live rider GPS, suspend real riders, create fake rider accounts,
+// cancel any active delivery. Code.gs's doPost() now checks this key against a
+// RIDER_API_KEY Script Property before routing any of those actions — set that
+// property in the Apps Script project (Project Settings → Script Properties) to
+// the SAME value as below, or every admin-tier call in this page will start
+// failing with "unauthorized". This is a real key embedded in page source, same
+// caveat as the rider app's own client-only login — it raises the bar against
+// casual/opportunistic misuse of the raw endpoint, not a determined attacker
+// willing to read this page's JS; a proper fix would need real per-admin session
+// tokens like the storefront backend's own requirePerm() already does.
+const RIDER_API_KEY = 'gebYkhs0cZk67Kb2oa3sAg0NL39_pHor';
 let recentlyAddedIds = new Set();
 
 // New state
@@ -3131,7 +3147,7 @@ async function loadRiderDashboard() {
   try {
     const res = await fetch(RIDER_GAS_ENDPOINT, {
       method: 'POST', headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'liveDashboard' })
+      body: JSON.stringify({ action: 'liveDashboard', apiKey: RIDER_API_KEY })
     });
     const json = await res.json();
     if (!json.ok) throw new Error(json.error || 'unknown_error');
@@ -3210,7 +3226,7 @@ async function loadRiderGps() {
   try {
     const res = await fetch(RIDER_GAS_ENDPOINT, {
       method: 'POST', headers: { 'Content-Type': 'text/plain' },
-      body: JSON.stringify({ action: 'riderLocations' })
+      body: JSON.stringify({ action: 'riderLocations', apiKey: RIDER_API_KEY })
     });
     const json = await res.json();
     if (!json.ok) throw new Error(json.error || 'unknown_error');
@@ -3327,7 +3343,7 @@ let allRidersMgmt = [];
 async function gasCallRider(payload) {
   const res = await fetch(RIDER_GAS_ENDPOINT, {
     method: 'POST', headers: { 'Content-Type': 'text/plain' },
-    body: JSON.stringify(payload)
+    body: JSON.stringify(Object.assign({ apiKey: RIDER_API_KEY }, payload))
   });
   return res.json();
 }
@@ -6210,7 +6226,7 @@ async function updateStatus(orderId, status, btnEl) {
     if (alsoDispatchToRider) {
       fetch(RIDER_GAS_ENDPOINT, {
         method: 'POST', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'dispatchOrder', orderId })
+        body: JSON.stringify({ action: 'dispatchOrder', orderId, apiKey: RIDER_API_KEY })
       }).then(async r => {
         const raw = await r.text();
         let d = null;
@@ -6247,7 +6263,7 @@ async function updateStatus(orderId, status, btnEl) {
     if (status !== 'confirmed' && oldStatus !== status) {
       fetch(RIDER_GAS_ENDPOINT, {
         method: 'POST', headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'cancelJobsForOrder', orderId, reason: 'order_status_set_to_' + status + '_from_admin' })
+        body: JSON.stringify({ action: 'cancelJobsForOrder', orderId, reason: 'order_status_set_to_' + status + '_from_admin', apiKey: RIDER_API_KEY })
       }).catch(() => {}); // fire-and-forget — poll()'s own cross-check is the backstop if this fails
     }
 
