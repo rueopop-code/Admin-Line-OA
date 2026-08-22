@@ -5703,8 +5703,7 @@ async function saveEnhancedEdit() {
   };
 
   try {
-    const { error } = await sb.from('orders').update(update).eq('order_id', eeEditingOrderId);
-    if (error) throw error;
+    await adminUpdateOrder(eeEditingOrderId, update);
     const savedEeOrderId = eeEditingOrderId;
 
     // Update local state
@@ -5757,13 +5756,13 @@ async function adjustStock(originalItems, newItems) {
             const currentStock = parseInt(arr[si].stock) || 0;
             const newStock = Math.max(0, currentStock + d.change);
             arr[si] = { ...arr[si], stock: newStock };
-            const { error } = await sb.from(currentProductsTable || 'products').update({ sizes: arr }).eq('id', prod.id);
-            if (!error) {
+            const updatedProd = await adminUpdateProduct(currentProductsTable || 'products', prod.id, { sizes: arr });
+            if (updatedProd) {
               prod.sizes = arr; // sync cache ในหน่วยความจำ กันหน้าต่างที่เปิดค้างอ่านค่าเก่าก่อน reload เสร็จ
               _emSizesCache[prod.name] = arr;
               handledAtSizeLevel = true;
             } else {
-              console.warn(`Stock adjust (ต่อไซซ์) ไม่สำเร็จสำหรับ "${d.name}":`, error.message || error);
+              console.warn(`Stock adjust (ต่อไซซ์) ไม่สำเร็จสำหรับ "${d.name}"`);
             }
           }
         }
@@ -5782,11 +5781,11 @@ async function adjustStock(originalItems, newItems) {
     const newStock = Math.max(0, currentStock + d.change);
 
     try {
-      const { error } = await sb.from(currentProductsTable || 'products').update({ [stockField]: newStock }).eq('id', prod.id);
-      if (!error) {
+      const updatedProd = await adminUpdateProduct(currentProductsTable || 'products', prod.id, { [stockField]: newStock });
+      if (updatedProd) {
         prod[stockField] = newStock; // update local cache
       } else {
-        console.warn(`Stock adjust (ระดับสินค้า) ไม่สำเร็จสำหรับ "${d.name}":`, error.message || error);
+        console.warn(`Stock adjust (ระดับสินค้า) ไม่สำเร็จสำหรับ "${d.name}"`);
       }
     } catch(e) {
       console.warn(`Stock adjust failed for ${d.name}:`, e);
@@ -6203,21 +6202,30 @@ async function updateStatus(orderId, status, btnEl) {
   try {
     const o = allOrders.find(x => x.order_id === orderId);
     const oldStatus = o ? o.status : null;
-    const { error } = await sb.from('orders').update({ status }).eq('order_id', orderId);
-    if (error) throw error;
+    // 🔒 was `sb.from('orders').update({status})` (anon key, no admin check)
+    // running ALONGSIDE this exact same backend call as a fire-and-forget
+    // afterthought — genuinely redundant, since this route already does the
+    // write (via the service-role key, with a real requirePerm('orders')
+    // check) plus the system-message log and customer LINE notification
+    // that a status change should always carry. Now the only write; awaited
+    // directly instead of fired-and-forgotten, so a failure here is one
+    // this function actually finds out about instead of silently having
+    // already "succeeded" via the old direct write regardless.
+    const bu = getBackendUrl();
+    if (!bu) throw new Error('ยังไม่ได้ตั้งค่า Backend URL');
+    if (oldStatus !== status) {
+      const statusRes = await fetch(`${bu}/orders/${orderId}/status`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      const statusBody = await statusRes.json().catch(() => ({}));
+      if (!statusRes.ok) throw new Error(statusBody.error || `อัปเดตสถานะไม่สำเร็จ (HTTP ${statusRes.status})`);
+    }
     if (o) o.status = status;
     if (btnEl) paintStatusBtn(btnEl, status);
     renderStats(allOrders);
     toast('อัปเดตสถานะแล้ว ✓', 'success');
     logActivity('🔄', `เปลี่ยนสถานะออเดอร์ #${orderId}`, `${statusLabelTh(oldStatus)} → ${statusLabelTh(status)}`);
-
-    const bu = getBackendUrl();
-    if (bu && oldStatus !== status) {
-      fetch(`${bu}/orders/${orderId}/status`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status })
-      }).catch(() => {});
-    }
 
     // Dispatch to the rider queue if that was the chosen intent on the
     // confirm() dialog above — fires alongside (not instead of) the normal
@@ -6304,8 +6312,7 @@ async function deleteOrder(orderId) {
   if (!confirm(`ลบออเดอร์ #${orderId}?`)) return;
   if (!sb) return;
   try {
-    const { error } = await sb.from('orders').delete().eq('order_id', orderId);
-    if (error) throw error;
+    await adminDeleteOrder(orderId);
     allOrders = allOrders.filter(o => o.order_id !== orderId);
     renderOrders(allOrders);
     renderStats(allOrders);
@@ -6656,11 +6663,10 @@ async function applyQuickPayment(orderId, method) {
   if (!sb) return;
   const label = method === 'cod' ? '🏍️ ปลายทาง' : method === 'transfer' ? '📲 โอน/QR' : null;
   try {
-    const { error } = await sb.from('orders').update({
+    await adminUpdateOrder(orderId, {
       payment_method: method || null,
       payment_label:  label,
-    }).eq('order_id', orderId);
-    if (error) throw error;
+    });
     const o = allOrders.find(x => x.order_id === orderId);
     if (o) { o.payment_method = method || null; o.payment_label = label; }
     renderOrders(allOrders);
@@ -6838,12 +6844,11 @@ async function autoLinkAllOrders() {
     if (!ghost.phone && real.phone) ghostUpdates.phone = real.phone;
 
     try {
-      const { error } = await sb.from('orders').update(updates).eq('order_id', real.order_id);
-      if (error) throw error;
+      await adminUpdateOrder(real.order_id, updates);
       Object.assign(real, updates);
       // อัปเดต ghost ด้วยถ้ามีข้อมูลเพิ่ม
       if (Object.keys(ghostUpdates).length) {
-        await sb.from('orders').update(ghostUpdates).eq('order_id', ghost.order_id).then(() => {
+        adminUpdateOrder(ghost.order_id, ghostUpdates).then(() => {
           Object.assign(ghost, ghostUpdates);
         }).catch(() => {});
       }
@@ -7111,8 +7116,8 @@ async function saveMergeOrders() {
         const srcUpdates = { line_user_id: target.line_user_id };
         if (target.line_name && !src.line_name) srcUpdates.line_name = target.line_name;
         try {
-          const { error: srcErr } = await sb.from('orders').update(srcUpdates).eq('order_id', src.order_id);
-          if (!srcErr) Object.assign(src, srcUpdates);
+          await adminUpdateOrder(src.order_id, srcUpdates);
+          Object.assign(src, srcUpdates);
         } catch(e) {}
       }
     } else {
@@ -7126,8 +7131,7 @@ async function saveMergeOrders() {
     if (Object.keys(updates).length === 0) { successCount++; continue; }
 
     try {
-      const { error } = await sb.from('orders').update(updates).eq('order_id', targetId);
-      if (error) throw error;
+      await adminUpdateOrder(targetId, updates);
       Object.assign(target, updates);
       successCount++;
     } catch(e) {
@@ -7204,8 +7208,7 @@ async function saveLinkGhost() {
     const updates = {};
     if (name)  updates.customer_name = name;
     if (phone) updates.phone = phone;
-    const { error: updErr } = await sb.from('orders').update(updates).eq('order_id', currentLinkGhostId);
-    if (updErr) throw updErr;
+    await adminUpdateOrder(currentLinkGhostId, updates);
     const backendUrl = (document.getElementById('backend-url')?.value || '').replace(/\/+$/, '');
     if (backendUrl) {
       try { await fetch(`${backendUrl}/backfill-line-links`, { method: 'POST' }); } catch(e) {}
@@ -7267,13 +7270,22 @@ async function sendMessage(order, text, opts = {}) {
   const silent = opts.silent || false;
   if (!text || !text.trim()) return false;
   let dbOk = false;
-  if (sb) {
+  // 🔒 was `sb.from('messages').insert(...)` (anon key, no admin check) —
+  // the backend's own /messages POST route already has real
+  // admin-vs-customer sender verification built in (checks x-admin-key /
+  // bearer token before allowing sender !== 'customer'), so this just calls
+  // that instead of writing directly.
+  const bu = getBackendUrl();
+  if (bu) {
     try {
-      const { error } = await sb.from('messages').insert({
-        order_id: order.order_id, customer_id: order.customer_id||null,
-        sender: kind, text, created_at: new Date().toISOString()
+      const res = await fetch(`${bu}/messages`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: order.order_id, customer_id: order.customer_id || null,
+          sender: kind, text
+        })
       });
-      if (!error) dbOk = true;
+      dbOk = res.ok;
     } catch(e) {}
   }
   if (!silent) {
@@ -7564,6 +7576,50 @@ let _editingCouponId = null;
 function getBackendUrl() { return (document.getElementById('backend-url')?.value||'').replace(/\/+$/,''); }
 function getAdminApiKey() { return (document.getElementById('admin-api-key')?.value || localStorage.getItem('admin_api_key') || '').trim(); }
 
+// 🔒 SECURITY: these two replace direct `sb.from('orders').update/delete(...)`
+// calls (which write via the anon key, with zero admin-login check on
+// Supabase's side — see the RLS audit notes on the backend's new
+// /admin/orders/:orderId/fields route for the full story). Every direct
+// write site in this file was moved to go through one of these two instead,
+// so the x-admin-key injector below actually gets a chance to prove this
+// caller is a logged-in admin before anything changes. Throws on failure —
+// callers keep their existing try/catch around the old sb.from(...) call.
+async function adminUpdateOrder(orderId, updates) {
+  const bu = getBackendUrl();
+  if (!bu) throw new Error('ยังไม่ได้ตั้งค่า Backend URL');
+  const res = await fetch(`${bu}/admin/orders/${orderId}/fields`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ updates })
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `แก้ไขออเดอร์ไม่สำเร็จ (HTTP ${res.status})`);
+  return body.order;
+}
+async function adminDeleteOrder(orderId) {
+  const bu = getBackendUrl();
+  if (!bu) throw new Error('ยังไม่ได้ตั้งค่า Backend URL');
+  const res = await fetch(`${bu}/admin/orders/${orderId}`, { method: 'DELETE' });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(body.error || `ลบออเดอร์ไม่สำเร็จ (HTTP ${res.status})`);
+}
+// same reasoning as adminUpdateOrder above, for the `products`/`menu_items`
+// tables' own "allow all anon" RLS gap. Returns null on failure instead of
+// throwing, matching how both call sites already handled a Supabase error
+// (log + skip, not abort the whole stock-adjust loop).
+async function adminUpdateProduct(table, id, updates) {
+  const bu = getBackendUrl();
+  if (!bu) return null;
+  try {
+    const res = await fetch(`${bu}/admin/products/${id}/fields`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ table, updates })
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) { console.warn('adminUpdateProduct failed:', body.error); return null; }
+    return body.product;
+  } catch (e) { console.warn('adminUpdateProduct failed:', e.message); return null; }
+}
+
 // 🔐 แนบ x-admin-key อัตโนมัติทุก request ที่ยิงไป backend (คูปอง/ยืนยันจ่าย/แจ้งสถานะ ฯลฯ)
 (function installAdminKeyInjector() {
   const _origFetch = window.fetch.bind(window);
@@ -7815,8 +7871,7 @@ async function resetOrderSalesCode(orderId) {
     const updates = { sales_id: null };
     // ref_code ที่เป็นรหัสเซล (S ตามด้วยตัวเลข) ล้างด้วย / ถ้าเป็น REF ชวนเพื่อน เก็บไว้
     if (/^S\d+$/i.test(o.ref_code || '')) updates.ref_code = null;
-    const { error } = await sb.from('orders').update(updates).eq('order_id', orderId);
-    if (error) throw error;
+    await adminUpdateOrder(orderId, updates);
     o.sales_id = null;
     if (updates.ref_code === null) o.ref_code = null;
     renderOrders(allOrders);
@@ -9055,12 +9110,13 @@ async function submitGpsAddPin() {
 
     if (_gapEditId) {
       // ── โหมดแก้ไขหมุดเดิม ──
-      const res = await fetch(`${SB_URL_SALES}/rest/v1/sales_pins?id=eq.${_gapEditId}`, {
-        method: 'PATCH',
-        headers: {
-          'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES,
-          'Content-Type': 'application/json', 'Prefer': 'return=minimal'
-        },
+      // 🔒 was a raw PATCH to Supabase's REST API using the anon key
+      // directly — now goes through the admin-gated backend endpoint
+      // instead (see /admin/sales-pins/:id in index.js)
+      const bu = getBackendUrl();
+      if (!bu) throw new Error('ยังไม่ได้ตั้งค่า Backend URL');
+      const res = await fetch(`${bu}/admin/sales-pins/${_gapEditId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sales_id: sid, name, phone, address: addr || null,
           province: province || null, district: district || null, subdistrict: subdistrict || null,
@@ -9079,12 +9135,11 @@ async function submitGpsAddPin() {
       toast('✅ แก้ไขข้อมูลลูกค้าแล้ว', 'success');
     } else {
       // ── โหมดปักหมุดใหม่ ──
-      const res = await fetch(`${SB_URL_SALES}/rest/v1/sales_pins`, {
-        method: 'POST',
-        headers: {
-          'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES,
-          'Content-Type': 'application/json', 'Prefer': 'return=representation'
-        },
+      // 🔒 same fix as the edit branch above — now goes through the backend
+      const bu2 = getBackendUrl();
+      if (!bu2) throw new Error('ยังไม่ได้ตั้งค่า Backend URL');
+      const res = await fetch(`${bu2}/admin/sales-pins`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sales_id: sid, name, phone, address: addr || null,
           province: province || null, district: district || null, subdistrict: subdistrict || null,
@@ -9135,10 +9190,10 @@ function _refreshAfterPinChange(affectedSalesIds) {
 async function deleteGpsPin(salesId, pinId, onDone) {
   if (!confirm('ลบลูกค้ารายนี้? การลบไม่สามารถย้อนกลับได้')) return;
   try {
-    const res = await fetch(`${SB_URL_SALES}/rest/v1/sales_pins?id=eq.${pinId}`, {
-      method: 'DELETE',
-      headers: { 'apikey': SB_KEY_SALES, 'Authorization': 'Bearer ' + SB_KEY_SALES }
-    });
+    // 🔒 same fix as add/edit — now goes through the backend
+    const bu = getBackendUrl();
+    if (!bu) throw new Error('ยังไม่ได้ตั้งค่า Backend URL');
+    const res = await fetch(`${bu}/admin/sales-pins/${pinId}`, { method: 'DELETE' });
     if (!res.ok) throw new Error('ลบไม่สำเร็จ');
     delete _pinsCache[salesId];
     await fetchSalesPins(salesId);
